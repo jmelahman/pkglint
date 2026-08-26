@@ -12,13 +12,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  regenerate:
+  scan:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       # TODO: pin actions by SHA with ratchet before enabling branch protection.
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false # no push token while parsing untrusted AUR content
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -28,6 +30,26 @@ jobs:
           key: aur-snapshots-${{ github.run_id }}
           restore-keys: aur-snapshots-
       - run: go run ./site -maintainer Jamison -top 500 -out docs
+      - uses: actions/upload-artifact@v6
+        with:
+          name: report-card-docs
+          path: docs
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true # docs/.nojekyll must ride along
+
+  publish:
+    needs: scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # TODO: pin actions by SHA with ratchet before enabling branch protection.
+      - uses: actions/checkout@v6 # default token persists — needed for git push
+      - uses: actions/download-artifact@v6
+        with:
+          name: report-card-docs
+          path: docs
       - name: Commit refreshed site
         run: |
           git config user.name "github-actions[bot]"

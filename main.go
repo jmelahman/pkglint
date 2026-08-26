@@ -117,7 +117,7 @@ func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
 	for _, path := range paths {
 		pkg, err := pkgbuild.Load(path)
 		if err != nil {
-			reports = append(reports, report.PackageReport{Name: path, Path: path, Grade: "?", Err: err.Error()})
+			reports = append(reports, report.NewError(path, err))
 			continue
 		}
 		findings := rules.Run(pkg, ignored)

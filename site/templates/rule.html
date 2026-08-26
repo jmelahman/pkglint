@@ -7,8 +7,11 @@
 <body>
 <main>
 <h1><a href="../index.html">AUR Report Card</a> / <a href="index.html">rules</a> / {{.Rule.ID}}</h1>
-<p class="sub"><code>{{.Rule.Name}}</code></p>
+<p class="sub"><code>{{.Rule.Name}}</code> {{template "fixpill" .Rule.FixLevel}}</p>
 <div class="doc"><p>{{.Rule.Doc}}</p></div>
+{{if .Rule.FixLevel.Fixable}}<div class="notice">pkglint can fix this automatically:
+run <code>pkglint {{.Rule.FixLevel.Flag}}</code>{{if not .Rule.FixLevel.Safe}} (behavior-changing,
+so review the result){{end}}. Preview without writing using <code>--diff</code>.</div>{{end}}
 <div class="example">
   <figure class="bad">
     <figcaption>Flagged</figcaption>

@@ -85,7 +85,9 @@ release pinned with a perfectly valid checksum.
 
 `site/` generates a static "AUR Report Card" — grades, per-package finding pages,
 a [rule reference](https://jamison.lahman.dev/pkglint/rules/) with a flagged/preferred
-example for every check, `results.json`, and embeddable SVG badges:
+example for every check, `results.json`, and embeddable SVG badges. Findings whose rule
+has an auto-fix are tagged with a `--fix`/`--unsafe-fix` badge so it's clear at a glance
+what pkglint can rewrite for you:
 
 ```shell
 go run ./site -maintainer Jamison -top 500 -out docs

@@ -26,6 +26,24 @@ const (
 	FixUnsafe
 )
 
+// Fixable reports whether the level has an auto-fix at all.
+func (l FixLevel) Fixable() bool { return l == FixSafe || l == FixUnsafe }
+
+// Safe reports whether the fix is behavior-preserving (applied by --fix).
+func (l FixLevel) Safe() bool { return l == FixSafe }
+
+// Flag is the CLI flag that applies fixes at this level (empty when none).
+func (l FixLevel) Flag() string {
+	switch l {
+	case FixSafe:
+		return "--fix"
+	case FixUnsafe:
+		return "--unsafe-fix"
+	default:
+		return ""
+	}
+}
+
 // Edit is a byte-range replacement within a single unit's Raw source. Start
 // and End are byte offsets into that unit's Raw; Start == End is an insertion.
 type Edit struct {

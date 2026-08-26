@@ -25,11 +25,22 @@ func renderSite(out string, results []siteResult) error {
 		return err
 	}
 
+	ruleIndex := map[string]rules.Rule{}
+	for _, r := range rules.Registry() {
+		ruleIndex[r.ID] = r
+	}
+
 	counts := map[string]int{}
 	findingsTotal := 0
+	fixableTotal := 0
 	for _, r := range results {
 		counts[r.Grade]++
 		findingsTotal += len(r.Findings)
+		for _, f := range r.Findings {
+			if rl, ok := ruleIndex[f.RuleID]; ok && rl.FixLevel.Fixable() {
+				fixableTotal++
+			}
+		}
 	}
 	indexData := map[string]any{
 		"Results":   results,
@@ -37,15 +48,14 @@ func renderSite(out string, results []siteResult) error {
 		"Grades":    []string{"A", "B", "C", "D", "F", "?"},
 		"Total":     len(results),
 		"Findings":  findingsTotal,
+		"Fixable":   fixableTotal,
 		"Generated": time.Now().UTC().Format("2006-01-02 15:04 UTC"),
 	}
 	if err := renderTo(tmpl, "index.html", filepath.Join(out, "index.html"), indexData); err != nil {
 		return err
 	}
 
-	ruleIndex := map[string]rules.Rule{}
-	for _, r := range rules.Registry() {
-		ruleIndex[r.ID] = r
+	for _, r := range ruleIndex {
 		data := map[string]any{"Rule": r}
 		if err := renderTo(tmpl, "rule.html", filepath.Join(out, "rules", r.ID+".html"), data); err != nil {
 			return err

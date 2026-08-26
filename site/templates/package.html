@@ -28,7 +28,8 @@ no opaque code paths that static analysis worries about.</p>
   {{range .R.Findings}}
   <tr>
     <td><span class="sev sev-{{sev .Severity}}">{{sev .Severity}}</span></td>
-    <td><a href="../rules/{{.RuleID}}.html">{{.RuleID}}</a></td>
+    <td><a href="../rules/{{.RuleID}}.html">{{.RuleID}}</a>
+      {{with index $.Rules .RuleID}}{{template "fixpill" .FixLevel}}{{end}}</td>
     <td class="loc">{{.Path}}:{{.Line}}</td>
     <td>{{.Message}}</td>
   </tr>

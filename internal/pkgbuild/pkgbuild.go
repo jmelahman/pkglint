@@ -147,6 +147,15 @@ func (p *Package) extractTopLevel() {
 			s, _ := RenderWord(as.Value, nil)
 			v.Values = []string{s}
 		}
+		// `source+=(...)` appends in bash; overwriting here would hide the
+		// original assignment from every rule. Appending to a name that has no
+		// prior assignment is a plain assignment, as in bash.
+		if as.Append {
+			if prev, ok := p.Vars[v.Name]; ok {
+				p.Vars[v.Name] = mergeAppend(prev, v)
+				return
+			}
+		}
 		p.Vars[v.Name] = v
 	}
 	for _, stmt := range p.PKGBUILD.TopLevel {
@@ -163,6 +172,27 @@ func (p *Package) extractTopLevel() {
 			}
 		}
 	}
+}
+
+// mergeAppend combines a prior top-level assignment with a later `+=` append
+// to the same name. Values are concatenated in source order, matching bash,
+// where `arr+=(x)` appends an element and `str+=x` concatenates text. If
+// either side is an array the merged value is an array; that degenerate
+// mismatch (`x=1; x+=(a b)`) keeps both sets of values rather than dropping
+// any, since a dropped source is a source no rule can see.
+//
+// The result keeps the *first* assignment's Pos and Assign, so it stays a
+// stable identity for byte-offset edits. Consequently auto-fixes and
+// per-element positions anchor to the first assignment: appended elements have
+// no entry in Assign.Array.Elems and fall back to the array's start position.
+func mergeAppend(prev, add *Var) *Var {
+	out := &Var{Name: prev.Name, Pos: prev.Pos, Assign: prev.Assign, Array: prev.Array || add.Array}
+	if out.Array {
+		out.Values = append(append([]string{}, prev.Values...), add.Values...)
+	} else {
+		out.Values = []string{strings.Join(prev.Values, "") + strings.Join(add.Values, "")}
+	}
+	return out
 }
 
 // Scalar returns the rendered value of a scalar variable, expanded against

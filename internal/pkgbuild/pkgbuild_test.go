@@ -162,6 +162,98 @@ func TestExpandScalar(t *testing.T) {
 	})
 }
 
+// TestAppendAssignments pins bash `+=` semantics for top-level assignments.
+// Before append support, a later `source+=(...)` overwrote the base
+// `source=(...)`, so the base entries vanished from every rule that reads
+// Sources() — and vice versa depending on which array makepkg actually used.
+func TestAppendAssignments(t *testing.T) {
+	// Array append is order-preserving: base elements first, appended after.
+	t.Run("array append preserves order", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "source=(\"a\")\nsource+=(\"b\" \"c\")\n")
+		var got []string
+		for _, e := range pkg.Sources() {
+			if e.Arch != "" {
+				t.Errorf("source %q has Arch %q, want \"\"", e.URL, e.Arch)
+			}
+			got = append(got, e.URL)
+		}
+		if want := []string{"a", "b", "c"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("Sources() URLs = %v, want %v", got, want)
+		}
+		if v := pkg.Vars["source"]; !v.Array {
+			t.Errorf("merged source Var has Array=false, want true")
+		}
+	})
+
+	// Appending to an unset name is a plain assignment in bash.
+	t.Run("append with no base assignment", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "source+=(\"only\")\n")
+		srcs := pkg.Sources()
+		if len(srcs) != 1 || srcs[0].URL != "only" {
+			t.Fatalf("Sources() = %+v, want a single entry %q", srcs, "only")
+		}
+	})
+
+	// Checksums must stay index-aligned with sources across the merge, or
+	// makepkg's source/sum pairing and SumsFor disagree.
+	t.Run("checksum append stays index aligned", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "source=(\"a\" \"b\")\nsha256sums=('AAAA')\nsha256sums+=('BBBB')\n")
+		srcs := pkg.Sources()
+		if len(srcs) != 2 {
+			t.Fatalf("Sources() returned %d entries, want 2", len(srcs))
+		}
+		for i, want := range []string{"AAAA", "BBBB"} {
+			if got := pkg.SumsFor(srcs[i]); !reflect.DeepEqual(got, []string{want}) {
+				t.Errorf("SumsFor(index %d) = %v, want [%q]", i, got, want)
+			}
+		}
+	})
+
+	// Scalar `+=` concatenates rather than replacing.
+	t.Run("scalar append concatenates", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "_x=foo\n_x+=bar\n")
+		got, ok := pkg.Scalar("_x")
+		if !ok || got != "foobar" {
+			t.Errorf("Scalar(_x) = (%q, %v), want (%q, true)", got, ok, "foobar")
+		}
+	})
+
+	// Degenerate scalar-then-array mismatch: keep both sets of values as an
+	// array. Dropping either half would hide values from the rules.
+	t.Run("scalar then array append keeps both", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "source=one\nsource+=(\"two\")\n")
+		v := pkg.Vars["source"]
+		if !v.Array {
+			t.Errorf("merged Var has Array=false, want true")
+		}
+		if want := []string{"one", "two"}; !reflect.DeepEqual(v.Values, want) {
+			t.Errorf("merged Values = %v, want %v", v.Values, want)
+		}
+	})
+
+	// The merged Var keeps the first assignment's identity so byte-offset
+	// fixes stay anchored to a real, editable AST node.
+	t.Run("merged var keeps the first assignment identity", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "pkgname=demo\nsource=(\"a\")\nsource+=(\"b\")\n")
+		v := pkg.Vars["source"]
+		if got := int(v.Pos.Line()); got != 2 {
+			t.Errorf("merged Var Pos line = %d, want 2 (the first assignment)", got)
+		}
+		if v.Assign == nil || v.Assign.Append {
+			t.Errorf("merged Var Assign = %+v, want the non-append first assignment", v.Assign)
+		}
+	})
+
+	// Plain `=` reassignment must still overwrite, exactly as before.
+	t.Run("plain reassignment still overwrites", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "source=(\"a\")\nsource=(\"b\")\n")
+		srcs := pkg.Sources()
+		if len(srcs) != 1 || srcs[0].URL != "b" {
+			t.Fatalf("Sources() = %+v, want a single entry %q", srcs, "b")
+		}
+	})
+}
+
 // TestParseSuppressions pins the inline "# pkglint: ignore=" directive parser.
 // Cross-file line collisions are deliberately not covered here.
 func TestParseSuppressions(t *testing.T) {

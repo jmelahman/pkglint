@@ -89,4 +89,4 @@ workflow regenerates it nightly and commits any changes.
 
 ## License
 
-MIT
+GPLv3 — see [LICENSE](LICENSE).

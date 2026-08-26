@@ -31,8 +31,8 @@ bug from the audit:
 |---|-------|-----|--------|------|------------|-----------|--------|
 | [001](001-parser-characterization-tests.md) | Characterization tests for `internal/pkgbuild` | P1 | M | LOW | — | test safety net for 002/003/005 | DONE (048e737) |
 | [002](002-source-append-support.md) | Support `+=` append assignments | P1 | M | MED | 001 | C1 (`source+=`/`depends+=` ignored) | DONE (e2b73a7) |
-| [003](003-source-url-parsing.md) | Correct source-URL fragment/query + per-element positions | P1 | M | MED | 001, ~002 | C2 (VCS-pin false-neg; wrong columns) | TODO |
-| [004](004-scriptlet-parse-errors.md) | Surface unparseable install scriptlets (new PB503) | P1 | S | LOW | — | C4 (root-run scriptlet silently skipped) | TODO |
+| [003](003-source-url-parsing.md) | Correct source-URL fragment/query + per-element positions | P1 | M | MED | 001, ~002 | C2 (VCS-pin false-neg; wrong columns) | DONE (9c3fd52, f4f3c42) |
+| [004](004-scriptlet-parse-errors.md) | Surface unparseable install scriptlets (new PB503) | P1 | S | LOW | — | C4 (root-run scriptlet silently skipped) | DONE (279931a) |
 | [005](005-suppressions-keyed-by-file.md) | Key inline suppressions by (file, line) | P1 | M | MED | 001 | C3 (cross-file suppression bleed) | TODO |
 | [006](006-setuid-octal-parsing.md) | Detect setuid/setgid by octal parse, not leading digit | P1 | S | LOW | — | C7 (PB403 evadable via `04755`/`7755`) | DONE (21a5282) |
 | [007](007-hermeticity-coverage-gaps.md) | Close 3 hermeticity gaps (PB204 `go get`/vendor, PB205 `export`) | P1 | M | MED | — | C8, C12, C9 | DONE (f2b1a7e) |
@@ -42,7 +42,7 @@ bug from the audit:
 | [011](011-site-generator-hardening.md) | Sanitize package names; bound download/decompress | P2 | S–M | LOW | — | SEC4 (path traversal), SEC6 (DoS) | DONE (ebaaefd) |
 | [012](012-ci-credential-separation.md) | Split untrusted scan from credentialed push (site.yml) | P2 | S | LOW | — | SEC3 (co-resident push token) | DONE (55ca6c1) |
 | [013](013-lint-examples-regression-suite.md) | Bad/Good examples become a regression suite | P2 | M | LOW | ~004 | DIRECTION-03 (example-drift guard) | TODO |
-| [014](014-sarif-output.md) | Add `--format=sarif` (SARIF 2.1.0) | P2 | M | LOW | ~009, ~010 | DIRECTION-02 (interoperability) | TODO |
+| [014](014-sarif-output.md) | Add `--format=sarif` (SARIF 2.1.0) | P2 | M | LOW | ~009, ~010 | DIRECTION-02 (interoperability) | DONE (15aa29e) |
 
 `~` = "sequence after if landing both, but not a hard dependency."
 Executors: flip a row's **Status** to `DONE` (with the merge commit) when its plan

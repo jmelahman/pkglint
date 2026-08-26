@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -36,6 +37,24 @@ const (
 
 	maxSnapshotFile  = 1 << 20 // per-file extraction cap
 	maxSnapshotFiles = 64
+)
+
+// Ceilings on untrusted downloads. These are DoS backstops, not correctness
+// limits: they exist so a hostile, MITM'd, or corrupt response cannot fill the
+// CI disk or exhaust memory. Both sit far above real data, measured
+// 2026-08-26: packages-meta-ext-v1.json.gz was 14,002,064 B (13.4 MiB)
+// compressed and 72,758,642 B (69.4 MiB) decompressed, and package snapshot
+// tarballs are kilobytes. They are vars, not consts, so tests can lower them.
+var (
+	// maxDownloadBytes caps any single HTTP body written to disk — ~19x the
+	// real metadata dump, and orders of magnitude above any snapshot.
+	maxDownloadBytes int64 = 256 << 20 // 256 MiB
+
+	// maxMetaDecompressed caps the decompressed metadata fed to the JSON
+	// decoder, guarding against a gzip bomb — ~14x the real dump. Truncating a
+	// legitimate dump would surface as a JSON decode error, so keep the
+	// headroom generous.
+	maxMetaDecompressed int64 = 1 << 30 // 1 GiB
 )
 
 type metaPackage struct {
@@ -121,6 +140,12 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 		return err
 	}
 	for _, r := range results {
+		// selectSeed already filtered these; re-check at the write site so a
+		// name arriving by any other route still cannot escape out/badge.
+		if !safeBase(r.Name) {
+			log.Printf("skipping badge for unsafe name %q", r.Name)
+			continue
+		}
 		if err := os.WriteFile(filepath.Join(out, "badge", r.Name+".svg"), []byte(badgeSVG(r.Grade)), 0o644); err != nil {
 			return err
 		}
@@ -147,18 +172,45 @@ func loadMeta(cache string) ([]metaPackage, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer gz.Close()
+	return decodeMeta(gz)
+}
+
+// decodeMeta decodes the metadata JSON from r, reading at most
+// maxMetaDecompressed bytes so a gzip bomb cannot exhaust memory. A truncated
+// stream surfaces as a JSON decode error, which is the safe failure mode.
+func decodeMeta(r io.Reader) ([]metaPackage, error) {
 	var meta []metaPackage
-	if err := json.NewDecoder(gz).Decode(&meta); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r, maxMetaDecompressed)).Decode(&meta); err != nil {
 		return nil, err
 	}
 	return meta, nil
 }
 
+// baseRe matches the shape the AUR already constrains package bases to: a
+// leading alphanumeric followed by alphanumerics and @._+- only.
+var baseRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@._+-]*$`)
+
+// safeBase reports whether an AUR package base is safe to use as a single path
+// component and URL segment. Anything else (slashes, "..", leading dot,
+// control characters) is treated as hostile metadata and dropped: the base
+// becomes a filename under the published site tree, so the generator must not
+// assume upstream validated it.
+func safeBase(name string) bool {
+	return name != ".." && baseRe.MatchString(name) && !strings.Contains(name, "..")
+}
+
 // selectSeed picks one representative per package base: everything by
-// maintainer, plus the top-N bases by votes.
+// maintainer, plus the top-N bases by votes. Bases with unsafe names are
+// dropped here, the single choke point, so no unsafe name reaches scanAll,
+// results.json, the rendered links, or any output filename.
 func selectSeed(meta []metaPackage, maintainer string, top int) []metaPackage {
 	byBase := map[string]metaPackage{}
 	for _, m := range meta {
+		if !safeBase(m.PackageBase) {
+			log.Printf("skipping package base with unsafe name %q", m.PackageBase)
+			continue
+		}
 		cur, ok := byBase[m.PackageBase]
 		if !ok || m.NumVotes > cur.NumVotes {
 			byBase[m.PackageBase] = m
@@ -337,7 +389,13 @@ func download(url, path string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	// Read one byte past the ceiling so an over-long body is detected rather
+	// than silently truncated into a "successful" download.
+	n, err := io.Copy(f, io.LimitReader(resp.Body, maxDownloadBytes+1))
+	if err == nil && n > maxDownloadBytes {
+		err = fmt.Errorf("download exceeded %d bytes: %s", maxDownloadBytes, url)
+	}
+	if err != nil {
 		f.Close()
 		os.Remove(tmp)
 		return err

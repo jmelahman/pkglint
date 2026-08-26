@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,12 @@ func renderSite(out string, results []siteResult) error {
 	}
 
 	for _, r := range results {
+		// selectSeed already filtered these; re-check at the write site so a
+		// name arriving by any other route still cannot escape out/package.
+		if !safeBase(r.Name) {
+			log.Printf("skipping page for unsafe name %q", r.Name)
+			continue
+		}
 		data := map[string]any{"R": r, "Rules": ruleIndex}
 		if err := renderTo(tmpl, "package.html", filepath.Join(out, "package", r.Name+".html"), data); err != nil {
 			return err

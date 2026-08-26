@@ -30,7 +30,9 @@ var integrityRules = []Rule{
 		Doc: "A VCS source without `#commit=` pins to a mutable reference: branches move and tags " +
 			"can be re-pointed by anyone with push access (or a compromised forge account). Pinning " +
 			"the exact commit hash makes the fetched tree tamper-evident.",
-		Check: checkVCSPins,
+		Check:    checkVCSPins,
+		FixLevel: FixSafe,
+		Fix:      fixVCSPins,
 	},
 	{
 		ID:   "PB104",
@@ -63,6 +65,149 @@ var integrityRules = []Rule{
 			"contents cannot be reviewed or linted.",
 		Check: checkMissingInstall,
 	},
+	{
+		ID:   "PB108",
+		Name: "makepkg-config-override",
+		Doc: "Assigning a makepkg.conf variable at the top level reconfigures makepkg itself. " +
+			"VCSCLIENTS and the COMPRESS* arrays are executed as commands, so overriding them injects " +
+			"code into the fetch and packaging steps; PACKAGER/GPGKEY spoof package identity and " +
+			"BUILDENV/INTEGRITY_CHECK can silently disable verification. Like DLAGENTS (PB106), these " +
+			"belong in makepkg.conf, never in a package.",
+		Check: checkMakepkgConfOverride,
+	},
+	{
+		ID:   "PB109",
+		Name: "forge-owner-mismatch",
+		Doc: "A source hosted on the same forge as the project url but under a different owner is a " +
+			"common repackaging vector: recent AUR compromises kept github.com and changed only the " +
+			"account in the path, which a host-only comparison (PB105) misses. Often a legitimate fork " +
+			"or mirror — hence a warning, not an error.",
+		Check: checkForgeOwner,
+	},
+	{
+		ID:   "PB110",
+		Name: "checksum-count-mismatch",
+		Doc: "makepkg pairs each source with the checksum at the same index, so a sums array of the " +
+			"wrong length means some sources are unverified (or verified against the wrong digest). " +
+			"makepkg errors on this; regenerate with updpkgsums.",
+		Check: checkChecksumCounts,
+	},
+}
+
+// makepkgConfExec are makepkg.conf variables whose values makepkg executes as
+// commands; overriding them at the package level is code injection.
+var makepkgConfExec = map[string]string{
+	"VCSCLIENTS":  "makepkg runs VCSCLIENTS entries to fetch VCS sources",
+	"COMPRESSZST": "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSGZ":  "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSXZ":  "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSBZ2": "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSLRZ": "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSLZO": "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSZ":   "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSLZ4": "makepkg runs the COMPRESS* command to package the build",
+	"COMPRESSLZ":  "makepkg runs the COMPRESS* command to package the build",
+	"PACMAN_AUTH": "PACMAN_AUTH is run to escalate privileges during packaging",
+}
+
+// makepkgConfTrust are makepkg.conf variables that affect package identity,
+// output location, or verification when overridden at the package level.
+var makepkgConfTrust = map[string]bool{
+	"PACKAGER": true, "GPGKEY": true, "BUILDENV": true, "INTEGRITY_CHECK": true,
+	"PKGEXT": true, "SRCEXT": true, "PKGDEST": true, "SRCDEST": true, "SRCPKGDEST": true,
+	"BUILDDIR": true, "OPTIONS": true, "PURGE_TARGETS": true, "PACMAN": true,
+	"STRIP_BINARIES": true, "STRIP_SHARED": true, "STRIP_STATIC": true,
+}
+
+func checkMakepkgConfOverride(ctx *Context) []Finding {
+	var out []Finding
+	for name, v := range ctx.Pkg.Vars {
+		if why, ok := makepkgConfExec[name]; ok {
+			out = append(out, findingAt("PB108", Critical, ctx.Pkg.PKGBUILD.Path, v.Pos,
+				"%s is set at the package level: %s", name, why))
+		} else if makepkgConfTrust[name] {
+			out = append(out, findingAt("PB108", Warn, ctx.Pkg.PKGBUILD.Path, v.Pos,
+				"%s overrides a makepkg.conf setting from within the package", name))
+		}
+	}
+	return out
+}
+
+var knownForges = map[string]bool{
+	"github.com": true, "gitlab.com": true, "codeberg.org": true,
+	"bitbucket.org": true, "git.sr.ht": true,
+}
+
+// forgeOwner returns the lowercased owner segment of a forge URL path.
+func forgeOwner(rawurl string) (string, bool) {
+	_, rest, ok := strings.Cut(rawurl, "://")
+	if !ok {
+		return "", false
+	}
+	slash := strings.IndexByte(rest, '/')
+	if slash < 0 {
+		return "", false
+	}
+	parts := strings.Split(strings.Trim(rest[slash:], "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", false
+	}
+	return strings.ToLower(strings.TrimSuffix(parts[0], ".git")), true
+}
+
+func checkForgeOwner(ctx *Context) []Finding {
+	urlVal, ok := ctx.Pkg.Scalar("url")
+	if !ok {
+		return nil
+	}
+	urlHost := hostOf(urlVal)
+	if !knownForges[urlHost] {
+		return nil
+	}
+	urlOwner, ok := forgeOwner(urlVal)
+	if !ok {
+		return nil
+	}
+	var out []Finding
+	for _, e := range ctx.Pkg.Sources() {
+		if e.Host() != urlHost {
+			continue // different host is PB105's concern
+		}
+		owner, ok := forgeOwner(e.URL)
+		if !ok || owner == urlOwner {
+			continue
+		}
+		out = append(out, findingAt("PB109", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
+			"source is under %q on %s but the project url is under %q; verify this is the same project",
+			owner, urlHost, urlOwner))
+	}
+	return out
+}
+
+func checkChecksumCounts(ctx *Context) []Finding {
+	counts := map[string]int{}
+	for _, e := range ctx.Pkg.Sources() {
+		counts[e.Arch]++
+	}
+	var out []Finding
+	for arch, n := range counts {
+		sums := ctx.Pkg.Checksums(arch)
+		for _, algo := range sumAlgoNames {
+			vals, ok := sums[algo]
+			if !ok || len(vals) == n {
+				continue
+			}
+			name := algo + "sums"
+			if arch != "" {
+				name += "_" + arch
+			}
+			v := ctx.Pkg.Vars[name]
+			out = append(out, findingAt("PB110", Error, ctx.Pkg.PKGBUILD.Path, v.Pos,
+				"%s has %d checksum(s) but there are %d source(s) for this arch; makepkg pairs them by index",
+				name, len(vals), n))
+		}
+	}
+	return out
 }
 
 func isSkip(s string) bool { return strings.EqualFold(s, "SKIP") }

@@ -56,6 +56,12 @@ type Rule struct {
 	Doc   string // one-paragraph explanation, rendered on the report card site
 	Check func(*Context) []Finding
 
+	// FixLevel classifies the rule's auto-fix (FixNone when it has none); Fix
+	// computes the edits. A FixSafe fix runs under --fix, a FixUnsafe fix only
+	// under --unsafe-fix.
+	FixLevel FixLevel
+	Fix      Fixer
+
 	// Bad and Good are illustrative PKGBUILD snippets shown on the report
 	// card site: Bad is a construct the rule flags, Good the preferred
 	// alternative. Attached from the examples table in Registry().

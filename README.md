@@ -31,6 +31,10 @@ pkglint [flags] [path ...]     # paths are package dirs or PKGBUILD files (defau
   --fail-on SEVERITY           # exit 1 at or above: info, warn, error (default), critical, never
   --ignore PB105,PB206         # disable rules
   --rules                      # list every rule with its documentation
+  --fix                        # apply safe auto-fixes in place
+  --unsafe-fix                 # also apply behavior-changing fixes (implies --fix)
+  --diff                       # with --fix/--unsafe-fix: show changes instead of writing
+  --offline                    # with --fix: skip fixes needing network (e.g. VCS ref resolution)
 ```
 
 Suppress a reviewed, intentional finding inline:
@@ -40,14 +44,30 @@ Suppress a reviewed, intentional finding inline:
 go build -o "$pkgname" .
 ```
 
+### Auto-fixing
+
+`--fix` rewrites what it can and prints every change; `--diff` previews without
+writing. Fixes come in two tiers:
+
+| Tier | Flag | Rules | What it does |
+|------|------|-------|--------------|
+| Safe | `--fix` | PB103, PB203, PB205 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings |
+| Unsafe | `--unsafe-fix` | PB204, PB206, PB403 | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; drop setuid/setgid mode bits |
+
+Safe fixes preserve behavior or restore a security default; unsafe fixes are
+mechanical but change what the build does, so review them. An inline
+`# pkglint: ignore=` on a finding's line also suppresses its fix. Findings whose
+remediation isn't a mechanical rewrite (checksums, `.SRCINFO`) print a one-line
+suggestion (`updpkgsums`, `makepkg --printsrcinfo`) instead.
+
 ## Rules
 
 | Group | Rules | What they catch |
 |-------|-------|-----------------|
-| Integrity | PB101–PB107 | SKIP/weak checksums, unpinned VCS sources, unencrypted transports, source/url domain mismatches, DLAGENTS overrides |
+| Integrity | PB101–PB110 | SKIP/weak checksums, unpinned VCS sources, unencrypted transports, source/url domain and forge-owner mismatches, DLAGENTS and other makepkg.conf overrides, checksum-count mismatches, missing install scripts |
 | Hermeticity | PB201–PB206 | network access outside `prepare()`, `pip` without `--require-hashes`, unlocked `cargo`, implicit Go module downloads, disabled checksum databases |
-| Execution | PB301–PB307 | top-level code, `eval`, decode-and-execute, download-and-execute (including `eval "$(curl ...)"` and `source <(wget ...)"` variants), `/dev/tcp`, unresolvable command names, embedded payloads |
-| Filesystem | PB401–PB403 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files |
+| Execution | PB301–PB309 | top-level code, `eval`, decode-and-execute, download-and-execute (including `eval "$(curl ...)"` and `source <(wget ...)"` variants), `/dev/tcp`, unresolvable command names, embedded payloads, makepkg-internal function overrides, hidden bidi/zero-width characters |
+| Filesystem | PB401–PB405 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files, install steps that skip `$pkgdir`, writes to pacman/dynamic-linker/sudoers config |
 | Scriptlets | PB501–PB502 | network access and persistence (crontabs, systemd units, shell profiles, login-capable users) in `.install` files running as root |
 | Consistency | PB601–PB602 | PKGBUILD / .SRCINFO drift, network access in `pkgver()` |
 

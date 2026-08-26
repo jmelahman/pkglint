@@ -17,7 +17,7 @@ keywords = [
 ]
 classifiers = [
     "Programming Language :: Go",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX",
     "Operating System :: MacOS",
 ]

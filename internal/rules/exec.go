@@ -62,6 +62,106 @@ var execRules = []Rule{
 			"script are how encoded payloads look at rest. Flagged for human review.",
 		Check: checkObfuscatedLiterals,
 	},
+	{
+		ID:   "PB308",
+		Name: "makepkg-function-override",
+		Doc: "makepkg sources the PKGBUILD after defining its own internal functions, so a top-level " +
+			"function that reuses an internal name (download_sources, verify_integrity_one, " +
+			"create_package, …) silently replaces makepkg's implementation — a way to disable integrity " +
+			"checks or tamper with fetching and packaging. Package functions are prepare/build/check/" +
+			"package/package_*/pkgver only.",
+		Check: checkMakepkgFuncOverride,
+	},
+	{
+		ID:   "PB309",
+		Name: "hidden-unicode",
+		Doc: "Bidirectional-override and invisible/zero-width characters can make the rendered source " +
+			"differ from what the shell executes (the \"Trojan Source\" class of attacks). A PKGBUILD is " +
+			"ASCII shell; these controls have no legitimate place in it.",
+		Check: checkHiddenUnicode,
+	},
+}
+
+// criticalMakepkgFuncs are libmakepkg/makepkg internal functions whose behavior
+// governs integrity verification, source fetching/extraction, or packaging.
+// Redefining any of them at the top level of a PKGBUILD hijacks makepkg itself.
+var criticalMakepkgFuncs = map[string]bool{
+	// integrity & signature verification
+	"check_checksums": true, "check_source_integrity": true, "check_pgpsigs": true,
+	"check_option": true, "verify_file_signature": true, "verify_git_signature": true,
+	"verify_integrity_one": true, "verify_integrity_sums": true, "source_has_signatures": true,
+	// download
+	"download_sources": true, "download_file": true, "download_git": true,
+	"download_svn": true, "download_hg": true, "download_bzr": true,
+	"download_fossil": true, "download_local": true,
+	"get_downloadclient": true, "get_vcsclient": true,
+	// source loading & extraction
+	"extract_sources": true, "extract_file": true, "extract_git": true,
+	"extract_svn": true, "extract_hg": true, "extract_bzr": true, "extract_fossil": true,
+	"source_buildfile": true, "source_safe": true, "source_files": true,
+	"source_makepkg_config": true,
+	// packaging & phase runners
+	"create_package": true, "create_package_signatures": true, "create_signature": true,
+	"run_function": true, "run_function_safe": true, "run_pacman": true,
+	"run_prepare": true, "run_build": true, "run_check": true, "run_verify": true,
+	"run_package": true, "run_single_packaging": true, "run_split_packaging": true,
+	"write_srcinfo": true,
+}
+
+func checkMakepkgFuncOverride(ctx *Context) []Finding {
+	var out []Finding
+	for name, fd := range ctx.Pkg.PKGBUILD.Functions {
+		if criticalMakepkgFuncs[name] {
+			out = append(out, findingAt("PB308", Critical, ctx.Pkg.PKGBUILD.Path, fd.Pos(),
+				"top-level function %q shadows a makepkg internal of the same name, replacing its behavior", name))
+		}
+	}
+	return out
+}
+
+// bidiControls are directional-override characters that can reorder how a line
+// renders without changing what the shell executes.
+var bidiControls = map[rune]string{
+	0x202A: "U+202A LEFT-TO-RIGHT EMBEDDING", 0x202B: "U+202B RIGHT-TO-LEFT EMBEDDING",
+	0x202C: "U+202C POP DIRECTIONAL FORMATTING", 0x202D: "U+202D LEFT-TO-RIGHT OVERRIDE",
+	0x202E: "U+202E RIGHT-TO-LEFT OVERRIDE", 0x2066: "U+2066 LEFT-TO-RIGHT ISOLATE",
+	0x2067: "U+2067 RIGHT-TO-LEFT ISOLATE", 0x2068: "U+2068 FIRST STRONG ISOLATE",
+	0x2069: "U+2069 POP DIRECTIONAL ISOLATE",
+}
+
+// invisibleChars are zero-width or otherwise non-rendering characters that can
+// hide text or split tokens invisibly.
+var invisibleChars = map[rune]string{
+	0x200B: "U+200B ZERO WIDTH SPACE", 0x200C: "U+200C ZERO WIDTH NON-JOINER",
+	0x200D: "U+200D ZERO WIDTH JOINER", 0x2060: "U+2060 WORD JOINER",
+	0xFEFF: "U+FEFF ZERO WIDTH NO-BREAK SPACE", 0x00AD: "U+00AD SOFT HYPHEN",
+}
+
+func checkHiddenUnicode(ctx *Context) []Finding {
+	var out []Finding
+	units := ctx.Pkg.Units()
+	for i := range units {
+		u := &units[i]
+		for lineNo, line := range strings.Split(string(u.Raw), "\n") {
+			for _, r := range line {
+				if name, ok := bidiControls[r]; ok {
+					out = append(out, Finding{RuleID: "PB309", Severity: Error,
+						Message: "bidirectional control character " + name + " can hide what the shell runs",
+						Path:    u.Path, Line: lineNo + 1, Col: 1})
+					break
+				}
+			}
+			for _, r := range line {
+				if name, ok := invisibleChars[r]; ok {
+					out = append(out, Finding{RuleID: "PB309", Severity: Warn,
+						Message: "invisible character " + name + " embedded in source",
+						Path:    u.Path, Line: lineNo + 1, Col: 1})
+					break
+				}
+			}
+		}
+	}
+	return out
 }
 
 // Top-level builtins that only manipulate shell/package state.

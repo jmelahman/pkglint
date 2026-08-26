@@ -45,6 +45,25 @@ source=("https://example.com/foo-$pkgver.tar.gz")`,
 		Bad:  `install="foo.install"   # ...but no foo.install is committed alongside the PKGBUILD`,
 		Good: `install="foo.install"   # foo.install ships in the same directory as the PKGBUILD`,
 	},
+	"PB108": {
+		Bad: `VCSCLIENTS=('git::/tmp/evil-git')   # makepkg runs this to fetch git sources
+source=("git+https://github.com/example/foo.git")`,
+		Good: `# Leave makepkg.conf variables to makepkg.conf; declare only package fields here.
+source=("git+https://github.com/example/foo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")`,
+	},
+	"PB109": {
+		Bad: `url="https://github.com/upstream/foo"
+source=("git+https://github.com/somebodyelse/foo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")`,
+		Good: `url="https://github.com/upstream/foo"
+source=("git+https://github.com/upstream/foo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")`,
+	},
+	"PB110": {
+		Bad: `source=("a.tar.gz" "b.tar.gz")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+		Good: `source=("a.tar.gz" "b.tar.gz")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
+            '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')`,
+	},
 	"PB201": {
 		Bad: `build() {
   curl -O https://example.com/extra-asset.bin
@@ -159,6 +178,23 @@ build() {
   make   # keep commands as readable text, not escape sequences
 }`,
 	},
+	"PB308": {
+		Bad: `# Redefining a makepkg internal disables its integrity checks:
+verify_integrity_one() { return 0; }
+build() { make; }`,
+		Good: `# Only define package functions; leave makepkg's internals to makepkg.
+build() { make; }
+package() { make DESTDIR="$pkgdir" install; }`,
+	},
+	"PB309": {
+		Bad: "build() {\n" +
+			"  # the RLO below reverses how the rest of the line renders\n" +
+			"  make ‮install\n" +
+			"}",
+		Good: `build() {
+  make install   # plain ASCII, renders exactly as it executes
+}`,
+	},
 	"PB401": {
 		Bad: `package() {
   install -Dm644 foo.conf /etc/foo.conf   # writes to the live filesystem
@@ -181,6 +217,22 @@ build() {
 }`,
 		Good: `package() {
   install -Dm755 foo "$pkgdir/usr/bin/foo"
+}`,
+	},
+	"PB404": {
+		Bad: `package() {
+  make install   # writes into the builder's live filesystem
+}`,
+		Good: `package() {
+  make DESTDIR="$pkgdir" install
+}`,
+	},
+	"PB405": {
+		Bad: `post_install() {
+  echo 'SigLevel = Never' >> /etc/pacman.conf   # disables signature checks system-wide
+}`,
+		Good: `post_install() {
+  echo "If you maintain a custom repo, add it to /etc/pacman.conf yourself."
 }`,
 	},
 	"PB501": {

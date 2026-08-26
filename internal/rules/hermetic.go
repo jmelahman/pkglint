@@ -29,7 +29,9 @@ var hermeticRules = []Rule{
 		Doc: "cargo without --locked (or --frozen/--offline) may resolve and fetch dependency " +
 			"versions that differ from the committed Cargo.lock, so the built artifact is not " +
 			"reproducible and unreviewed code can enter the build.",
-		Check: checkCargoLocked,
+		Check:    checkCargoLocked,
+		FixLevel: FixSafe,
+		Fix:      fixCargoLocked,
 	},
 	{
 		ID:   "PB204",
@@ -38,7 +40,9 @@ var hermeticRules = []Rule{
 			"That download happens inside build() with no makepkg-level verification (go.sum " +
 			"verifies content, but resolution still depends on network state). Vendor the modules, " +
 			"or run `go mod download` in prepare().",
-		Check: checkGoDownloads,
+		Check:    checkGoDownloads,
+		FixLevel: FixUnsafe,
+		Fix:      fixGoDownloads,
 	},
 	{
 		ID:   "PB205",
@@ -46,14 +50,18 @@ var hermeticRules = []Rule{
 		Doc: "GOFLAGS/GONOSUMCHECK/GOSUMDB/GOINSECURE settings that disable Go's module checksum " +
 			"database or allow insecure transports remove the only integrity verification Go " +
 			"downloads get inside a build.",
-		Check: checkGoEnvWeakening,
+		Check:    checkGoEnvWeakening,
+		FixLevel: FixSafe,
+		Fix:      fixGoEnvWeakening,
 	},
 	{
 		ID:   "PB206",
 		Name: "npm-install-unlocked",
 		Doc: "`npm install` may rewrite the dependency tree; `npm ci` (and yarn --immutable) " +
 			"installs exactly what the committed lockfile specifies and fails otherwise.",
-		Check: checkNpmCI,
+		Check:    checkNpmCI,
+		FixLevel: FixUnsafe,
+		Fix:      fixNpmCI,
 	},
 }
 
@@ -187,28 +195,31 @@ func checkCargoLocked(ctx *Context) []Finding {
 	return out
 }
 
-func checkGoDownloads(ctx *Context) []Finding {
-	// Consider the build hermetic if the PKGBUILD vendors modules or
-	// pre-fetches them in prepare().
-	vendored := false
+// goVendored reports whether the PKGBUILD vendors Go modules or pre-fetches
+// them in prepare(), making implicit build-phase downloads unnecessary.
+func goVendored(ctx *Context) bool {
 	for _, c := range ctx.CommandsNamed("go") {
 		if c.HasArg("-mod=vendor") || (c.Subcommand() == "mod" && (c.HasArg("vendor") || c.HasArg("download")) && !c.InBuildPhase()) {
-			vendored = true
+			return true
 		}
 	}
 	for _, v := range ctx.Pkg.Vars {
 		for _, val := range v.Values {
 			if strings.Contains(val, "-mod=vendor") {
-				vendored = true
+				return true
 			}
 		}
 	}
 	for _, e := range ctx.Pkg.Sources() {
 		if strings.Contains(strings.ToLower(e.Expanded), "vendor") {
-			vendored = true
+			return true
 		}
 	}
-	if vendored {
+	return false
+}
+
+func checkGoDownloads(ctx *Context) []Finding {
+	if goVendored(ctx) {
 		return nil
 	}
 	var out []Finding
@@ -226,25 +237,30 @@ func checkGoDownloads(ctx *Context) []Finding {
 	return out
 }
 
+// goEnvWeakens reports whether an environment assignment disables Go's module
+// checksum database or permits insecure module transports, with a message
+// describing the weakening.
+func goEnvWeakens(name, value string) (msg string, bad bool) {
+	switch name {
+	case "GOSUMDB":
+		if strings.TrimSpace(value) == "off" {
+			return "GOSUMDB=off disables Go's checksum database", true
+		}
+	case "GONOSUMCHECK", "GONOSUMDB":
+		return name + " disables Go module checksum verification", true
+	case "GOINSECURE":
+		return "GOINSECURE allows fetching modules over insecure transports", true
+	case "GOFLAGS":
+		if strings.Contains(value, "-insecure") {
+			return "GOFLAGS contains -insecure", true
+		}
+	}
+	return "", false
+}
+
 func checkGoEnvWeakening(ctx *Context) []Finding {
 	var out []Finding
-	bad := func(name, value string) (string, bool) {
-		switch name {
-		case "GOSUMDB":
-			if strings.TrimSpace(value) == "off" {
-				return "GOSUMDB=off disables Go's checksum database", true
-			}
-		case "GONOSUMCHECK", "GONOSUMDB":
-			return name + " disables Go module checksum verification", true
-		case "GOINSECURE":
-			return "GOINSECURE allows fetching modules over insecure transports", true
-		case "GOFLAGS":
-			if strings.Contains(value, "-insecure") {
-				return "GOFLAGS contains -insecure", true
-			}
-		}
-		return "", false
-	}
+	bad := goEnvWeakens
 	for name, v := range ctx.Pkg.Vars {
 		if len(v.Values) == 1 {
 			if msg, isBad := bad(name, v.Values[0]); isBad {

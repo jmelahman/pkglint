@@ -189,6 +189,45 @@ sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`
 	t.Run("PB107 missing install script", func(t *testing.T) {
 		expectRule(t, "PB107", map[string]string{"PKGBUILD": pkgbuildWith("", `install=demo.install`)})
 	})
+	t.Run("PB108 command-executing makepkg.conf override", func(t *testing.T) {
+		expectRule(t, "PB108", map[string]string{"PKGBUILD": pkgbuildWith("",
+			`VCSCLIENTS=('git::/tmp/evil-git')`)})
+	})
+	t.Run("PB108 trust-affecting override", func(t *testing.T) {
+		expectRule(t, "PB108", map[string]string{"PKGBUILD": pkgbuildWith("",
+			`PACKAGER='Trusted Maintainer <root@example.com>'`)})
+	})
+	t.Run("PB108 leaves ordinary build vars alone", func(t *testing.T) {
+		expectNoRule(t, "PB108", map[string]string{"PKGBUILD": pkgbuildWith("",
+			`MAKEFLAGS="-j$(nproc)"`)})
+	})
+	t.Run("PB109 same forge, different owner", func(t *testing.T) {
+		expectRule(t, "PB109", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://github.com/upstream/demo'
+source=("git+https://github.com/somebodyelse/demo.git#commit=0123abc")
+sha256sums=('SKIP')`, "")})
+	})
+	t.Run("PB109 same forge and owner is fine", func(t *testing.T) {
+		expectNoRule(t, "PB109", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://github.com/upstream/demo'
+source=("git+https://github.com/upstream/demo.git#commit=0123abc")
+sha256sums=('SKIP')`, "")})
+	})
+	t.Run("PB110 checksum count mismatch", func(t *testing.T) {
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("https://example.com/a.tar.gz" "https://example.com/b.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 matched counts are fine", func(t *testing.T) {
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith("", "")})
+	})
 }
 
 func TestHermeticRules(t *testing.T) {
@@ -319,6 +358,24 @@ build() {
   p=$'\x62\x61\x73\x68\x20\x2d\x63\x20\x65\x76\x69\x6c'
 }`)})
 	})
+	t.Run("PB308 overrides a makepkg internal", func(t *testing.T) {
+		expectRule(t, "PB308", map[string]string{"PKGBUILD": pkgbuildWith("", `
+verify_integrity_one() {
+  return 0
+}`)})
+	})
+	t.Run("PB308 ordinary package functions are fine", func(t *testing.T) {
+		expectNoRule(t, "PB308", map[string]string{"PKGBUILD": cleanPKGBUILD})
+	})
+	t.Run("PB309 bidi override control", func(t *testing.T) {
+		expectRule(t, "PB309", map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  make ‮install\n}")})
+	})
+	t.Run("PB309 zero-width character", func(t *testing.T) {
+		expectRule(t, "PB309", map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  ma​ke\n}")})
+	})
+	t.Run("PB309 plain ASCII is clean", func(t *testing.T) {
+		expectNoRule(t, "PB309", map[string]string{"PKGBUILD": cleanPKGBUILD})
+	})
 }
 
 // Adversarial variants that trivially evade regex scanners but not an AST.
@@ -392,6 +449,68 @@ build() {
 		expectRule(t, "PB403", map[string]string{"PKGBUILD": pkgbuildWith("", `
 package() {
   chmod u+s "$pkgdir/usr/bin/demo"
+}`)})
+	})
+	t.Run("PB403 setuid install mode", func(t *testing.T) {
+		expectRule(t, "PB403", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  install -Dm4755 demo "$pkgdir/usr/bin/demo"
+}`)})
+	})
+	t.Run("PB403 ordinary install mode fine", func(t *testing.T) {
+		expectNoRule(t, "PB403", map[string]string{"PKGBUILD": cleanPKGBUILD})
+	})
+	t.Run("PB404 make install without destdir", func(t *testing.T) {
+		expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  make install
+}`)})
+	})
+	t.Run("PB404 DESTDIR arg is fine", func(t *testing.T) {
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  make DESTDIR="$pkgdir" install
+}`)})
+	})
+	t.Run("PB404 exported DESTDIR is fine", func(t *testing.T) {
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  export DESTDIR="$pkgdir"
+  ninja -C build install
+}`)})
+	})
+	t.Run("PB404 cmake --install with prefix is fine", func(t *testing.T) {
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  cmake --install build --prefix "$pkgdir/usr"
+}`)})
+	})
+	t.Run("PB404 install outside package() ignored", func(t *testing.T) {
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  make install
+}`)})
+	})
+	t.Run("PB405 write to pacman.conf", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  echo 'SigLevel = Never' >> /etc/pacman.conf
+}`)}
+		expectRule(t, "PB405", files)
+		expectNoRule(t, "PB401", files) // PB405 owns sensitive paths; no double report
+	})
+	t.Run("PB405 pacman-key", func(t *testing.T) {
+		expectRule(t, "PB405", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=demo.install"),
+			"demo.install": `post_install() {
+  pacman-key --recv-keys DEADBEEF
+}`,
+		})
+	})
+	t.Run("PB405 staged pacman.conf under pkgdir is fine", func(t *testing.T) {
+		expectNoRule(t, "PB405", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  install -Dm644 pacman.conf "$pkgdir/etc/pacman.conf"
 }`)})
 	})
 }

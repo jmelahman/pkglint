@@ -221,6 +221,23 @@ func manualSuggestions(pkg *pkgbuild.Package, ignore map[string]bool) []string {
 	return out
 }
 
+// gitTransports are the URL schemes `git ls-remote` may be pointed at. The
+// URL comes from an untrusted source=() entry, so everything else is refused:
+// notably file:// and ext:: (which git treats as "run this command"), and
+// anything without a scheme (which git could read as an option or a local
+// path). These cover every transport a real AUR git source uses — makepkg's
+// git+ prefix strips to one of them, and scp-style git@host:repo URLs never
+// reach here because they parse as local sources.
+var gitTransports = map[string]bool{"https": true, "http": true, "git": true, "ssh": true}
+
+// allowedGitURL reports whether url names a remote over an allowed transport.
+// Schemes are case-insensitive per RFC 3986; the URL itself is passed to git
+// unchanged.
+func allowedGitURL(url string) bool {
+	scheme, _, ok := strings.Cut(url, "://")
+	return ok && gitTransports[strings.ToLower(scheme)]
+}
+
 // resolveGitRef resolves a git tag or branch name on a remote to its commit
 // hash via `git ls-remote` — the only network access the fix path performs.
 func resolveGitRef(rawurl, ref string) (string, error) {
@@ -230,9 +247,14 @@ func resolveGitRef(rawurl, ref string) (string, error) {
 			url = url[plus+1:] // git+https://… → https://…
 		}
 	}
+	if !allowedGitURL(url) {
+		return "", fmt.Errorf("refusing to resolve ref over unsupported URL scheme: %q", url)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "ls-remote", url, ref).Output()
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", url, ref)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0") // never block on credentials
+	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}

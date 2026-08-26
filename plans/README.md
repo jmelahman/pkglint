@@ -30,13 +30,13 @@ bug from the audit:
 | # | Title | Pri | Effort | Risk | Depends on | Addresses | Status |
 |---|-------|-----|--------|------|------------|-----------|--------|
 | [001](001-parser-characterization-tests.md) | Characterization tests for `internal/pkgbuild` | P1 | M | LOW | — | test safety net for 002/003/005 | DONE (048e737) |
-| [002](002-source-append-support.md) | Support `+=` append assignments | P1 | M | MED | 001 | C1 (`source+=`/`depends+=` ignored) | TODO |
+| [002](002-source-append-support.md) | Support `+=` append assignments | P1 | M | MED | 001 | C1 (`source+=`/`depends+=` ignored) | DONE (e2b73a7) |
 | [003](003-source-url-parsing.md) | Correct source-URL fragment/query + per-element positions | P1 | M | MED | 001, ~002 | C2 (VCS-pin false-neg; wrong columns) | TODO |
 | [004](004-scriptlet-parse-errors.md) | Surface unparseable install scriptlets (new PB503) | P1 | S | LOW | — | C4 (root-run scriptlet silently skipped) | TODO |
 | [005](005-suppressions-keyed-by-file.md) | Key inline suppressions by (file, line) | P1 | M | MED | 001 | C3 (cross-file suppression bleed) | TODO |
 | [006](006-setuid-octal-parsing.md) | Detect setuid/setgid by octal parse, not leading digit | P1 | S | LOW | — | C7 (PB403 evadable via `04755`/`7755`) | DONE (21a5282) |
-| [007](007-hermeticity-coverage-gaps.md) | Close 3 hermeticity gaps (PB204 `go get`/vendor, PB205 `export`) | P1 | M | MED | — | C8, C12, C9 | TODO |
-| [008](008-harden-untrusted-paths.md) | Contain `install=` paths; harden `git ls-remote` | P1/P2 | S | LOW | — | SEC2 (traversal/DoS), SEC1 (hardening) | TODO |
+| [007](007-hermeticity-coverage-gaps.md) | Close 3 hermeticity gaps (PB204 `go get`/vendor, PB205 `export`) | P1 | M | MED | — | C8, C12, C9 | DONE (f2b1a7e) |
+| [008](008-harden-untrusted-paths.md) | Contain `install=` paths; harden `git ls-remote` | P1/P2 | S | LOW | — | SEC2 (traversal/DoS), SEC1 (hardening) | DONE (2aa70a1, 1424ea5) |
 | [009](009-report-output-safety.md) | Sanitize terminal output; fix "." name & null findings | P2 | S | LOW | — | SEC5, C14a, C14b | DONE (de67eb6) |
 | [010](010-deterministic-findings.md) | Total-ordered, de-duplicated findings | P1 | S | LOW | — | C13 (unstable sort), C15 (PB502 dupes) | DONE (8fba363) |
 | [011](011-site-generator-hardening.md) | Sanitize package names; bound download/decompress | P2 | S–M | LOW | — | SEC4 (path traversal), SEC6 (DoS) | DONE (ebaaefd) |

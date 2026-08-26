@@ -1,0 +1,4982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>AUR Report Card</title>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #ffffff; --fg: #1a1f24; --muted: #667; --line: #e3e6ea; --card: #f6f7f9;
+  --a: #2da44e; --b: #97ca00; --c: #dfb317; --d: #fe7d37; --f: #e05d44; --u: #9f9f9f;
+  --link: #0b62c4;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1116; --fg: #e6e9ee; --muted: #99a; --line: #262c35; --card: #161b22; --link: #58a6ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 1.5rem; margin: 0.5rem 0 0.25rem; }
+h1 a { color: inherit; }
+.sub { color: var(--muted); margin: 0 0 1.5rem; }
+.grade { display: inline-block; min-width: 1.6em; padding: 0.05em 0.35em; border-radius: 4px;
+  color: #fff; font-weight: 700; text-align: center; }
+.grade-A { background: var(--a); } .grade-B { background: var(--b); }
+.grade-C { background: var(--c); } .grade-D { background: var(--d); }
+.grade-F { background: var(--f); } .grade-\? { background: var(--u); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
+tr:hover td { background: var(--card); }
+.sevrow td { border-bottom: none; padding-top: 0.15rem; padding-bottom: 0.15rem; }
+.sev { font-size: 0.78rem; font-weight: 700; border-radius: 3px; padding: 0.1em 0.4em; color: #fff; }
+.sev-info { background: #6c7a89; } .sev-warn { background: var(--c); }
+.sev-error { background: var(--d); } .sev-critical { background: var(--f); }
+.tiles { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; min-width: 5.5rem; }
+.tile b { display: block; font-size: 1.3rem; }
+.tile span { color: var(--muted); font-size: 0.8rem; }
+input[type=search] { width: 100%; max-width: 24rem; padding: 0.45rem 0.7rem; margin: 0 0 1rem;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+code, .loc { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 0.85em; }
+.loc { color: var(--muted); }
+.notice { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.7rem 1rem; color: var(--muted); font-size: 0.88rem; margin: 1.25rem 0; }
+.doc { max-width: 46rem; }
+.example { display: grid; gap: 1rem; margin: 1.25rem 0; grid-template-columns: 1fr 1fr; }
+@media (max-width: 44rem) { .example { grid-template-columns: 1fr; } }
+.example figure { margin: 0; }
+.example figcaption { font-size: 0.8rem; font-weight: 700; margin-bottom: 0.3rem;
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.example .bad figcaption { color: var(--f); }
+.example .good figcaption { color: var(--a); }
+.example pre { margin: 0; padding: 0.7rem 0.85rem; border-radius: 8px; overflow-x: auto;
+  border: 1px solid var(--line); background: var(--card);
+  font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 0.82rem; line-height: 1.5; }
+.example .bad pre { border-left: 3px solid var(--f); }
+.example .good pre { border-left: 3px solid var(--a); }
+.rulegroup { margin: 1.75rem 0 0.5rem; font-size: 1.05rem; }
+td.rid { white-space: nowrap; }
+footer { margin-top: 3rem; color: var(--muted); font-size: 0.8rem; }
+.overflow { overflow-x: auto; }
+</style>
+
+</head>
+<body>
+<main>
+<h1>AUR Report Card</h1>
+<p class="sub">Static security &amp; hygiene grades for AUR PKGBUILDs, generated 2026-08-26 11:33 UTC by pkglint.
+See the <a href="rules/index.html">rule reference</a> for every check, with examples.</p>
+
+<div class="tiles">
+  <div class="tile"><b>607</b><span>packages</span></div>
+  <div class="tile"><b>990</b><span>findings</span></div>
+  
+  <div class="tile"><b><span class="grade grade-A">A</span> 242</b><span>graded A</span></div>
+  
+  <div class="tile"><b><span class="grade grade-B">B</span> 241</b><span>graded B</span></div>
+  
+  <div class="tile"><b><span class="grade grade-C">C</span> 5</b><span>graded C</span></div>
+  
+  <div class="tile"><b><span class="grade grade-D">D</span> 75</b><span>graded D</span></div>
+  
+  <div class="tile"><b><span class="grade grade-F">F</span> 39</b><span>graded F</span></div>
+  
+  <div class="tile"><b><span class="grade grade-?">?</span> 5</b><span>graded ?</span></div>
+  
+</div>
+
+<div class="notice">Grades are a <strong>static hygiene score</strong> — they measure how
+reviewable and reproducible a PKGBUILD is (pinned sources, no network during build, no
+opaque code paths). They are <strong>not</strong> a malware verdict: a C is "room for
+improvement", not an accusation, and an A is not an endorsement.</div>
+
+<input type="search" id="q" placeholder="Filter packages…" autocomplete="off">
+<div class="overflow">
+<table id="pkgs">
+  <thead><tr><th>Grade</th><th>Package</th><th>Findings</th><th>Votes</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/android-studio.html">android-studio</a></td>
+    <td>2</td>
+    <td>1138</td>
+    <td>The official Android IDE (Stable branch)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/brscan4.html">brscan4</a></td>
+    <td>3</td>
+    <td>178</td>
+    <td>SANE drivers from Brother for compatible models</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/chromium-snapshot-bin.html">chromium-snapshot-bin</a></td>
+    <td>6</td>
+    <td>495</td>
+    <td>The open-source project behind Google Chrome (Latest Snapshot)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/compiz.html">compiz</a></td>
+    <td>1</td>
+    <td>168</td>
+    <td>Composite manager for Aiglx and Xgl, with plugins and CCSM</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/discord_arch_electron.html">discord_arch_electron</a></td>
+    <td>36</td>
+    <td>211</td>
+    <td>Discord using system provided electron for increased security and performance</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/flutter.html">flutter</a></td>
+    <td>7</td>
+    <td>152</td>
+    <td>Flutter SDK component - full installation of development tool and runtime</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/icaclient.html">icaclient</a></td>
+    <td>6</td>
+    <td>186</td>
+    <td>Citrix Workspace App (a.k.a. ICAClient, Citrix Receiver)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/itch-setup-bin.html">itch-setup-bin</a></td>
+    <td>3</td>
+    <td>127</td>
+    <td>Installer for the itch.io desktop app</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/java3d.html">java3d</a></td>
+    <td>3</td>
+    <td>107</td>
+    <td>High-level constructs to create and manipulate 3D geometry</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/jdk7.html">jdk7</a></td>
+    <td>13</td>
+    <td>132</td>
+    <td>Oracle Java 7 Development Kit (public release - end of support)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/jdk8.html">jdk8</a></td>
+    <td>13</td>
+    <td>103</td>
+    <td>Oracle Java 8 Development Kit LTS</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/joplin-appimage.html">joplin-appimage</a></td>
+    <td>3</td>
+    <td>108</td>
+    <td>The latest stable AppImage of Joplin - a cross-platform note taking and to-do app</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/komodo-edit.html">komodo-edit</a></td>
+    <td>5</td>
+    <td>252</td>
+    <td>Free &amp; Open-Source counterpart of ActiveState Komodo IDE - XUL based</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/linux-lqx.html">linux-lqx</a></td>
+    <td>8</td>
+    <td>168</td>
+    <td>The Linux Liquorix kernel and modules</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/linux-mainline.html">linux-mainline</a></td>
+    <td>4</td>
+    <td>299</td>
+    <td>The Linux Mainline kernel and modules</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/linux-pf.html">linux-pf</a></td>
+    <td>7</td>
+    <td>211</td>
+    <td>The pf-kernel and modules</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/linux-xanmod.html">linux-xanmod</a></td>
+    <td>15</td>
+    <td>131</td>
+    <td>The Linux kernel and modules with Xanmod patches</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/masterpdfeditor.html">masterpdfeditor</a></td>
+    <td>3</td>
+    <td>202</td>
+    <td>A complete solution for viewing, creating and editing PDF files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/mendeleydesktop.html">mendeleydesktop</a></td>
+    <td>1</td>
+    <td>305</td>
+    <td>Academic software for managing and sharing research papers.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/meshlab.html">meshlab</a></td>
+    <td>4</td>
+    <td>120</td>
+    <td>System for processing and editing of unstructured 3D models arising in 3D scanning (qt5 version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/mpv-git.html">mpv-git</a></td>
+    <td>4</td>
+    <td>229</td>
+    <td>Video player based on MPlayer/mplayer2 (git version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/nagios.html">nagios</a></td>
+    <td>5</td>
+    <td>113</td>
+    <td>Nagios is an open source host, service and network monitoring program.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/obs-studio-git.html">obs-studio-git</a></td>
+    <td>3</td>
+    <td>112</td>
+    <td>Free, open source software for live streaming and recording</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/octopi.html">octopi</a></td>
+    <td>2</td>
+    <td>1919</td>
+    <td>A powerful Pacman frontend using Qt libs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/optimus-manager-git.html">optimus-manager-git</a></td>
+    <td>10</td>
+    <td>137</td>
+    <td>Allows using Nvidia Optimus laptop graphics</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/pamac-aur.html">pamac-aur</a></td>
+    <td>1</td>
+    <td>409</td>
+    <td>A Gtk frontend, Package Manager based on libalpm with AUR and Appstream support</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/quake3.html">quake3</a></td>
+    <td>7</td>
+    <td>121</td>
+    <td>The stock Quake 3 Arena binaries. PunkBuster Compatible.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/rabbitvcs.html">rabbitvcs</a></td>
+    <td>1</td>
+    <td>116</td>
+    <td>A project with the goal of developing a collection of utilities to allow for better client integration with some of the popular version control systems (core)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/smartgit.html">smartgit</a></td>
+    <td>2</td>
+    <td>178</td>
+    <td>Git client with Hg and SVN support.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/tor-browser-bin.html">tor-browser-bin</a></td>
+    <td>3</td>
+    <td>1309</td>
+    <td>Tor Browser Bundle: anonymous browsing using Firefox and Tor</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/ttf-merriweather-sans.html">ttf-merriweather-sans</a></td>
+    <td>3</td>
+    <td>118</td>
+    <td>A sans-serif typeface that is pleasant to read on screens by Sorkin Type Co</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/ttf-ms-win11-auto.html">ttf-ms-win11-auto</a></td>
+    <td>6</td>
+    <td>122</td>
+    <td>Microsoft Windows 11 TrueType fonts</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/ungoogled-chromium.html">ungoogled-chromium</a></td>
+    <td>3</td>
+    <td>360</td>
+    <td>A lightweight approach to removing Google web service dependency</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/ungoogled-chromium-bin.html">ungoogled-chromium-bin</a></td>
+    <td>3</td>
+    <td>156</td>
+    <td>A lightweight approach to removing Google web service dependency</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/unigine-heaven.html">unigine-heaven</a></td>
+    <td>2</td>
+    <td>163</td>
+    <td>Unigine Benchmark</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/vmware-workstation.html">vmware-workstation</a></td>
+    <td>13</td>
+    <td>250</td>
+    <td>The industry standard for running multiple operating systems as virtual machines on a single Linux PC.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/worldofgoo.html">worldofgoo</a></td>
+    <td>4</td>
+    <td>100</td>
+    <td>A physics based puzzle/construction game (requires copy of the full game).</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/xen.html">xen</a></td>
+    <td>4</td>
+    <td>183</td>
+    <td>Open-source type-1 or baremetal hypervisor</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-F">F</span></td>
+    <td><a href="package/zfs-linux.html">zfs-linux</a></td>
+    <td>4</td>
+    <td>276</td>
+    <td>Kernel modules for the Zettabyte File System.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/1password.html">1password</a></td>
+    <td>5</td>
+    <td>151</td>
+    <td>Password manager and secure wallet</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/acroread-fonts-systemwide.html">acroread-fonts-systemwide</a></td>
+    <td>3</td>
+    <td>115</td>
+    <td>Fonts from Adobe Acrobat Reader DC</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/android-ndk.html">android-ndk</a></td>
+    <td>2</td>
+    <td>283</td>
+    <td>Android C/C&#43;&#43; developer kit</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/android-sdk.html">android-sdk</a></td>
+    <td>3</td>
+    <td>1483</td>
+    <td>Google Android SDK</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/android-sdk-platform-tools.html">android-sdk-platform-tools</a></td>
+    <td>3</td>
+    <td>1302</td>
+    <td>Platform-Tools for Google Android SDK (adb and fastboot)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/auto-cpufreq.html">auto-cpufreq</a></td>
+    <td>2</td>
+    <td>96</td>
+    <td>Automatic CPU speed &amp; power optimizer</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/bin32-jre.html">bin32-jre</a></td>
+    <td>4</td>
+    <td>118</td>
+    <td>Oracle Java 8 Runtime Enviroment (32-bit) with desktop integration (GUI, sound)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/code-marketplace.html">code-marketplace</a></td>
+    <td>2</td>
+    <td>133</td>
+    <td>Enable vscode marketplace in Code OSS</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/codecs64.html">codecs64</a></td>
+    <td>2</td>
+    <td>201</td>
+    <td>Non-linux native codec pack.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/codelite.html">codelite</a></td>
+    <td>16</td>
+    <td>172</td>
+    <td>Cross platform IDE for C, C&#43;&#43;, Rust, Python, PHP and Node.js written in C&#43;&#43;</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/crossover.html">crossover</a></td>
+    <td>1</td>
+    <td>231</td>
+    <td>Run Windows Programs on Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/davmail.html">davmail</a></td>
+    <td>2</td>
+    <td>126</td>
+    <td>a POP/IMAP/SMTP/Caldav/LDAP gateway for the exchange service</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/db4.5.html">db4.5</a></td>
+    <td>1</td>
+    <td>118</td>
+    <td>The Berkeley DB embedded database system 4.5</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/deb2targz.html">deb2targz</a></td>
+    <td>1</td>
+    <td>238</td>
+    <td>convert a Debian Linux .deb file to a .tar.gz</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/dtrx.html">dtrx</a></td>
+    <td>1</td>
+    <td>100</td>
+    <td>An intelligent archive extraction tool</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/eagle.html">eagle</a></td>
+    <td>1</td>
+    <td>283</td>
+    <td>Powerful suite for schematic capture and printed circuit board design (aka eaglecad)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/eduke32.html">eduke32</a></td>
+    <td>3</td>
+    <td>132</td>
+    <td>An advanced Duke Nukem 3D source port</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/enemy-territory.html">enemy-territory</a></td>
+    <td>3</td>
+    <td>259</td>
+    <td>Wolfenstein: Enemy Territory is a completely free, standalone, team-based, multiplayer FPS</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/epsxe-plugin-gpu-xgl2.html">epsxe-plugin-gpu-xgl2</a></td>
+    <td>3</td>
+    <td>102</td>
+    <td>Linux port of the OpenGL2 plugin</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/epsxe-plugin-spu-alsa.html">epsxe-plugin-spu-alsa</a></td>
+    <td>2</td>
+    <td>105</td>
+    <td>OSS/Alsa SPU plugin</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/ffmpeg-full.html">ffmpeg-full</a></td>
+    <td>6</td>
+    <td>141</td>
+    <td>Complete solution to record, convert and stream audio and video (all possible features including libfdk-aac)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/filebot.html">filebot</a></td>
+    <td>3</td>
+    <td>138</td>
+    <td>The ultimate TV and Movie Renamer</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/foxitreader.html">foxitreader</a></td>
+    <td>1</td>
+    <td>462</td>
+    <td>A fast, secure and complete PDF viewer</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/geekbench.html">geekbench</a></td>
+    <td>1</td>
+    <td>104</td>
+    <td>A cross-platform benchmark that measures processor and memory performance</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/genymotion.html">genymotion</a></td>
+    <td>2</td>
+    <td>329</td>
+    <td>Complete set of tools that provides a virtual environment for Android.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/google-earth-pro.html">google-earth-pro</a></td>
+    <td>4</td>
+    <td>1090</td>
+    <td>3D interface to explore the globe, terrain, streets, buildings and other planets (Pro version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/hal-info.html">hal-info</a></td>
+    <td>2</td>
+    <td>192</td>
+    <td>Hardware Abstraction Layer information files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/hplip-plugin.html">hplip-plugin</a></td>
+    <td>2</td>
+    <td>409</td>
+    <td>Binary plugin for HPs hplip printer driver library</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/i2p.html">i2p</a></td>
+    <td>3</td>
+    <td>324</td>
+    <td>A distributed anonymous network</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/informant.html">informant</a></td>
+    <td>4</td>
+    <td>137</td>
+    <td>An Arch Linux News reader and pacman hook</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/insync.html">insync</a></td>
+    <td>1</td>
+    <td>324</td>
+    <td>An unofficial Dropbox, Google Drive, and OneDrive client that runs on Linux, with support for various desktops</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/jdk.html">jdk</a></td>
+    <td>2</td>
+    <td>1088</td>
+    <td>Oracle Java Runtime Environment</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/jdownloader2.html">jdownloader2</a></td>
+    <td>2</td>
+    <td>461</td>
+    <td>Download manager, written in Java, for one-click hosting sites like Rapidshare and MEGA. Uses its own updater</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/lib32-gdbm.html">lib32-gdbm</a></td>
+    <td>1</td>
+    <td>180</td>
+    <td>GNU database library (32-bit)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/lib32-gtk-engine-murrine.html">lib32-gtk-engine-murrine</a></td>
+    <td>2</td>
+    <td>183</td>
+    <td>GTK2 engine to make your desktop look like the art glass works done by Venicians glass blowers (32 bit)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/libgnomecups.html">libgnomecups</a></td>
+    <td>1</td>
+    <td>152</td>
+    <td>GNOME CUPS library</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/libgnomeprint.html">libgnomeprint</a></td>
+    <td>2</td>
+    <td>145</td>
+    <td>Printing routines for GNOME</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/libpng15.html">libpng15</a></td>
+    <td>4</td>
+    <td>125</td>
+    <td>A collection of routines used to create PNG format graphics files (1.5 branch)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/libpthread-stubs.html">libpthread-stubs</a></td>
+    <td>1</td>
+    <td>176</td>
+    <td>This library provides weak aliases for pthread functions not provided in libc or otherwise available by default.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/lives.html">lives</a></td>
+    <td>2</td>
+    <td>200</td>
+    <td>A Video Editing System</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/localepurge.html">localepurge</a></td>
+    <td>1</td>
+    <td>267</td>
+    <td>Script to remove disk space wasted for unneeded localizations.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/log4c.html">log4c</a></td>
+    <td>1</td>
+    <td>130</td>
+    <td>Logging FrameWork for C, as Log4j or Log4Cpp</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/luckybackup.html">luckybackup</a></td>
+    <td>1</td>
+    <td>177</td>
+    <td>Backup &amp; Sync tool using Rsync and Qt5</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/masterpdfeditor-free.html">masterpdfeditor-free</a></td>
+    <td>6</td>
+    <td>114</td>
+    <td>A complete solution for creation and editing PDF files - Free version without watermark</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/memtest86-efi.html">memtest86-efi</a></td>
+    <td>3</td>
+    <td>110</td>
+    <td>A free, thorough, stand alone memory test as an EFI application</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/mint-x-icons.html">mint-x-icons</a></td>
+    <td>2</td>
+    <td>125</td>
+    <td>A mint/metal theme based on mintified versions of Clearlooks Revamp, Elementary and Faenza</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/moka-icon-theme-git.html">moka-icon-theme-git</a></td>
+    <td>1</td>
+    <td>112</td>
+    <td>An icon theme designed with a minimal, flat style, using simple geometry &amp; colours.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/monitorix.html">monitorix</a></td>
+    <td>1</td>
+    <td>103</td>
+    <td>A lightweight system monitoring tool that uses rrd databases.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/mullvad-vpn-bin.html">mullvad-vpn-bin</a></td>
+    <td>14</td>
+    <td>169</td>
+    <td>The Mullvad VPN client app for desktop (desktop application)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/netease-cloud-music.html">netease-cloud-music</a></td>
+    <td>3</td>
+    <td>105</td>
+    <td>Netease Cloud Music, converted from .deb package</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/nomachine.html">nomachine</a></td>
+    <td>1</td>
+    <td>98</td>
+    <td>Remote desktop application</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/nordvpn-bin.html">nordvpn-bin</a></td>
+    <td>2</td>
+    <td>179</td>
+    <td>NordVPN CLI tool for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/nvidia-beta.html">nvidia-beta</a></td>
+    <td>1</td>
+    <td>350</td>
+    <td>NVIDIA kernel module (beta version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/oh-my-zsh-git.html">oh-my-zsh-git</a></td>
+    <td>3</td>
+    <td>491</td>
+    <td>A community-driven framework for managing your zsh configuration. Includes 180&#43; optional plugins and over 120 themes to spice up your morning, and an auto-update tool so that makes it easy to keep up with the latest updates from the community</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/perl-gtk2-ex-simple-list.html">perl-gtk2-ex-simple-list</a></td>
+    <td>2</td>
+    <td>141</td>
+    <td>A simple interface to Gtk2&#39;s complex MVC list widget</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/perl-io-stty.html">perl-io-stty</a></td>
+    <td>1</td>
+    <td>97</td>
+    <td>lib/IO/Stty.pm</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/pi-hole-core.html">pi-hole-core</a></td>
+    <td>6</td>
+    <td>119</td>
+    <td>The Pi-hole is an advertising-aware DNS/Web server. Arch adaptation for lan wide DNS server.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/pkgcacheclean.html">pkgcacheclean</a></td>
+    <td>1</td>
+    <td>103</td>
+    <td>Application to clean the pacman package cache</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/preload.html">preload</a></td>
+    <td>1</td>
+    <td>198</td>
+    <td>Makes applications run faster by prefetching binaries and shared objects</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/retroshare.html">retroshare</a></td>
+    <td>2</td>
+    <td>167</td>
+    <td>Serverless encrypted instant messenger with filesharing, chatgroups, e-mail</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/sabnzbd.html">sabnzbd</a></td>
+    <td>7</td>
+    <td>275</td>
+    <td>A web-interface based binary newsgrabber with NZB file support</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/samsung-unified-driver.html">samsung-unified-driver</a></td>
+    <td>1</td>
+    <td>227</td>
+    <td>Samsung Unified Linux Driver (common files)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/spotify.html">spotify</a></td>
+    <td>8</td>
+    <td>273</td>
+    <td>A proprietary music streaming service</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/steamcmd.html">steamcmd</a></td>
+    <td>2</td>
+    <td>156</td>
+    <td>Steam Command Line Tools</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/sublime-text-2.html">sublime-text-2</a></td>
+    <td>2</td>
+    <td>539</td>
+    <td>Sophisticated text editor for code, html and prose (legacy version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/tango-icon-theme.html">tango-icon-theme</a></td>
+    <td>2</td>
+    <td>228</td>
+    <td>Icon theme that follows the Tango visual guidelines</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/teamviewer.html">teamviewer</a></td>
+    <td>1</td>
+    <td>1483</td>
+    <td>All-In-One Software for Remote Support and Online Meetings</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/ttf-mac-fonts.html">ttf-mac-fonts</a></td>
+    <td>3</td>
+    <td>338</td>
+    <td>Mac fonts including Lucida Grande, Apple Garamond and other fonts from Apple</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/ttf-twemoji.html">ttf-twemoji</a></td>
+    <td>2</td>
+    <td>109</td>
+    <td>Truetype builds of Twemoji; Twitter Color Emoji for everyone.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/tuxboot.html">tuxboot</a></td>
+    <td>2</td>
+    <td>142</td>
+    <td>A tool that helps you to create a bootable Live USB drive for Clonezilla live, DRBL live, GParted live and Tux2live</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/ventoy-bin.html">ventoy-bin</a></td>
+    <td>1</td>
+    <td>461</td>
+    <td>A new bootable USB solution</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/vlc-git.html">vlc-git</a></td>
+    <td>2</td>
+    <td>213</td>
+    <td>Multi-platform MPEG, VCD/DVD, and DivX player (monolithic)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/w_scan_cpp.html">w_scan_cpp</a></td>
+    <td>5</td>
+    <td>200</td>
+    <td>A dtv channel scanner based on VDR. Successor of w_scan</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/wordnet.html">wordnet</a></td>
+    <td>4</td>
+    <td>138</td>
+    <td>An Electronic Lexical Database from Princeton University</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-D">D</span></td>
+    <td><a href="package/xrdp.html">xrdp</a></td>
+    <td>1</td>
+    <td>152</td>
+    <td>An open source remote desktop protocol (RDP) server</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-C">C</span></td>
+    <td><a href="package/alacritty-git.html">alacritty-git</a></td>
+    <td>3</td>
+    <td>98</td>
+    <td>A cross-platform, GPU-accelerated terminal emulator</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-C">C</span></td>
+    <td><a href="package/clion.html">clion</a></td>
+    <td>5</td>
+    <td>248</td>
+    <td>Cross-platform IDE for C and C&#43;&#43; from JetBrains.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-C">C</span></td>
+    <td><a href="package/dolphin-emu-git.html">dolphin-emu-git</a></td>
+    <td>22</td>
+    <td>121</td>
+    <td>A Gamecube / Wii emulator - git version</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-C">C</span></td>
+    <td><a href="package/pencil.html">pencil</a></td>
+    <td>5</td>
+    <td>189</td>
+    <td>Sketching and GUI prototyping/wireframing tool</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-C">C</span></td>
+    <td><a href="package/psi-plus-git.html">psi-plus-git</a></td>
+    <td>6</td>
+    <td>133</td>
+    <td>Psi&#43; is a powerful XMPP client (Qt, C&#43;&#43;) designed for the XMPP power users (built with Qt 5.x)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/8192cu-dkms.html">8192cu-dkms</a></td>
+    <td>2</td>
+    <td>101</td>
+    <td>Driver for Realtek RTL8188CUS (8188C, 8192C) chipset wireless cards</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/agent-deck.html">agent-deck</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Terminal session manager for AI coding agents. Built with Go &#43; Bubble Tea.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/aircrack-ng-git.html">aircrack-ng-git</a></td>
+    <td>1</td>
+    <td>122</td>
+    <td>Key cracker for the 802.11 WEP and WPA-PSK protocols</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/amdgpu-pro-installer.html">amdgpu-pro-installer</a></td>
+    <td>19</td>
+    <td>125</td>
+    <td>AMDGPU Pro Advanced Multimedia Framework</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/android-platform.html">android-platform</a></td>
+    <td>2</td>
+    <td>187</td>
+    <td>Android SDK Platform, latest API</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/android-udev-git.html">android-udev-git</a></td>
+    <td>1</td>
+    <td>605</td>
+    <td>Udev rules to connect Android devices to your linux box</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/annas-mcp.html">annas-mcp</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>MCP server and CLI tool for searching and downloading documents from Anna&#39;s Archive</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/aqemu.html">aqemu</a></td>
+    <td>1</td>
+    <td>125</td>
+    <td>QEMU GUI written in Qt5</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/arc-gtk-theme-git.html">arc-gtk-theme-git</a></td>
+    <td>1</td>
+    <td>236</td>
+    <td>A flat theme suite with transparent elements.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/archey3-git.html">archey3-git</a></td>
+    <td>1</td>
+    <td>170</td>
+    <td>Python script to display system information alongside the Arch Linux logo.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/archiso-git.html">archiso-git</a></td>
+    <td>1</td>
+    <td>118</td>
+    <td>Tools for creating Arch Linux live and install iso images</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/aur-auto-vote-git.html">aur-auto-vote-git</a></td>
+    <td>2</td>
+    <td>691</td>
+    <td>Automates voting on installed and uninstalled AUR packages</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/auracle-git.html">auracle-git</a></td>
+    <td>1</td>
+    <td>130</td>
+    <td>A flexible client for the AUR</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/aurget.html">aurget</a></td>
+    <td>1</td>
+    <td>157</td>
+    <td>A simple, Pacman-like AUR helper</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/aurman.html">aurman</a></td>
+    <td>1</td>
+    <td>197</td>
+    <td>AUR helper with almost pacman syntax</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/awesome-git.html">awesome-git</a></td>
+    <td>2</td>
+    <td>228</td>
+    <td>Highly configurable framework window manager</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/aws-doctor.html">aws-doctor</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Diagnose AWS costs, detect idle resources, and optimize cloud spending directly from your terminal. 🩺 ☁️</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/b43-firmware.html">b43-firmware</a></td>
+    <td>2</td>
+    <td>251</td>
+    <td>Firmware for Broadcom B43 wireless networking chips - latest release</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/babl-git.html">babl-git</a></td>
+    <td>2</td>
+    <td>111</td>
+    <td>Dynamic, any to any, pixel format translation library.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/backintime.html">backintime</a></td>
+    <td>1</td>
+    <td>303</td>
+    <td>Simple backup system inspired from the Flyback Project and TimeVault. Qt6 GUI version.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/balena-etcher.html">balena-etcher</a></td>
+    <td>5</td>
+    <td>267</td>
+    <td>Flash OS images to SD cards &amp; USB drives, safely and easily</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/blipgloss.html">blipgloss</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Style definitions for nice terminal layouts 👄</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/blueman-git.html">blueman-git</a></td>
+    <td>1</td>
+    <td>109</td>
+    <td>A GTK&#43; Bluetooth Manager (BlueZ 5) - git</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/brave-bin.html">brave-bin</a></td>
+    <td>3</td>
+    <td>1028</td>
+    <td>Web browser that blocks ads and trackers by default (binary release)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/breeze-gtk-git.html">breeze-gtk-git</a></td>
+    <td>1</td>
+    <td>120</td>
+    <td>Breeze widget theme for GTK 2 and 3. (GIT version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/brev-cli.html">brev-cli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Connect your laptop to cloud computers. Follow to stay updated about our product</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/captain.html">captain</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Captain - Convert your Git workflow to Docker :whale: containers</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/cascadia.html">cascadia</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Go cascadia package command line CSS selector</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/cert.html">cert</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Cert is the Go tool to get TLS certificate information.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/cfnctl.html">cfnctl</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Cfnctl brings the Terraform cli experience to AWS Cloudformation :cloud:</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/check-symlinks.html">check-symlinks</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>Check for broken symlinks</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/checkip.html">checkip</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Get (security) info about IP addresses</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/clive.html">clive</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>⚡ Automates terminal operations.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/cloud189.html">cloud189</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>基于天翼云接口的go客户端</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/cls3.html">cls3</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>The CLI tool &#34;cls3&#34; is to CLear S3 Buckets. It empties (so deletes all objects and versions/delete-markers in) S3 Buckets or deletes the buckets themselves.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/codeowners.html">codeowners</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>🔒 Command line tool and Go library for CODEOWNERS files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/comigo.html">comigo</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Comic &amp; Manga Reader in Linux，Windows，MacOS。简单跨平台的漫画阅读器。わかりやすい漫画リーダー。</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/conky-lua-nv.html">conky-lua-nv</a></td>
+    <td>1</td>
+    <td>130</td>
+    <td>Lightweight system monitor for X with lua and nvidia enabled</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/connections.html">connections</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>A command-line client for the NYT Connections game.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/customizepkg-git.html">customizepkg-git</a></td>
+    <td>1</td>
+    <td>125</td>
+    <td>A tool to modify automatically PKGBUILD</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/cycle-cli.html">cycle-cli</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>A command-line utility for indoor bike.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/deadbeef-git.html">deadbeef-git</a></td>
+    <td>2</td>
+    <td>122</td>
+    <td>A GTK&#43; audio player for GNU/Linux (devel branch)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/diny.html">diny</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>generate ai git commit messages</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/docker-debug.html">docker-debug</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>use new container attach on already container go on debug</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/dockerfilegraph.html">dockerfilegraph</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Visualize your multi-stage Dockerfiles</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/dropbox.html">dropbox</a></td>
+    <td>2</td>
+    <td>2377</td>
+    <td>A free service that lets you bring your photos, docs, and videos anywhere and share them easily.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/dupeguru.html">dupeguru</a></td>
+    <td>2</td>
+    <td>107</td>
+    <td>Find duplicate files with various contents, using perceptual diff for pictures</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/dwarftherapist-git.html">dwarftherapist-git</a></td>
+    <td>1</td>
+    <td>95</td>
+    <td>Heavily modified version of the original Dwarf Therapist.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/enpasscli.html">enpasscli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Enpass commandline client</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/epson-inkjet-printer-escpr.html">epson-inkjet-printer-escpr</a></td>
+    <td>2</td>
+    <td>103</td>
+    <td>Epson Inkjet Printer Driver (ESC/P-R) for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/epsxe.html">epsxe</a></td>
+    <td>3</td>
+    <td>226</td>
+    <td>Enhanced PSX emulator</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/faas-cli.html">faas-cli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Official CLI for OpenFaaS</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/faba-icon-theme-git.html">faba-icon-theme-git</a></td>
+    <td>1</td>
+    <td>105</td>
+    <td>A sexy and modern FreeDesktop icon set with Tango and elementary influences</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/faenza-cupertino-icon-theme.html">faenza-cupertino-icon-theme</a></td>
+    <td>3</td>
+    <td>103</td>
+    <td>Icon theme designed for Equinox GTK theme, recolored</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/fil.html">fil</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>😋 Unix file command written in Go</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/firefox-nightly.html">firefox-nightly</a></td>
+    <td>2</td>
+    <td>612</td>
+    <td>Fast, Private &amp; Safe Web Browser (Nightly version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/flacon.html">flacon</a></td>
+    <td>1</td>
+    <td>167</td>
+    <td>An Audio File Encoder. Extracts audio tracks from an audio CD image to separate tracks.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/flashplayer-standalone.html">flashplayer-standalone</a></td>
+    <td>1</td>
+    <td>195</td>
+    <td>Adobe Flash Player Standalone (A.K.A. Adobe Flash Player Projector)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/franz.html">franz</a></td>
+    <td>2</td>
+    <td>150</td>
+    <td>Messaging app for WhatsApp, Slack, Telegram, Gmail, Hangouts and many many more.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/freecad-git.html">freecad-git</a></td>
+    <td>2</td>
+    <td>109</td>
+    <td>A general purpose 3D CAD modeler - git checkout</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/freetube.html">freetube</a></td>
+    <td>2</td>
+    <td>97</td>
+    <td>An open source desktop YouTube player built with privacy in mind.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/freshplayerplugin-git.html">freshplayerplugin-git</a></td>
+    <td>1</td>
+    <td>145</td>
+    <td>PPAPI-host NPAPI-plugin adapter.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/furiusisomount.html">furiusisomount</a></td>
+    <td>1</td>
+    <td>131</td>
+    <td>A PyGTK interface for managing ISO/IMG/BIN/MDF/NRG image files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gcalcli.html">gcalcli</a></td>
+    <td>1</td>
+    <td>124</td>
+    <td>Google calendar command line interface</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gconf.html">gconf</a></td>
+    <td>1</td>
+    <td>132</td>
+    <td>An obsolete configuration database system</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gegl-git.html">gegl-git</a></td>
+    <td>2</td>
+    <td>105</td>
+    <td>Graph based image processing framework</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gh-eco.html">gh-eco</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>🦎 gh cli extension to explore the ecosystem</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gh-markdown-preview.html">gh-markdown-preview</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>GitHub CLI extension to preview Markdown looks like GitHub.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gh-s.html">gh-s</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>🔎 search github repositories interactively</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gimp-git.html">gimp-git</a></td>
+    <td>4</td>
+    <td>116</td>
+    <td>GNU Image Manipulation Program</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gimp-plugin-resynthesizer-git.html">gimp-plugin-resynthesizer-git</a></td>
+    <td>1</td>
+    <td>217</td>
+    <td>Suite of gimp plugins for texture synthesis (like heal-selection). Git-Version</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/git-orchard.html">git-orchard</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>A command-line utility for managing git-subtrees.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gitcs.html">gitcs</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>📈 Command line tool written in Go. It allows developers to scan their local Git repositories and generate a visual contributions graph.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gitkraken.html">gitkraken</a></td>
+    <td>3</td>
+    <td>312</td>
+    <td>The intuitive, fast, and beautiful cross-platform Git client.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/glib.html">glib</a></td>
+    <td>2</td>
+    <td>108</td>
+    <td>Common C routines used by Gtk&#43; and other libs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gnome-browser-connector-git.html">gnome-browser-connector-git</a></td>
+    <td>1</td>
+    <td>232</td>
+    <td>Native browser connector for integration with extensions.gnome.org</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gnome-shell-extension-system-monitor-next-git.html">gnome-shell-extension-system-monitor-next-git</a></td>
+    <td>1</td>
+    <td>214</td>
+    <td>Display system information in GNOME Shell status bar (next fork)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/go-carpet.html">go-carpet</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Tool for show test coverage in terminal for Go source files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/go-global-update.html">go-global-update</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A command to update globally installed go executables</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/go-grip.html">go-grip</a></td>
+    <td>2</td>
+    <td>4</td>
+    <td>Preview Markdown files locally before committing them.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/go-mtpfs-git.html">go-mtpfs-git</a></td>
+    <td>2</td>
+    <td>140</td>
+    <td>Simple tool for viewing MTP devices as FUSE filesystems</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/go-perftuner.html">go-perftuner</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Helper tool for manual Go code optimization.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/go-test-report.html">go-test-report</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Captures go test output and parses it into a single self-contained HTML file.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/goben.html">goben</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>goben is a golang tool to measure TCP/UDP transport layer throughput between hosts.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gocognit.html">gocognit</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Calculates cognitive complexities of functions (and methods) in Go source code. (Golang cognitive complexity)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gocovsh.html">gocovsh</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Go Coverage in your terminal: a tool for exploring Go Coverage reports from the command line 💻</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gojekyll.html">gojekyll</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A fast Go implementation of the Jekyll blogging engine</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/golly.html">golly</a></td>
+    <td>2</td>
+    <td>111</td>
+    <td>A simulator for Conway&#39;s Game of Life and other cellular automata</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gotouch.html">gotouch</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Language Agnostic Customizable Boilerplate Project Creator</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gotun.html">gotun</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>一个基于 SSH 的正向代理工具，让你的 HTTP/HTTPS 请求从远程主机的网络环境中发出，实现对其可达资源的透明访问。An SSH-powered forward proxy CLI that makes your network requests originate from the remote host.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gowebdav.html">gowebdav</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A golang WebDAV client library and command line tool.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gowsdl.html">gowsdl</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>WSDL2Go code generation as well as its SOAP proxy</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/grpcmd.html">grpcmd</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A simple, easy-to-use, and developer-friendly CLI tool for gRPC.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/grub2-theme-archlinux.html">grub2-theme-archlinux</a></td>
+    <td>1</td>
+    <td>256</td>
+    <td>Grub2 gfxmenu theme.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/grub2-theme-archxion.html">grub2-theme-archxion</a></td>
+    <td>1</td>
+    <td>161</td>
+    <td>Grub2 gfxmenu theme.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gscript.html">gscript</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>framework to rapidly implement custom droppers for all three major operating systems</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gtasks.html">gtasks</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A CLI client for Google Tasks, written in Go</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gvm.html">gvm</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A programming language version manager 🚀 🚀</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gyp-git.html">gyp-git</a></td>
+    <td>2</td>
+    <td>101</td>
+    <td>GYP can Generate Your Projects.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/gzdoom.html">gzdoom</a></td>
+    <td>2</td>
+    <td>173</td>
+    <td>Feature centric port for all Doom engine games</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/handbrake-git.html">handbrake-git</a></td>
+    <td>1</td>
+    <td>109</td>
+    <td>Multithreaded video transcoder</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/hanime-hunter.html">hanime-hunter</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A CLI app to download HAnime. 用于下载里番的 CLI 工具</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/hashi-up.html">hashi-up</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>bootstrap HashiCorp Consul, Nomad, or Vault over SSH &lt; 1 minute</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/htb-cli.html">htb-cli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Interact with Hackthebox using your terminal - Be faster and more competitive !</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/hyphanet.html">hyphanet</a></td>
+    <td>4</td>
+    <td>184</td>
+    <td>A peer-to-peer network for censorship-resistant and privacy-respecting publishing and communication, a.k.a The Original Freenet since 1999. This is NOT Locutus.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/hyprland-git.html">hyprland-git</a></td>
+    <td>1</td>
+    <td>100</td>
+    <td>Hyprland is an independent, highly customizable, dynamic tiling Wayland compositor that doesn&#39;t sacrifice on its looks</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/i3-git.html">i3-git</a></td>
+    <td>2</td>
+    <td>194</td>
+    <td>An improved dynamic tiling window manager</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/icecat.html">icecat</a></td>
+    <td>2</td>
+    <td>253</td>
+    <td>GNU version of the Firefox ESR browser</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/iftree.html">iftree</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>iftree help understand container networks by visualizing network interfaces( veth bridge lo ) relation , output in text, table, images and dot language.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/imagewriter.html">imagewriter</a></td>
+    <td>2</td>
+    <td>197</td>
+    <td>A graphical utility for writing raw disk images &amp; hybrid isos to USB keys</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/jaggr.html">jaggr</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>JSON Aggregation CLI</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/jenkins-cli.html">jenkins-cli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Jenkins CLI allows you to manage your Jenkins in an easy way. Jenkins 命令行客户端</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/joplin.html">joplin</a></td>
+    <td>3</td>
+    <td>286</td>
+    <td>A note taking and to-do application with synchronization capabilities - CLI App</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/json2struct.html">json2struct</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>CLI tool to convert JSON to struct type definitions</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/jstest-gtk-git.html">jstest-gtk-git</a></td>
+    <td>1</td>
+    <td>128</td>
+    <td>A simple GTK2-based joystick tester and calibrator</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/kdeconnect-git.html">kdeconnect-git</a></td>
+    <td>1</td>
+    <td>155</td>
+    <td>Adds communication between KDE and your smartphone</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ktail.html">ktail</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A tool to easily tail Kubernetes container logs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/kure.html">kure</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>CLI password manager with sessions</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/lib32-gtk-engines.html">lib32-gtk-engines</a></td>
+    <td>2</td>
+    <td>207</td>
+    <td>Theme engines for GTK&#43; 2 (32 bit)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/libcgroup.html">libcgroup</a></td>
+    <td>2</td>
+    <td>122</td>
+    <td>Library that abstracts the control group file system in Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/libfm-git.html">libfm-git</a></td>
+    <td>2</td>
+    <td>113</td>
+    <td>A glib/gio-based library to develop file managers. Does not include the GTK components.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/libinput-gestures.html">libinput-gestures</a></td>
+    <td>1</td>
+    <td>102</td>
+    <td>Actions gestures on your touchpad using libinput</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/libselinux.html">libselinux</a></td>
+    <td>1</td>
+    <td>136</td>
+    <td>SELinux library and simple utilities</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/libsepol.html">libsepol</a></td>
+    <td>1</td>
+    <td>115</td>
+    <td>SELinux binary policy manipulation library</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/lightdm-git.html">lightdm-git</a></td>
+    <td>2</td>
+    <td>278</td>
+    <td>A lightweight display manager</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/lightspark-git.html">lightspark-git</a></td>
+    <td>1</td>
+    <td>117</td>
+    <td>Open source Flash player implementation</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/llvm-git.html">llvm-git</a></td>
+    <td>2</td>
+    <td>123</td>
+    <td>LLVM development version. includes clang and many other tools</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/lyx.html">lyx</a></td>
+    <td>1</td>
+    <td>107</td>
+    <td>An advanced WYSIWYM document processor &amp; LaTeX front-end</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/mac-cleanup-go.html">mac-cleanup-go</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>TUI macOS cleaner that scans caches/logs, shows sizes/paths, lets you select what to delete before Trash.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/madonctl.html">madonctl</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>CLI client for the Mastodon social network API</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/megasync.html">megasync</a></td>
+    <td>2</td>
+    <td>393</td>
+    <td>Official MEGA desktop application for syncing with MEGA Cloud Drive</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/menulibre.html">menulibre</a></td>
+    <td>1</td>
+    <td>218</td>
+    <td>An advanced menu editor that provides modern features in a clean, easy-to-use interface</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/microsoft-edge-dev-bin.html">microsoft-edge-dev-bin</a></td>
+    <td>2</td>
+    <td>102</td>
+    <td>A browser that combines a minimal design with sophisticated technology to make the web faster, safer, and easier</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/microsoft-edge-stable-bin.html">microsoft-edge-stable-bin</a></td>
+    <td>2</td>
+    <td>154</td>
+    <td>A browser that combines a minimal design with sophisticated technology to make the web faster, safer, and easier</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/minecraft-server.html">minecraft-server</a></td>
+    <td>3</td>
+    <td>170</td>
+    <td>Minecraft server unit files, script, and jar</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/mirrorbits.html">mirrorbits</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Mirrorbits is a geographical download redirector written in Go for distributing files efficiently across a set of mirrors.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/miscsplashutils.html">miscsplashutils</a></td>
+    <td>1</td>
+    <td>133</td>
+    <td>Miscellaneous framebuffer utilities including fbres and fbtruetype</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/mpd-git.html">mpd-git</a></td>
+    <td>2</td>
+    <td>104</td>
+    <td>Flexible, powerful, server-side application for playing music</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/mufetch.html">mufetch</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>neofetch-style music cli</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/my-token.html">my-token</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>📈Track token prices in your terminal</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/n26.html">n26</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>API and CLI to get information of your N26 account</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/nano-syntax-highlighting-git.html">nano-syntax-highlighting-git</a></td>
+    <td>1</td>
+    <td>123</td>
+    <td>Improved nano syntax highlighting files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/nature-sounds.html">nature-sounds</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>A lightweight, nature sounds player for the command-line.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ncmpcpp-git.html">ncmpcpp-git</a></td>
+    <td>2</td>
+    <td>112</td>
+    <td>An almost exact clone of ncmpc with some new features (git version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ncurses5-compat-libs.html">ncurses5-compat-libs</a></td>
+    <td>1</td>
+    <td>585</td>
+    <td>System V Release 4.0 curses emulation library, ABI 5</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/neovim-git.html">neovim-git</a></td>
+    <td>3</td>
+    <td>264</td>
+    <td>Fork of Vim aiming to improve user experience, plugins, and GUIs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/netatalk.html">netatalk</a></td>
+    <td>1</td>
+    <td>103</td>
+    <td>Open-source implementation of the Apple Filing Protocol</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/nirvana.html">nirvana</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Golang Restful API Framework for Productivity</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/nomore403.html">nomore403</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>🚫 Advanced tool for security researchers to bypass 403/40X restrictions through smart techniques and adaptive request manipulation. Fast. Precise. Effective.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ntpdate.html">ntpdate</a></td>
+    <td>2</td>
+    <td>168</td>
+    <td>Client for the Network Time Protocol (NTP)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/numix-circle-icon-theme-git.html">numix-circle-icon-theme-git</a></td>
+    <td>1</td>
+    <td>356</td>
+    <td>Circle icon theme from the Numix project</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/numix-gtk-theme-git.html">numix-gtk-theme-git</a></td>
+    <td>1</td>
+    <td>111</td>
+    <td>A flat and light theme with a modern look (GNOME, Openbox, Unity, Xfce)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/numix-icon-theme-git.html">numix-icon-theme-git</a></td>
+    <td>1</td>
+    <td>437</td>
+    <td>Base icon theme from the Numix project</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ojosama.html">ojosama</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>テキストを壱百満天原サロメお嬢様風の口調に変換します</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/onedrive-abraunegg.html">onedrive-abraunegg</a></td>
+    <td>1</td>
+    <td>155</td>
+    <td>Free OneDrive client written in D - abraunegg&#39;s fork. Follows the releases on https://github.com/abraunegg/onedrive/releases</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/opsy.html">opsy</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Opsy - Your AI-Powered SRE Colleague</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/otel-cli.html">otel-cli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>OpenTelemetry command-line tool for sending events from shell scripts &amp; similar environments</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ovpm.html">ovpm</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>OpenVPN Management Server - Effortless and free OpenVPN server administration tool</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/package-query.html">package-query</a></td>
+    <td>1</td>
+    <td>1141</td>
+    <td>Query ALPM and AUR</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/package-query-git.html">package-query-git</a></td>
+    <td>1</td>
+    <td>147</td>
+    <td>Query ALPM and AUR</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/paclear.html">paclear</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>👾paclear is a clear command with PAC-MAN animation👾</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/palemoon.html">palemoon</a></td>
+    <td>2</td>
+    <td>145</td>
+    <td>Open source web browser based on Firefox focusing on efficiency.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/palemoon-bin.html">palemoon-bin</a></td>
+    <td>1</td>
+    <td>197</td>
+    <td>Open source web browser based on Firefox focusing on efficiency.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/paper-gtk-theme-git.html">paper-gtk-theme-git</a></td>
+    <td>2</td>
+    <td>183</td>
+    <td>A modern desktop theme suite. Its design is mostly flat with a minimal use of shadows for depth.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/paper-icon-theme-git.html">paper-icon-theme-git</a></td>
+    <td>1</td>
+    <td>228</td>
+    <td>Paper is an icon theme for GTK based desktops and fits perfectly the paper-gtk-theme</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/papirus-icon-theme-git.html">papirus-icon-theme-git</a></td>
+    <td>1</td>
+    <td>124</td>
+    <td>Pixel perfect icon theme for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/partitionmanager-git.html">partitionmanager-git</a></td>
+    <td>1</td>
+    <td>133</td>
+    <td>A KDE utility that allows you to manage disks, partitions, and file systems. (GIT version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/pasystray-git.html">pasystray-git</a></td>
+    <td>1</td>
+    <td>135</td>
+    <td>PulseAudio system tray (a replacement for padevchooser)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/pcmanfm-git.html">pcmanfm-git</a></td>
+    <td>1</td>
+    <td>117</td>
+    <td>Extremely fast and lightweight file manager</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/pcsx2-git.html">pcsx2-git</a></td>
+    <td>2</td>
+    <td>135</td>
+    <td>PlayStation 2 emulator</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/pep-ebook.html">pep-ebook</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>📚自动下载带书签的电子书(人民教育教出版社)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/picom-git.html">picom-git</a></td>
+    <td>1</td>
+    <td>359</td>
+    <td>X compositor (fork of compton) (git-version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/pkgbrowser.html">pkgbrowser</a></td>
+    <td>1</td>
+    <td>283</td>
+    <td>A utility for browsing pacman databases and the AUR</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/plymouth-git.html">plymouth-git</a></td>
+    <td>1</td>
+    <td>278</td>
+    <td>Graphical boot splash screen (git version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/pnmixer.html">pnmixer</a></td>
+    <td>1</td>
+    <td>132</td>
+    <td>GTK volume mixer applet that runs in the system tray.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/poutine.html">poutine</a></td>
+    <td>2</td>
+    <td>1</td>
+    <td>boostsecurityio/poutine</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/powerline-fonts-git.html">powerline-fonts-git</a></td>
+    <td>1</td>
+    <td>156</td>
+    <td>Patched fonts for Powerline users</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/protolock.html">protolock</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Protocol Buffer companion tool. Track your .proto files and prevent changes to messages and services which impact API compatibility.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/prxy.html">prxy</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>🔌 Command-line reverse proxy for forwarding HTTP requests through an outbound proxy</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/python-powerline-git.html">python-powerline-git</a></td>
+    <td>1</td>
+    <td>129</td>
+    <td>The ultimate statusline/prompt utility</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/qt-sudo.html">qt-sudo</a></td>
+    <td>1</td>
+    <td>515</td>
+    <td>A clone of LXQt sudo tool, without LXQt libs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/rad.html">rad</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Modern CLI scripts made easy.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/rambox-bin.html">rambox-bin</a></td>
+    <td>3</td>
+    <td>110</td>
+    <td>Free and Open Source messaging and emailing app that combines common web applications into one.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ranger-git.html">ranger-git</a></td>
+    <td>1</td>
+    <td>150</td>
+    <td>A simple, vim-like file manager</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/rar.html">rar</a></td>
+    <td>1</td>
+    <td>749</td>
+    <td>A command-line port of the rar compression utility.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/redis_tui.html">redis_tui</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Redis terminal application</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/release-tag.html">release-tag</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>Automatically create semantic version git tags.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/remarkable.html">remarkable</a></td>
+    <td>1</td>
+    <td>97</td>
+    <td>A free fully featured markdown editor for Linux.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/saw.html">saw</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Fast, multi-purpose tool for AWS CloudWatch Logs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/sendmail.html">sendmail</a></td>
+    <td>1</td>
+    <td>140</td>
+    <td>A general purpose internetwork email routing MTA</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/smplayer-git.html">smplayer-git</a></td>
+    <td>2</td>
+    <td>143</td>
+    <td>Media player with built-in codecs that can play virtually all video and audio formats</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/snipkit.html">snipkit</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Snippet CLI manager for quickly generating and executing shell snippets without leaving the terminal.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/soapui.html">soapui</a></td>
+    <td>3</td>
+    <td>112</td>
+    <td>free and open source cross-platform functional testing solution for APIs and web services</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/spicetify-cli.html">spicetify-cli</a></td>
+    <td>2</td>
+    <td>95</td>
+    <td>Command-line tool to customize Spotify client</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/sqsmover.html">sqsmover</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>AWS SQS Message mover</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/stree.html">stree</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>📁Directory trees of AWS S3 Bucket</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/sunflower.html">sunflower</a></td>
+    <td>2</td>
+    <td>113</td>
+    <td>Small and highly customizable twin-panel file manager for Linux with support for plugins</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/sway-git.html">sway-git</a></td>
+    <td>1</td>
+    <td>150</td>
+    <td>Tiling Wayland compositor and replacement for the i3 window manager (git development version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/systemd-boot-pacman-hook.html">systemd-boot-pacman-hook</a></td>
+    <td>1</td>
+    <td>186</td>
+    <td>Pacman hook to upgrade systemd-boot after systemd upgrade.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/systemd-numlockontty.html">systemd-numlockontty</a></td>
+    <td>3</td>
+    <td>100</td>
+    <td>Systemd service &#43; script, automatically activate numpad on ttys</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/tabtoy.html">tabtoy</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>高性能表格数据导出器</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/teams-for-linux.html">teams-for-linux</a></td>
+    <td>2</td>
+    <td>112</td>
+    <td>Unofficial Microsoft Teams client for Linux using Electron.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/tecli.html">tecli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>In a world where everything is Terraform, teams use Terraform Cloud API to manage their workloads. TECLI increases teams productivity by facilitating such interaction and by providing easy commands that can be executed on a terminal or on CI/CD systems.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/tfsort.html">tfsort</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A CLI utility to sort Terraform variables and outputs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/tinyfeed.html">tinyfeed</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Generate a static HTML page from a collection of feeds wtih a simple CLI tool</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/trice.html">trice</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>🟢 super fast 🚀 tiny 🐥 𝘾 printf-look-and-feel ✍ trace code, in ⚡ interrupts ⚡ too ‼️, and real-time PC 💻 logging 👀</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/truss.html">truss</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Truss helps you build go-kit microservices without having to worry about writing or maintaining boilerplate code.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ttf-google-fonts-git.html">ttf-google-fonts-git</a></td>
+    <td>1</td>
+    <td>560</td>
+    <td>TrueType fonts from the Google Fonts project (git version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ttf-ms-fonts.html">ttf-ms-fonts</a></td>
+    <td>1</td>
+    <td>2188</td>
+    <td>Core TTF Fonts from Microsoft</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ttf-unifont.html">ttf-unifont</a></td>
+    <td>1</td>
+    <td>127</td>
+    <td>TrueType version of the GNU Unifont</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/ttf-wps-fonts.html">ttf-wps-fonts</a></td>
+    <td>1</td>
+    <td>106</td>
+    <td>Symbol fonts required by wps-office.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/uswsusp-git.html">uswsusp-git</a></td>
+    <td>2</td>
+    <td>161</td>
+    <td>Userspace software suspend - git checkout</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vgo.html">vgo</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A simple project scaffolder for Go, written in Go.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vibecheck.html">vibecheck</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>vibecheck is a lightweight, cross-platform command line AI-tool that automatically generates meaningful and consistent Git Commit Messages by analyzing your code changes — ship faster with vibecheck</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vicious-git.html">vicious-git</a></td>
+    <td>1</td>
+    <td>131</td>
+    <td>Widgets for the Awesome window manager</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vim-colors-solarized-git.html">vim-colors-solarized-git</a></td>
+    <td>2</td>
+    <td>99</td>
+    <td>Precision colors for machines and people.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vim-latexsuite-git.html">vim-latexsuite-git</a></td>
+    <td>2</td>
+    <td>164</td>
+    <td>Provides a comprehensive set of tools to view, edit, and compile LaTeX documents within Vim. Also provides macros to speed up the creation of LaTeX documents.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vim-pathogen.html">vim-pathogen</a></td>
+    <td>1</td>
+    <td>128</td>
+    <td>A vim plugin for managing your runtimepath</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vivaldi-snapshot.html">vivaldi-snapshot</a></td>
+    <td>1</td>
+    <td>131</td>
+    <td>An advanced browser made with the power user in mind. Snapshot</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/vscodium-bin.html">vscodium-bin</a></td>
+    <td>1</td>
+    <td>394</td>
+    <td>Binary releases of VS Code without MS branding/telemetry/licensing.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/wacli.html">wacli</a></td>
+    <td>2</td>
+    <td>2</td>
+    <td>WhatsApp CLI</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/wechat-universal-bwrap.html">wechat-universal-bwrap</a></td>
+    <td>1</td>
+    <td>146</td>
+    <td>WeChat (Universal) with bwrap sandbox</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/winetricks-git.html">winetricks-git</a></td>
+    <td>2</td>
+    <td>117</td>
+    <td>Script to install various redistributable runtime libraries in Wine.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/work.html">work</a></td>
+    <td>1</td>
+    <td>0</td>
+    <td>A stupid simple time tracker.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/world-cup-2022-cli-dashboard.html">world-cup-2022-cli-dashboard</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Watch live World Cup 2022 matches in your terminal. ⚽🏆</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/wps-office.html">wps-office</a></td>
+    <td>1</td>
+    <td>489</td>
+    <td>Kingsoft Office (WPS Office) - an office productivity suite</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/x264-git.html">x264-git</a></td>
+    <td>1</td>
+    <td>233</td>
+    <td>Open Source H.264/AVC video encoder (git version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/xdg-su.html">xdg-su</a></td>
+    <td>1</td>
+    <td>122</td>
+    <td>Run a program as root with the most environment appropriate available graphical authentication agent</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/xf86-video-ati-git.html">xf86-video-ati-git</a></td>
+    <td>1</td>
+    <td>175</td>
+    <td>X.org ati video driver</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/xf86-video-intel-git.html">xf86-video-intel-git</a></td>
+    <td>1</td>
+    <td>115</td>
+    <td>X.org Intel i810/i830/i915/945G/G965&#43; video drivers</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/xscreensaver-arch-logo.html">xscreensaver-arch-logo</a></td>
+    <td>1</td>
+    <td>213</td>
+    <td>Screen saver and locker for the X Window System with Arch Linux branding</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/yamldiff.html">yamldiff</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A CLI tool to diff two YAML files.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/yandex-disk.html">yandex-disk</a></td>
+    <td>1</td>
+    <td>139</td>
+    <td>Yandex.Disk keeps your files with you at all times.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/youtube-dl-git.html">youtube-dl-git</a></td>
+    <td>1</td>
+    <td>134</td>
+    <td>A command-line program to download videos from YouTube.com and a few more sites</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/youtube-viewer-git.html">youtube-viewer-git</a></td>
+    <td>1</td>
+    <td>110</td>
+    <td>A lightweight YouTube client for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/yt-dlg-git.html">yt-dlg-git</a></td>
+    <td>1</td>
+    <td>95</td>
+    <td>A cross platform front-end GUI of the popular youtube-dl written in wxPython (maintained fork of youtube-dl-gui)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/zeit.html">zeit</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>Zeit, erfassen. A command line tool for tracking time. (https://codeberg.org/mrus/zeit)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/zfs-dkms.html">zfs-dkms</a></td>
+    <td>2</td>
+    <td>200</td>
+    <td>Kernel modules for the Zettabyte File System.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/zkcli.html">zkcli</a></td>
+    <td>2</td>
+    <td>0</td>
+    <td>A interactive Zookeeper client.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/zramswap.html">zramswap</a></td>
+    <td>1</td>
+    <td>236</td>
+    <td>Sets up zram-based swap devices on boot</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-B">B</span></td>
+    <td><a href="package/zsh-completions-git.html">zsh-completions-git</a></td>
+    <td>1</td>
+    <td>108</td>
+    <td>Additional completion definitions for Zsh</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/acestream-engine.html">acestream-engine</a></td>
+    <td>1</td>
+    <td>131</td>
+    <td>Ace Stream engine</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aic94xx-firmware.html">aic94xx-firmware</a></td>
+    <td>1</td>
+    <td>392</td>
+    <td>Adaptec SAS 44300, 48300, 58300 Sequencer Firmware for AIC94xx driver</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/alarm-clock-applet.html">alarm-clock-applet</a></td>
+    <td>0</td>
+    <td>109</td>
+    <td>A fully-featured alarm clock for use with an AppIndicator implementation.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aligo.html">aligo</a></td>
+    <td>0</td>
+    <td>0</td>
+    <td>Utility for checking and viewing Golang struct alignment info</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/alsi.html">alsi</a></td>
+    <td>0</td>
+    <td>179</td>
+    <td>ALSI: a configurable system information tool for Arch Linux.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/anaconda.html">anaconda</a></td>
+    <td>0</td>
+    <td>111</td>
+    <td>Simplifies package management and deployment of Anaconda</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/android-apktool.html">android-apktool</a></td>
+    <td>0</td>
+    <td>257</td>
+    <td>A tool for reengineering Android apk files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/android-sdk-build-tools.html">android-sdk-build-tools</a></td>
+    <td>1</td>
+    <td>496</td>
+    <td>Build-Tools for Google Android SDK (aapt, aidl, dexdump, dx, llvm-rs-cc)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/anydesk-bin.html">anydesk-bin</a></td>
+    <td>0</td>
+    <td>246</td>
+    <td>The Fast Remote Desktop Application</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/apache-tools.html">apache-tools</a></td>
+    <td>0</td>
+    <td>139</td>
+    <td>Useful Apache tools - htdigest, htpasswd, ab (Apache Benchmark), htdbm</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/appimagelauncher.html">appimagelauncher</a></td>
+    <td>0</td>
+    <td>145</td>
+    <td>Helper for running and integrating AppImages</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/apulse.html">apulse</a></td>
+    <td>0</td>
+    <td>148</td>
+    <td>PulseAudio emulation for ALSA</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/archlinux-java-run.html">archlinux-java-run</a></td>
+    <td>0</td>
+    <td>99</td>
+    <td>Java Application Launcher for Arch Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/archlinux-themes-sddm.html">archlinux-themes-sddm</a></td>
+    <td>0</td>
+    <td>150</td>
+    <td>Adaptation to SDDM of Archlinux themes made for KDM</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aseprite.html">aseprite</a></td>
+    <td>4</td>
+    <td>143</td>
+    <td>Create animated sprites and pixel art</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/asterisk.html">asterisk</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>A complete PBX solution</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aur-sync-vote.html">aur-sync-vote</a></td>
+    <td>0</td>
+    <td>237</td>
+    <td>Syncing votes with the currently installed AUR packages</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aura.html">aura</a></td>
+    <td>0</td>
+    <td>177</td>
+    <td>A package manager for Arch Linux and its AUR</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aura-bin.html">aura-bin</a></td>
+    <td>0</td>
+    <td>183</td>
+    <td>A package manager for Arch Linux and its AUR - Prebuild binary</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/aurutils.html">aurutils</a></td>
+    <td>0</td>
+    <td>303</td>
+    <td>helper tools for the arch user repository</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/bcompare.html">bcompare</a></td>
+    <td>0</td>
+    <td>108</td>
+    <td>Beyond Compare 5: Compare, sync, and merge files and folders.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/betterbird-bin.html">betterbird-bin</a></td>
+    <td>0</td>
+    <td>308</td>
+    <td>EN-US // Betterbird is a fine-tuned version of Mozilla Thunderbird, Thunderbird on steroids, if you will.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/bitwig-studio.html">bitwig-studio</a></td>
+    <td>0</td>
+    <td>135</td>
+    <td>Digital audio workstation for music production, remixing and live performance</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/bottles.html">bottles</a></td>
+    <td>0</td>
+    <td>190</td>
+    <td>Easily manage wine and proton prefix</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/buildifier.html">buildifier</a></td>
+    <td>0</td>
+    <td>1</td>
+    <td>A command line tool to format Bazel BUILD files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/buildifier-bin.html">buildifier-bin</a></td>
+    <td>0</td>
+    <td>2</td>
+    <td>A command line tool to format Bazel BUILD files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/buildozer.html">buildozer</a></td>
+    <td>0</td>
+    <td>1</td>
+    <td>A command line tool to rewrite Bazel BUILD files using standard conventions</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/buildozer-bin.html">buildozer-bin</a></td>
+    <td>0</td>
+    <td>1</td>
+    <td>A command line tool to rewrite Bazel BUILD files using standard conventions</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/burpsuite.html">burpsuite</a></td>
+    <td>1</td>
+    <td>127</td>
+    <td>An integrated platform for performing security testing of web applications (free edition)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/caffeine-ng.html">caffeine-ng</a></td>
+    <td>0</td>
+    <td>134</td>
+    <td>Status bar application able to temporarily inhibit the screensaver and sleep mode.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/chrome-remote-desktop.html">chrome-remote-desktop</a></td>
+    <td>0</td>
+    <td>127</td>
+    <td>Access other computers or allow another user to access your computer securely over the Internet</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/chromium-widevine.html">chromium-widevine</a></td>
+    <td>1</td>
+    <td>430</td>
+    <td>A browser plugin designed for the viewing of premium video content</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/conkyforecast.html">conkyforecast</a></td>
+    <td>0</td>
+    <td>102</td>
+    <td>Provides weather forecast information to be displayed in conky.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/davinci-resolve.html">davinci-resolve</a></td>
+    <td>1</td>
+    <td>190</td>
+    <td>Professional A/V post-production software suite from Blackmagic Design</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/deadbeef.html">deadbeef</a></td>
+    <td>1</td>
+    <td>101</td>
+    <td>Modular GTK audio player for GNU/Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/debtap.html">debtap</a></td>
+    <td>0</td>
+    <td>331</td>
+    <td>A script to convert .deb packages to Arch Linux packages, focused on accuracy. Do not use it to convert packages that already exist on official repositories or can be built from AUR!</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/dex2jar.html">dex2jar</a></td>
+    <td>0</td>
+    <td>97</td>
+    <td>Tools to work with android .dex and java .class files. ThexXTURBOXx&#39;s fork.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/disper.html">disper</a></td>
+    <td>0</td>
+    <td>117</td>
+    <td>An on-the-fly display switch utility, intended to be used on laptops, especially with nVidia cards.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/displaylink.html">displaylink</a></td>
+    <td>0</td>
+    <td>109</td>
+    <td>Linux driver for DisplayLink devices</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/dockbarx.html">dockbarx</a></td>
+    <td>0</td>
+    <td>178</td>
+    <td>TaskBar with groupping and group manipulation</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/downgrade.html">downgrade</a></td>
+    <td>0</td>
+    <td>912</td>
+    <td>Bash script for downgrading one or more packages to a version in your cache or the A.L.A.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/droidcam.html">droidcam</a></td>
+    <td>0</td>
+    <td>144</td>
+    <td>A tool to turn your phone/tablet into a wireless/usb webcam</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/dropbox-cli.html">dropbox-cli</a></td>
+    <td>0</td>
+    <td>472</td>
+    <td>Command line interface for Dropbox</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/dxvk-bin.html">dxvk-bin</a></td>
+    <td>0</td>
+    <td>239</td>
+    <td>A Vulkan-based compatibility layer for Direct3D 9/10/11 which allows running 3D applications on Linux using Wine (Windows DLL binary files)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/dynamips.html">dynamips</a></td>
+    <td>0</td>
+    <td>104</td>
+    <td>Cisco router emulator.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/emacs-org-mode.html">emacs-org-mode</a></td>
+    <td>1</td>
+    <td>105</td>
+    <td>Emacs Org Mode</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/esound.html">esound</a></td>
+    <td>0</td>
+    <td>207</td>
+    <td>Enlightened Sound Daemon</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/etcher-bin.html">etcher-bin</a></td>
+    <td>0</td>
+    <td>174</td>
+    <td>Flash OS images to SD cards &amp; USB drives, safely and easily</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/exaile.html">exaile</a></td>
+    <td>1</td>
+    <td>149</td>
+    <td>A full-featured Amarok-style media player for GTK&#43;</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/f3.html">f3</a></td>
+    <td>0</td>
+    <td>131</td>
+    <td>Simple tool that tests flash cards capacity and performance to see if they live up to claimed specifications</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/fcitx-sogoupinyin.html">fcitx-sogoupinyin</a></td>
+    <td>0</td>
+    <td>112</td>
+    <td>Sogou Pinyin for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/fingerprint-gui.html">fingerprint-gui</a></td>
+    <td>0</td>
+    <td>135</td>
+    <td>Fingerprint-based authentication, supports UPEK readers with non-free library</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/firefox-beta-bin.html">firefox-beta-bin</a></td>
+    <td>0</td>
+    <td>398</td>
+    <td>Standalone web browser from mozilla.org - Beta</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/firefox-esr-bin.html">firefox-esr-bin</a></td>
+    <td>0</td>
+    <td>165</td>
+    <td>Standalone web browser from mozilla.org - Extended Support Release</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/flvstreamer.html">flvstreamer</a></td>
+    <td>0</td>
+    <td>108</td>
+    <td>Open source command-line RTMP client</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/foldingathome.html">foldingathome</a></td>
+    <td>2</td>
+    <td>186</td>
+    <td>A distributed computing project for simulating protein dynamics</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/font-symbola.html">font-symbola</a></td>
+    <td>0</td>
+    <td>110</td>
+    <td>Font for symbol blocks of the Unicode Standard (OTF)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/fontconfig-ubuntu.html">fontconfig-ubuntu</a></td>
+    <td>0</td>
+    <td>349</td>
+    <td>A library for configuring and customizing font access (with Ubuntu patches)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/fontmatrix.html">fontmatrix</a></td>
+    <td>0</td>
+    <td>136</td>
+    <td>Free font collections manager for Linux, Mac and Windows.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/freetube-bin.html">freetube-bin</a></td>
+    <td>0</td>
+    <td>229</td>
+    <td>An open source desktop YouTube player built with privacy in mind.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/fritzing.html">fritzing</a></td>
+    <td>3</td>
+    <td>247</td>
+    <td>PCB layout prototyping application</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/fusesmb.html">fusesmb</a></td>
+    <td>1</td>
+    <td>146</td>
+    <td>SMB for FUSE is a Samba shares filesystem</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gallery-dl.html">gallery-dl</a></td>
+    <td>0</td>
+    <td>109</td>
+    <td>Command-line program to download image-galleries and collections from several image hosting sites</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ganttproject.html">ganttproject</a></td>
+    <td>0</td>
+    <td>142</td>
+    <td>A project scheduling application featuring gantt chart, resource management, calendaring.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/get_iplayer.html">get_iplayer</a></td>
+    <td>0</td>
+    <td>105</td>
+    <td>Allows you to download or stream any iPlayer programme from the BBC in H.264 (Quicktime/mp4) format, any radio programmes in MP3 or RealAudio format</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/git-cola.html">git-cola</a></td>
+    <td>1</td>
+    <td>235</td>
+    <td>The highly caffeinated Git GUI</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gnome-colors-icon-theme.html">gnome-colors-icon-theme</a></td>
+    <td>0</td>
+    <td>242</td>
+    <td>GNOME-Colors icon theme</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gnome-shell-extension-dash-to-dock.html">gnome-shell-extension-dash-to-dock</a></td>
+    <td>0</td>
+    <td>131</td>
+    <td>Move the dash out of the overview transforming it in a dock</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gnome-shell-pomodoro.html">gnome-shell-pomodoro</a></td>
+    <td>0</td>
+    <td>117</td>
+    <td>A time management utility for GNOME based on the pomodoro technique</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gnome-terminal-transparency.html">gnome-terminal-transparency</a></td>
+    <td>0</td>
+    <td>109</td>
+    <td>The GNOME Terminal Emulator with background transparency</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gns3-gui.html">gns3-gui</a></td>
+    <td>0</td>
+    <td>104</td>
+    <td>GNS3 network simulator. Graphical user interface package.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/google-chrome.html">google-chrome</a></td>
+    <td>0</td>
+    <td>2367</td>
+    <td>The popular web browser by Google (Stable Channel)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/google-chrome-beta.html">google-chrome-beta</a></td>
+    <td>0</td>
+    <td>358</td>
+    <td>The popular web browser by Google (Beta Channel)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/google-chrome-dev.html">google-chrome-dev</a></td>
+    <td>0</td>
+    <td>652</td>
+    <td>The popular web browser by Google (Dev Channel)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/google-cloud-cli.html">google-cloud-cli</a></td>
+    <td>0</td>
+    <td>205</td>
+    <td>A core set of command-line tools for the Google Cloud Platform. Includes only gcloud core (with beta and alpha commands), gcloud-crc32c and man pages</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/greybird-gtk-theme.html">greybird-gtk-theme</a></td>
+    <td>1</td>
+    <td>287</td>
+    <td>A grey theme for GNOME, Xfce, GTK&#43; 2 and 3</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/grisbi.html">grisbi</a></td>
+    <td>1</td>
+    <td>109</td>
+    <td>Shared files for the finance management program Grisbi.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/grive.html">grive</a></td>
+    <td>0</td>
+    <td>282</td>
+    <td>An open source Linux client for Google Drive with support for the new Drive REST API and partial sync</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gstreamer0.10.html">gstreamer0.10</a></td>
+    <td>0</td>
+    <td>126</td>
+    <td>Legacy GStreamer 0.10 multimedia framework</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gstreamer0.10-base.html">gstreamer0.10-base</a></td>
+    <td>0</td>
+    <td>133</td>
+    <td>Legacy GStreamer 0.10 base plugin libraries</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/gtk2-theme-dust.html">gtk2-theme-dust</a></td>
+    <td>0</td>
+    <td>106</td>
+    <td>A clean, modern remix on the defining aesthetic elements of Ubuntu</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/heroic-games-launcher-bin.html">heroic-games-launcher-bin</a></td>
+    <td>1</td>
+    <td>294</td>
+    <td>An Open source Launcher for Epic, Amazon and GOG Games</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ibazel.html">ibazel</a></td>
+    <td>0</td>
+    <td>2</td>
+    <td>Tool for building Bazel targets when source files change.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ibazel-bin.html">ibazel-bin</a></td>
+    <td>0</td>
+    <td>1</td>
+    <td>Tool for building Bazel targets when source files change.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/insomnia-bin.html">insomnia-bin</a></td>
+    <td>2</td>
+    <td>162</td>
+    <td>API Client and Design Platform for GraphQL and REST</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/intellij-idea-ultimate-edition.html">intellij-idea-ultimate-edition</a></td>
+    <td>1</td>
+    <td>453</td>
+    <td>An intelligent IDE for Java, Groovy and other programming languages with advanced refactoring features intensely focused on developer productivity.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ipscan.html">ipscan</a></td>
+    <td>1</td>
+    <td>98</td>
+    <td>Angry IP Scanner (or simply ipscan) is an open-source and cross-platform network scanner designed to be fast and simple to use. It scans IP addresses and ports as well as has many other features.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/jabref.html">jabref</a></td>
+    <td>4</td>
+    <td>218</td>
+    <td>Graphical Java application for managing BibTeX and biblatex (.bib) databases</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/java-service-wrapper.html">java-service-wrapper</a></td>
+    <td>0</td>
+    <td>146</td>
+    <td>Enables a Java Application to be run as a Windows Service or Unix Daemon</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/jd-gui-bin.html">jd-gui-bin</a></td>
+    <td>0</td>
+    <td>127</td>
+    <td>A standalone Java decompiler GUI</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/jellyfin-desktop.html">jellyfin-desktop</a></td>
+    <td>0</td>
+    <td>106</td>
+    <td>Jellyfin Desktop Client</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/jetbrains-toolbox.html">jetbrains-toolbox</a></td>
+    <td>0</td>
+    <td>217</td>
+    <td>Manage all your JetBrains Projects and Tools</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/jitsi.html">jitsi</a></td>
+    <td>1</td>
+    <td>369</td>
+    <td>An audio/video SIP VoIP phone and instant messenger written in Java (formerly SIP-Communicator)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/jmtpfs.html">jmtpfs</a></td>
+    <td>0</td>
+    <td>381</td>
+    <td>FUSE and libmtp based filesystem for accessing MTP (Media Transfer Protocol) devices</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/kalu.html">kalu</a></td>
+    <td>0</td>
+    <td>181</td>
+    <td>Upgrade notifier w/ AUR support, watched (AUR) packages, news</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/kazam.html">kazam</a></td>
+    <td>0</td>
+    <td>136</td>
+    <td>Screencast and screenshot application created with design in mind</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/kega-fusion.html">kega-fusion</a></td>
+    <td>3</td>
+    <td>98</td>
+    <td>An emulator of classic Sega consoles, including SMS/GG, Genesis/Megadrive and add-ons</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/keybase-bin.html">keybase-bin</a></td>
+    <td>0</td>
+    <td>152</td>
+    <td>the Keybase Go client, filesystem, and GUI</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/laptop-mode-tools.html">laptop-mode-tools</a></td>
+    <td>0</td>
+    <td>184</td>
+    <td>Power saving tool for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/lastpass.html">lastpass</a></td>
+    <td>1</td>
+    <td>96</td>
+    <td>The Universal LastPass installer for Firefox, Chrome, and Opera</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/lha.html">lha</a></td>
+    <td>1</td>
+    <td>99</td>
+    <td>A compression and archive utility for LH-7 format archives</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/lib32-libxpm.html">lib32-libxpm</a></td>
+    <td>0</td>
+    <td>144</td>
+    <td>X11 pixmap library (32-bit)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/lib32-nvidia-utils-beta.html">lib32-nvidia-utils-beta</a></td>
+    <td>0</td>
+    <td>150</td>
+    <td>NVIDIA drivers utilities (32-bit, beta version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/lib32-pangox-compat.html">lib32-pangox-compat</a></td>
+    <td>1</td>
+    <td>220</td>
+    <td>X Window System font support for Pango (32bit)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/libreoffice-extension-languagetool.html">libreoffice-extension-languagetool</a></td>
+    <td>1</td>
+    <td>309</td>
+    <td>An Open Source style and grammar checker (more than 30 languages)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/libsvg.html">libsvg</a></td>
+    <td>0</td>
+    <td>151</td>
+    <td>A library for rendering SVG documents</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/libsvg-cairo.html">libsvg-cairo</a></td>
+    <td>0</td>
+    <td>131</td>
+    <td>A library for rendering SVG documents</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/lightworks.html">lightworks</a></td>
+    <td>0</td>
+    <td>134</td>
+    <td>Lightworks is a professional video editing suite</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/linuxqq.html">linuxqq</a></td>
+    <td>3</td>
+    <td>111</td>
+    <td>New Linux QQ based on Electron</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/localsend-bin.html">localsend-bin</a></td>
+    <td>0</td>
+    <td>149</td>
+    <td>An open source cross-platform alternative to AirDrop</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/logmein-hamachi.html">logmein-hamachi</a></td>
+    <td>0</td>
+    <td>234</td>
+    <td>A zero-configuration VPN service</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mailspring-bin.html">mailspring-bin</a></td>
+    <td>0</td>
+    <td>216</td>
+    <td>A beautiful, fast and fully open source mail client.(Prebuilt version.Use system-wide electron)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/makehuman.html">makehuman</a></td>
+    <td>2</td>
+    <td>96</td>
+    <td>Parametrical modeling program for creating human bodies</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/makemkv.html">makemkv</a></td>
+    <td>0</td>
+    <td>342</td>
+    <td>DVD and Blu-ray to MKV converter</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mbrola.html">mbrola</a></td>
+    <td>0</td>
+    <td>118</td>
+    <td>A phoneme-to-audio converter used by many TTS (Text-to-speech) programs</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mimeo.html">mimeo</a></td>
+    <td>0</td>
+    <td>151</td>
+    <td>Open files by MIME-type or file name using regular expressions.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/minecraft-launcher.html">minecraft-launcher</a></td>
+    <td>0</td>
+    <td>1142</td>
+    <td>Official Minecraft Launcher</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mkinitcpio-firmware.html">mkinitcpio-firmware</a></td>
+    <td>0</td>
+    <td>106</td>
+    <td>Optional firmware for the default linux kernel to get rid of the annoying &#39;WARNING: Possibly missing firmware for module:&#39; messages</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/modprobed-db.html">modprobed-db</a></td>
+    <td>1</td>
+    <td>269</td>
+    <td>Keeps track of EVERY kernel module ever used - useful for make localmodconfig</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mongodb-bin.html">mongodb-bin</a></td>
+    <td>4</td>
+    <td>99</td>
+    <td>A high-performance, open source, schema-free document-oriented database</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/moodbar.html">moodbar</a></td>
+    <td>0</td>
+    <td>162</td>
+    <td>moodbar binaries and script for Amarok</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mprime-bin.html">mprime-bin</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>A GIMPS, distributed computing project client, dedicated to finding Mersenne primes. Precompiled binary version.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ms-sys.html">ms-sys</a></td>
+    <td>0</td>
+    <td>254</td>
+    <td>Write Microsoft-compatible boot records (MBR and PBR)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/multibootusb.html">multibootusb</a></td>
+    <td>0</td>
+    <td>111</td>
+    <td>Boot multiple live Linux distros from a usb flash drive</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/mysql-connector-java.html">mysql-connector-java</a></td>
+    <td>0</td>
+    <td>121</td>
+    <td>Java library to connect to MySQL</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/nautilus-dropbox.html">nautilus-dropbox</a></td>
+    <td>1</td>
+    <td>578</td>
+    <td>Dropbox Nautilus Extension</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/neroaac-bin.html">neroaac-bin</a></td>
+    <td>1</td>
+    <td>122</td>
+    <td>Nero AAC reference quality MPEG-4 and 3GPP audio codec. Decoder</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ngrok.html">ngrok</a></td>
+    <td>4</td>
+    <td>122</td>
+    <td>A tunneling, reverse proxy for developing and understanding networked, HTTP services</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/nitrux-icon-theme.html">nitrux-icon-theme</a></td>
+    <td>0</td>
+    <td>161</td>
+    <td>New squared icon set for Linux that sports clean lines, smooth gradients, and simple icon logos</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/npapi-vlc-git.html">npapi-vlc-git</a></td>
+    <td>0</td>
+    <td>150</td>
+    <td>The modern VLC Mozilla (NPAPI) plugin - Git version</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/nvidia-470xx-utils.html">nvidia-470xx-utils</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>NVIDIA drivers utilities</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/nvidia-utils-beta.html">nvidia-utils-beta</a></td>
+    <td>0</td>
+    <td>343</td>
+    <td>NVIDIA drivers utilities (beta version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/obmenu-generator.html">obmenu-generator</a></td>
+    <td>0</td>
+    <td>121</td>
+    <td>A fast pipe/static menu generator for the Openbox Window Manager (with icons support).</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ocrmypdf.html">ocrmypdf</a></td>
+    <td>0</td>
+    <td>159</td>
+    <td>A tool to add an OCR text layer to scanned PDF files, allowing them to be searched</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/onlyoffice-bin.html">onlyoffice-bin</a></td>
+    <td>1</td>
+    <td>302</td>
+    <td>An office suite that combines text, spreadsheet and presentation editors</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/opencl-amd.html">opencl-amd</a></td>
+    <td>0</td>
+    <td>143</td>
+    <td>ROCm components repackaged from AMD&#39;s Ubuntu releases (ROCr runtime, OpenCL runtime, HIP runtime) - This package is intended to work along with the free amdgpu stack.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/osu-lazer-bin.html">osu-lazer-bin</a></td>
+    <td>2</td>
+    <td>122</td>
+    <td>The future of osu! and the beginning of an open era! Commonly known by the codename osu!lazer. Pew pew.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/packettracer.html">packettracer</a></td>
+    <td>1</td>
+    <td>158</td>
+    <td>A cross-platform visual simulation tool designed by Cisco Systems that allows users to create network topologies and imitate modern computer network</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pacserve.html">pacserve</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>Easily share Pacman packages between computers. A replacement for PkgD.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pandoc-bin.html">pandoc-bin</a></td>
+    <td>3</td>
+    <td>343</td>
+    <td>Conversion between documentation formats</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/paru.html">paru</a></td>
+    <td>0</td>
+    <td>1250</td>
+    <td>Feature packed AUR helper</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/paru-bin.html">paru-bin</a></td>
+    <td>0</td>
+    <td>325</td>
+    <td>Feature packed AUR helper</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pavumeter.html">pavumeter</a></td>
+    <td>0</td>
+    <td>182</td>
+    <td>A simple GTK volume meter for the PulseAudio sound server</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/perl-mp3-tag.html">perl-mp3-tag</a></td>
+    <td>0</td>
+    <td>103</td>
+    <td>Module for reading tags of MP3 audio files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/perl-term-shellui.html">perl-term-shellui</a></td>
+    <td>1</td>
+    <td>154</td>
+    <td>A fully-featured shell-like command line environment</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/phc-intel-dkms-stable.html">phc-intel-dkms-stable</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>Frequency driver for Intel CPUs with undervolting feature. DKMS-based kernel module, stable branch.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/photoqt.html">photoqt</a></td>
+    <td>0</td>
+    <td>108</td>
+    <td>Fast and highly configurable image viewer with a simple and nice interface.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/phpstorm.html">phpstorm</a></td>
+    <td>0</td>
+    <td>234</td>
+    <td>Lightweight and Smart PHP IDE</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pidgin-extprefs.html">pidgin-extprefs</a></td>
+    <td>0</td>
+    <td>110</td>
+    <td>Plugin adds additional preferences for pidgin.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pikaur.html">pikaur</a></td>
+    <td>0</td>
+    <td>297</td>
+    <td>AUR helper which asks all questions before installing/building. Inspired by pacaur, yaourt and yay.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/plex-media-server.html">plex-media-server</a></td>
+    <td>0</td>
+    <td>345</td>
+    <td>The back-end media server component of Plex.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/plex-media-server-plexpass.html">plex-media-server-plexpass</a></td>
+    <td>0</td>
+    <td>142</td>
+    <td>The back-end media server component of Plex.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/plymouth-theme-arch-logo.html">plymouth-theme-arch-logo</a></td>
+    <td>0</td>
+    <td>101</td>
+    <td>A remake of the ubuntu-logo Plymouth theme, based on the debian-logo theme, but featuring the Arch Linux logo.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pm2ml.html">pm2ml</a></td>
+    <td>0</td>
+    <td>173</td>
+    <td>Generate metalinks for downloading Pacman packages and databases.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pmount.html">pmount</a></td>
+    <td>0</td>
+    <td>97</td>
+    <td>mount removable devices as normal user</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pocketsphinx.html">pocketsphinx</a></td>
+    <td>0</td>
+    <td>102</td>
+    <td>A small speech recognizer</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/postman-bin.html">postman-bin</a></td>
+    <td>2</td>
+    <td>313</td>
+    <td>Build, test, and document your APIs faster</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/prek.html">prek</a></td>
+    <td>0</td>
+    <td>8</td>
+    <td>⚡ Better &#39;pre-commit&#39;, re-engineered in Rust</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/proton-ge-custom-bin.html">proton-ge-custom-bin</a></td>
+    <td>0</td>
+    <td>298</td>
+    <td>A fancy custom distribution of Valves Proton with various patches</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/protonup-qt.html">protonup-qt</a></td>
+    <td>0</td>
+    <td>118</td>
+    <td>Install and manage GE-Proton, Luxtorpeda &amp; more for Steam, Lutris and Heroic</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pulseaudio-ctl.html">pulseaudio-ctl</a></td>
+    <td>0</td>
+    <td>198</td>
+    <td>Control pulseaudio volume from the shell or mapped to keyboard shortcuts.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/pycharm.html">pycharm</a></td>
+    <td>0</td>
+    <td>310</td>
+    <td>The only Python IDE you need. Bundled with the official JetBrains Runtime (JBR)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python-blessings.html">python-blessings</a></td>
+    <td>0</td>
+    <td>2</td>
+    <td>A thin, practical wrapper around terminal coloring, styling, and positioning</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python-dict2xml.html">python-dict2xml</a></td>
+    <td>0</td>
+    <td>2</td>
+    <td>Small utility to convert a python dictionary into an XML string</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python-e3-core.html">python-e3-core</a></td>
+    <td>0</td>
+    <td>0</td>
+    <td>Framework to ease the development of portable automated build systems</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python-e3-testsuite.html">python-e3-testsuite</a></td>
+    <td>0</td>
+    <td>0</td>
+    <td>Generic Testsuite Driver in Python</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python-pyalsaaudio.html">python-pyalsaaudio</a></td>
+    <td>0</td>
+    <td>221</td>
+    <td>ALSA wrappers for Python</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python3-aur.html">python3-aur</a></td>
+    <td>0</td>
+    <td>221</td>
+    <td>AUR-related modules and helper utilities (aurploader, aurquery, aurtomatic).</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python3-memoizedb.html">python3-memoizedb</a></td>
+    <td>0</td>
+    <td>116</td>
+    <td>Generic data retrieval memoizer that uses an sqlite database to cache data.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python3-xcgf.html">python3-xcgf</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>Xyne&#39;s common generic functions, for internal use.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/python3-xcpf.html">python3-xcpf</a></td>
+    <td>0</td>
+    <td>119</td>
+    <td>Xyne&#39;s common Pacman functions, for internal use.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/qdirstat.html">qdirstat</a></td>
+    <td>0</td>
+    <td>168</td>
+    <td>Qt-based directory statistics (KDirStat/K4DirStat without any KDE - from the original KDirStat author)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/qownnotes.html">qownnotes</a></td>
+    <td>1</td>
+    <td>143</td>
+    <td>Plain-text file markdown note taking with Nextcloud/ownCloud integration</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/redeclipse.html">redeclipse</a></td>
+    <td>1</td>
+    <td>95</td>
+    <td>free, casual arena shooter</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/rider.html">rider</a></td>
+    <td>0</td>
+    <td>110</td>
+    <td>A cross-platform .NET IDE by JetBrains.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ripsecrets.html">ripsecrets</a></td>
+    <td>0</td>
+    <td>1</td>
+    <td>A command-line tool to prevent committing secret keys into your source code</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/robo3t-bin.html">robo3t-bin</a></td>
+    <td>2</td>
+    <td>146</td>
+    <td>Shell-centric MongoDB management tool</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/rslsync.html">rslsync</a></td>
+    <td>2</td>
+    <td>365</td>
+    <td>Resilio Sync (ex:BitTorrent Sync) - automatically sync files via secure, distributed technology</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/rstudio-desktop-bin.html">rstudio-desktop-bin</a></td>
+    <td>0</td>
+    <td>358</td>
+    <td>An integrated development environment (IDE) for R (binary from RStudio official repository)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/rubymine.html">rubymine</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>Ruby and Rails IDE with the full stack of essential developer tools</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/rustdesk-bin.html">rustdesk-bin</a></td>
+    <td>0</td>
+    <td>168</td>
+    <td>Yet another remote desktop software, written in Rust. Works out of the box, no configuration required.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/rutorrent.html">rutorrent</a></td>
+    <td>0</td>
+    <td>123</td>
+    <td>Yet another web front-end for rTorrent</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/seafile.html">seafile</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>An online file storage and collaboration tool</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/seafile-client.html">seafile-client</a></td>
+    <td>0</td>
+    <td>176</td>
+    <td>GUI client for synchronizing your local files with seafile server</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/slack-desktop.html">slack-desktop</a></td>
+    <td>1</td>
+    <td>638</td>
+    <td>Slack Desktop (Beta) for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/snapd.html">snapd</a></td>
+    <td>0</td>
+    <td>232</td>
+    <td>Service and tools for management of snap packages.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/sonarr-bin.html">sonarr-bin</a></td>
+    <td>0</td>
+    <td>107</td>
+    <td>Smart PVR for newsgroup and torrent users</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/spideroak-one.html">spideroak-one</a></td>
+    <td>1</td>
+    <td>263</td>
+    <td>Secure file backup, sync and sharing client. SpiderOak One client.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/stockfish.html">stockfish</a></td>
+    <td>1</td>
+    <td>170</td>
+    <td>A strong UCI chess engine</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/sublime-text-dev.html">sublime-text-dev</a></td>
+    <td>0</td>
+    <td>515</td>
+    <td>Sophisticated text editor for code, html and prose - dev build</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/swift-bin.html">swift-bin</a></td>
+    <td>0</td>
+    <td>96</td>
+    <td>Binary builds of the Swift programming language</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/syncthingtray.html">syncthingtray</a></td>
+    <td>0</td>
+    <td>96</td>
+    <td>Tray application for Syncthing</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/terminus-font-ttf.html">terminus-font-ttf</a></td>
+    <td>0</td>
+    <td>196</td>
+    <td>Monospaced bitmap font designed for long work with computers (TTF version, mainly for Java applications)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/thinkfan.html">thinkfan</a></td>
+    <td>0</td>
+    <td>198</td>
+    <td>A minimalist fan control program. Supports the sysfs hwmon interface and thinkpad_acpi</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/thunar-dropbox.html">thunar-dropbox</a></td>
+    <td>0</td>
+    <td>324</td>
+    <td>Plugin for Thunar that adds context-menu items for Dropbox.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/todotxt.html">todotxt</a></td>
+    <td>0</td>
+    <td>144</td>
+    <td>Simple and extensible shell script for managing your todo.txt file</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/tortoisehg.html">tortoisehg</a></td>
+    <td>1</td>
+    <td>123</td>
+    <td>Graphical tools for Mercurial</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/trizen.html">trizen</a></td>
+    <td>0</td>
+    <td>322</td>
+    <td>Trizen AUR Package Manager: lightweight pacman wrapper and AUR helper.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/trousers.html">trousers</a></td>
+    <td>0</td>
+    <td>96</td>
+    <td>Open-source TCG Software Stack implementation for use with a TPM</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-envy-code-r.html">ttf-envy-code-r</a></td>
+    <td>0</td>
+    <td>95</td>
+    <td>Free scalable coding font by DamienG</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-inconsolata-g.html">ttf-inconsolata-g</a></td>
+    <td>1</td>
+    <td>160</td>
+    <td>Monospace font for pretty code listings and for the terminal modified by Leonardo Maffi http://www.fantascienza.net/leonardo/)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-iosevka.html">ttf-iosevka</a></td>
+    <td>2</td>
+    <td>143</td>
+    <td>Typeface family designed for coding, terminal use and technical documents.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-merriweather.html">ttf-merriweather</a></td>
+    <td>9</td>
+    <td>115</td>
+    <td>A typeface that is pleasant to read on screens by Sorkin Type Co</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-oswald.html">ttf-oswald</a></td>
+    <td>7</td>
+    <td>104</td>
+    <td>Sans-serif typeface from Google by Vernon Adams</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-quintessential.html">ttf-quintessential</a></td>
+    <td>2</td>
+    <td>104</td>
+    <td>Calligraphic typeface from Google by Brian J. Bonislawsky</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-signika.html">ttf-signika</a></td>
+    <td>0</td>
+    <td>102</td>
+    <td>Sans-serif typeface from Google by Anna Giedryś</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-twemoji-color.html">ttf-twemoji-color</a></td>
+    <td>0</td>
+    <td>116</td>
+    <td>A color and B&amp;W emoji SVG-in-OpenType font by Twitter with support for ZWJ, skin tone modifiers and country flags.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ttf-vista-fonts.html">ttf-vista-fonts</a></td>
+    <td>1</td>
+    <td>439</td>
+    <td>Microsoft Vista and Office 2007 True Type Fonts</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/tty-clock.html">tty-clock</a></td>
+    <td>0</td>
+    <td>118</td>
+    <td>Digital clock in ncurses</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/tuxonice-userui.html">tuxonice-userui</a></td>
+    <td>0</td>
+    <td>99</td>
+    <td>TuxOnIce userspace user interface</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/tvheadend.html">tvheadend</a></td>
+    <td>1</td>
+    <td>115</td>
+    <td>TV streaming server for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/typora.html">typora</a></td>
+    <td>0</td>
+    <td>135</td>
+    <td>A minimal markdown editor and reader.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/ubuntu-themes.html">ubuntu-themes</a></td>
+    <td>0</td>
+    <td>196</td>
+    <td>Ubuntu monochrome icon theme, Ambiance and Radiance themes, and Ubuntu artwork</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/unetbootin.html">unetbootin</a></td>
+    <td>0</td>
+    <td>104</td>
+    <td>Create bootable Live USB drives</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/unityhub.html">unityhub</a></td>
+    <td>1</td>
+    <td>114</td>
+    <td>The Unity Hub is a standalone application that streamlines the way you find, download, and manage your Unity Projects and installations.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/upd72020x-fw.html">upd72020x-fw</a></td>
+    <td>0</td>
+    <td>167</td>
+    <td>Renesas uPD720201 / uPD720202 USB 3.0 chipsets firmware</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/update-grub.html">update-grub</a></td>
+    <td>0</td>
+    <td>132</td>
+    <td>Simple wrapper around grub-mkconfig</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/urlview.html">urlview</a></td>
+    <td>0</td>
+    <td>201</td>
+    <td>A curses URL parser for text files</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/usb-creator.html">usb-creator</a></td>
+    <td>0</td>
+    <td>368</td>
+    <td>Create bootable USB from a LiveCD or disc image ISO</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/vertex-themes.html">vertex-themes</a></td>
+    <td>1</td>
+    <td>174</td>
+    <td>Vertex Gtk2, Gtk3, Metacity, Xfwm, Cinnamon and GNOME Shell themes (GNOME 3.22 version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/vesktop-bin.html">vesktop-bin</a></td>
+    <td>0</td>
+    <td>165</td>
+    <td>A cross platform electron-based desktop app aiming to give you a snappier Discord experience with Vencord pre-installed.(Prebuilt version.Use system-wide electron)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/viber.html">viber</a></td>
+    <td>0</td>
+    <td>264</td>
+    <td>Free and secure calls and messages to anyone, anywhere, on any device and network, in any country!</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/vim-youcompleteme-git.html">vim-youcompleteme-git</a></td>
+    <td>0</td>
+    <td>169</td>
+    <td>A code-completion engine for Vim</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/virtio-win.html">virtio-win</a></td>
+    <td>1</td>
+    <td>112</td>
+    <td>virtio drivers for Windows 7 and newer guests</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/virtualbox-ext-oracle.html">virtualbox-ext-oracle</a></td>
+    <td>0</td>
+    <td>1371</td>
+    <td>Oracle VM VirtualBox Extension Pack</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/visual-studio-code-bin.html">visual-studio-code-bin</a></td>
+    <td>0</td>
+    <td>1705</td>
+    <td>Visual Studio Code (vscode): Editor for building and debugging modern web and cloud applications (official binary version)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/vuze.html">vuze</a></td>
+    <td>0</td>
+    <td>118</td>
+    <td>A feature-rich Java-based BitTorrent client (previously called &#39;Azureus&#39;)</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/wd719x-firmware.html">wd719x-firmware</a></td>
+    <td>0</td>
+    <td>332</td>
+    <td>Firmware for Western Digital WD7193, WD7197, and WD7296 SCSI cards</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/webstorm.html">webstorm</a></td>
+    <td>0</td>
+    <td>189</td>
+    <td>JavaScript IDE and HTML editor</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/wivrn-server.html">wivrn-server</a></td>
+    <td>0</td>
+    <td>101</td>
+    <td>A wireless Monado-based OpenXR runtime for standalone headsets.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/woeusb-ng.html">woeusb-ng</a></td>
+    <td>0</td>
+    <td>194</td>
+    <td>Simple tool that enable you to create your own usb stick with Windows installer.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/xboxdrv.html">xboxdrv</a></td>
+    <td>0</td>
+    <td>272</td>
+    <td>Userspace Xbox gamepad driver and input remapper</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/xcursor-human.html">xcursor-human</a></td>
+    <td>0</td>
+    <td>144</td>
+    <td>Ubuntu&#39;s default cursor theme</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/xlibre-xserver.html">xlibre-xserver</a></td>
+    <td>1</td>
+    <td>106</td>
+    <td>XLibre X server</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/xnviewmp.html">xnviewmp</a></td>
+    <td>0</td>
+    <td>328</td>
+    <td>An efficient multimedia viewer, browser and converter.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/yay.html">yay</a></td>
+    <td>0</td>
+    <td>2647</td>
+    <td>Yet another yogurt. Pacman wrapper and AUR helper written in go.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/yay-bin.html">yay-bin</a></td>
+    <td>0</td>
+    <td>368</td>
+    <td>Yet another yogurt. Pacman wrapper and AUR helper written in go. Pre-compiled.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/yed.html">yed</a></td>
+    <td>0</td>
+    <td>252</td>
+    <td>Very powerful graph editor written in java</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/zen-browser-bin.html">zen-browser-bin</a></td>
+    <td>0</td>
+    <td>339</td>
+    <td>Official package for Zen, a privacy-focused, feature packed Firefox-based web browser</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/zoom.html">zoom</a></td>
+    <td>0</td>
+    <td>744</td>
+    <td>Video Conferencing and Web Conferencing Service</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/zotero-bin.html">zotero-bin</a></td>
+    <td>0</td>
+    <td>460</td>
+    <td>Zotero Standalone. Is a free, easy-to-use tool to help you collect, organize, cite, and share your research sources.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-A">A</span></td>
+    <td><a href="package/zuki-themes.html">zuki-themes</a></td>
+    <td>0</td>
+    <td>484</td>
+    <td>Zuki themes for GNOME, Xfce and more.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-?">?</span></td>
+    <td><a href="package/emacs-git.html">emacs-git</a></td>
+    <td>0</td>
+    <td>109</td>
+    <td>GNU Emacs. Development master branch.</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-?">?</span></td>
+    <td><a href="package/lib32-ncurses5-compat-libs.html">lib32-ncurses5-compat-libs</a></td>
+    <td>0</td>
+    <td>113</td>
+    <td>System V Release 4.0 curses emulation library (32-bit), ABI 5</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-?">?</span></td>
+    <td><a href="package/mesa-git.html">mesa-git</a></td>
+    <td>0</td>
+    <td>192</td>
+    <td>an open-source implementation of the OpenGL specification, git version</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-?">?</span></td>
+    <td><a href="package/openswan.html">openswan</a></td>
+    <td>0</td>
+    <td>144</td>
+    <td>Open Source implementation of IPsec for Linux</td>
+  </tr>
+  
+  <tr>
+    <td><span class="grade grade-?">?</span></td>
+    <td><a href="package/ttf-ms-win10.html">ttf-ms-win10</a></td>
+    <td>0</td>
+    <td>124</td>
+    <td>Microsoft Windows 10 TrueType fonts</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+
+<footer>
+  Generated by <a href="https://github.com/jmelahman/pkglint">pkglint</a> — a static hygiene
+  score for PKGBUILDs, not a malware verdict. A low grade means "worth reviewing", never
+  "malicious", and a high grade is not an endorsement.
+</footer>
+
+</main>
+<script>
+document.getElementById('q').addEventListener('input', function () {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll('#pkgs tbody tr').forEach(function (tr) {
+    tr.style.display = tr.textContent.toLowerCase().indexOf(q) === -1 ? 'none' : '';
+  });
+});
+</script>
+</body>
+</html>

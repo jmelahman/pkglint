@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Rule reference — AUR Report Card</title>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #ffffff; --fg: #1a1f24; --muted: #667; --line: #e3e6ea; --card: #f6f7f9;
+  --a: #2da44e; --b: #97ca00; --c: #dfb317; --d: #fe7d37; --f: #e05d44; --u: #9f9f9f;
+  --link: #0b62c4;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1116; --fg: #e6e9ee; --muted: #99a; --line: #262c35; --card: #161b22; --link: #58a6ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 1.5rem; margin: 0.5rem 0 0.25rem; }
+h1 a { color: inherit; }
+.sub { color: var(--muted); margin: 0 0 1.5rem; }
+.grade { display: inline-block; min-width: 1.6em; padding: 0.05em 0.35em; border-radius: 4px;
+  color: #fff; font-weight: 700; text-align: center; }
+.grade-A { background: var(--a); } .grade-B { background: var(--b); }
+.grade-C { background: var(--c); } .grade-D { background: var(--d); }
+.grade-F { background: var(--f); } .grade-\? { background: var(--u); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
+tr:hover td { background: var(--card); }
+.sevrow td { border-bottom: none; padding-top: 0.15rem; padding-bottom: 0.15rem; }
+.sev { font-size: 0.78rem; font-weight: 700; border-radius: 3px; padding: 0.1em 0.4em; color: #fff; }
+.sev-info { background: #6c7a89; } .sev-warn { background: var(--c); }
+.sev-error { background: var(--d); } .sev-critical { background: var(--f); }
+.tiles { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; min-width: 5.5rem; }
+.tile b { display: block; font-size: 1.3rem; }
+.tile span { color: var(--muted); font-size: 0.8rem; }
+input[type=search] { width: 100%; max-width: 24rem; padding: 0.45rem 0.7rem; margin: 0 0 1rem;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+code, .loc { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 0.85em; }
+.loc { color: var(--muted); }
+.notice { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.7rem 1rem; color: var(--muted); font-size: 0.88rem; margin: 1.25rem 0; }
+.doc { max-width: 46rem; }
+.example { display: grid; gap: 1rem; margin: 1.25rem 0; grid-template-columns: 1fr 1fr; }
+@media (max-width: 44rem) { .example { grid-template-columns: 1fr; } }
+.example figure { margin: 0; }
+.example figcaption { font-size: 0.8rem; font-weight: 700; margin-bottom: 0.3rem;
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.example .bad figcaption { color: var(--f); }
+.example .good figcaption { color: var(--a); }
+.example pre { margin: 0; padding: 0.7rem 0.85rem; border-radius: 8px; overflow-x: auto;
+  border: 1px solid var(--line); background: var(--card);
+  font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 0.82rem; line-height: 1.5; }
+.example .bad pre { border-left: 3px solid var(--f); }
+.example .good pre { border-left: 3px solid var(--a); }
+.rulegroup { margin: 1.75rem 0 0.5rem; font-size: 1.05rem; }
+td.rid { white-space: nowrap; }
+footer { margin-top: 3rem; color: var(--muted); font-size: 0.8rem; }
+.overflow { overflow-x: auto; }
+</style>
+
+</head>
+<body>
+<main>
+<h1><a href="../index.html">AUR Report Card</a> / rules</h1>
+<p class="sub">Every check pkglint runs, grouped by concern. Each links to a page with an
+explanation and a flagged/preferred example.</p>
+
+<div class="notice">Grading: any <span class="sev sev-critical">critical</span> &rarr; F,
+any <span class="sev sev-error">error</span> &rarr; D, three or more
+<span class="sev sev-warn">warn</span> &rarr; C, one or two &rarr; B, otherwise A.
+Suppress a reviewed case inline with <code># pkglint: ignore=PB123</code>.</div>
+
+
+<h2 class="rulegroup">PB1xx — Integrity &amp; provenance</h2>
+<div class="overflow">
+<table>
+  <thead><tr><th>Rule</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td class="rid"><a href="PB101.html">PB101</a></td>
+    <td><code>skipped-checksum</code></td>
+    <td>Every remote, non-VCS source should carry a real checksum. `SKIP` means makepkg performs no integrity verification at all: if the upstream file or the connection is tampered with, nothing notices. Pin the artifact with a sha256 or stronger digest.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB102.html">PB102</a></td>
+    <td><code>weak-checksum</code></td>
+    <td>md5 and sha1 are broken for collision resistance. When they are the only digests present, an attacker able to produce collisions can substitute the source artifact. Add sha256sums, sha512sums or b2sums.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB103.html">PB103</a></td>
+    <td><code>unpinned-vcs-source</code></td>
+    <td>A VCS source without `#commit=` pins to a mutable reference: branches move and tags can be re-pointed by anyone with push access (or a compromised forge account). Pinning the exact commit hash makes the fetched tree tamper-evident.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB104.html">PB104</a></td>
+    <td><code>insecure-transport</code></td>
+    <td>Sources fetched over http://, git:// or ftp:// can be modified in transit. With a strong checksum this downgrades availability rather than integrity, but combined with SKIP or weak sums it is a working man-in-the-middle vector. Use https:// (or git&#43;https://).</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB105.html">PB105</a></td>
+    <td><code>source-url-mismatch</code></td>
+    <td>A source hosted on a different domain than the project&#39;s `url` is worth a second look: repackaged or &#39;mirrored&#39; artifacts are a common way to slip in modified binaries. Often legitimate (CDNs, release mirrors) — hence only informational.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB106.html">PB106</a></td>
+    <td><code>dlagents-override</code></td>
+    <td>Overriding DLAGENTS replaces makepkg&#39;s download logic with arbitrary commands, which run before any checksum is verified. Legitimate uses exist but are rare enough that every override deserves review.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB107.html">PB107</a></td>
+    <td><code>missing-install-script</code></td>
+    <td>The PKGBUILD references an install scriptlet that is not present next to it, so its contents cannot be reviewed or linted.</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+<h2 class="rulegroup">PB2xx — Hermeticity</h2>
+<div class="overflow">
+<table>
+  <thead><tr><th>Rule</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td class="rid"><a href="PB201.html">PB201</a></td>
+    <td><code>network-in-build</code></td>
+    <td>Downloads during build(), check() or package() bypass makepkg&#39;s checksum verification and make the build non-hermetic: what gets compiled depends on network state at build time. Move fetching to prepare() (or better, the source array) where artifacts are pinned by lockfiles or checksums.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB202.html">PB202</a></td>
+    <td><code>pip-without-hashes</code></td>
+    <td>`pip install` without --require-hashes will happily fetch whatever the index serves. With hash-pinned requirements, pip verifies every downloaded artifact against a digest recorded in the requirements file.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB203.html">PB203</a></td>
+    <td><code>cargo-unlocked</code></td>
+    <td>cargo without --locked (or --frozen/--offline) may resolve and fetch dependency versions that differ from the committed Cargo.lock, so the built artifact is not reproducible and unreviewed code can enter the build.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB204.html">PB204</a></td>
+    <td><code>go-implicit-downloads</code></td>
+    <td>`go build` fetches modules on demand unless they were vendored or pre-downloaded. That download happens inside build() with no makepkg-level verification (go.sum verifies content, but resolution still depends on network state). Vendor the modules, or run `go mod download` in prepare().</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB205.html">PB205</a></td>
+    <td><code>go-verification-disabled</code></td>
+    <td>GOFLAGS/GONOSUMCHECK/GOSUMDB/GOINSECURE settings that disable Go&#39;s module checksum database or allow insecure transports remove the only integrity verification Go downloads get inside a build.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB206.html">PB206</a></td>
+    <td><code>npm-install-unlocked</code></td>
+    <td>`npm install` may rewrite the dependency tree; `npm ci` (and yarn --immutable) installs exactly what the committed lockfile specifies and fails otherwise.</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+<h2 class="rulegroup">PB3xx — Execution &amp; obfuscation</h2>
+<div class="overflow">
+<table>
+  <thead><tr><th>Rule</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td class="rid"><a href="PB301.html">PB301</a></td>
+    <td><code>top-level-execution</code></td>
+    <td>Commands outside any function run the moment the PKGBUILD is sourced — including by tools that only wanted metadata (`makepkg --printsrcinfo`, AUR helpers rendering a preview). Top-level code should be limited to variable assignments.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB302.html">PB302</a></td>
+    <td><code>eval</code></td>
+    <td>eval executes a string as code, defeating static review: what actually runs is assembled at build time. Almost every legitimate use has a plain-bash equivalent.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB303.html">PB303</a></td>
+    <td><code>decode-and-execute</code></td>
+    <td>Decoding embedded data (base64, xxd, openssl enc) and piping it into an interpreter is the canonical way to smuggle a payload past human review. There is no legitimate reason for a PKGBUILD to execute decoded blobs.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB304.html">PB304</a></td>
+    <td><code>download-and-execute</code></td>
+    <td>Piping a download straight into an interpreter executes whatever the server chooses to send, with no checksum, no review, and no record. This includes `eval &#34;$(curl ...)&#34;`, `sh -c &#34;$(wget ...)&#34;` and `source &lt;(curl ...)` variants.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB305.html">PB305</a></td>
+    <td><code>dev-tcp</code></td>
+    <td>/dev/tcp and /dev/udp redirections are bash&#39;s built-in network sockets — in a PKGBUILD they are typically reverse shells or exfiltration, never packaging.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB306.html">PB306</a></td>
+    <td><code>unresolvable-command</code></td>
+    <td>A command whose name comes from indirection (${!var}) or command substitution cannot be statically reviewed. In a PKGBUILD, hiding *which program runs* is itself a signal: obfuscation is what this rule flags.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB307.html">PB307</a></td>
+    <td><code>obfuscated-payload</code></td>
+    <td>Long hex-escape sequences or large base64-looking literals embedded in a build script are how encoded payloads look at rest. Flagged for human review.</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+<h2 class="rulegroup">PB4xx — Filesystem &amp; privilege</h2>
+<div class="overflow">
+<table>
+  <thead><tr><th>Rule</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td class="rid"><a href="PB401.html">PB401</a></td>
+    <td><code>write-outside-builddir</code></td>
+    <td>A build must only write beneath $srcdir and $pkgdir. Writes to $HOME or absolute system paths either corrupt the builder&#39;s machine or hint at persistence being installed outside the package manager&#39;s tracking.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB402.html">PB402</a></td>
+    <td><code>privilege-escalation</code></td>
+    <td>makepkg builds must never escalate: sudo/su/doas/pkexec in a PKGBUILD runs arbitrary commands as root on the build machine. Anything needing privileges belongs in the package&#39;s install step, executed and tracked by pacman.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB403.html">PB403</a></td>
+    <td><code>setuid-file</code></td>
+    <td>chmod u&#43;s/g&#43;s (or 4xxx/2xxx modes) creates setuid/setgid binaries — a privilege boundary that deserves explicit review whenever a package ships one.</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+<h2 class="rulegroup">PB5xx — Install scriptlets</h2>
+<div class="overflow">
+<table>
+  <thead><tr><th>Rule</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td class="rid"><a href="PB501.html">PB501</a></td>
+    <td><code>network-in-scriptlet</code></td>
+    <td>Install scriptlets run as root during pacman transactions. A scriptlet that talks to the network executes unreviewable remote input at the worst possible moment — this is how the 2018 acroread AUR compromise delivered its payload.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB502.html">PB502</a></td>
+    <td><code>scriptlet-persistence</code></td>
+    <td>Files a package ships belong in package(), tracked and removed by pacman. A scriptlet that edits crontabs, systemd units, shell profiles or autostart entries, or creates login-capable users, is installing untracked persistence — a classic backdoor pattern.</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+<h2 class="rulegroup">PB6xx — Metadata consistency</h2>
+<div class="overflow">
+<table>
+  <thead><tr><th>Rule</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+  
+  <tr>
+    <td class="rid"><a href="PB601.html">PB601</a></td>
+    <td><code>srcinfo-mismatch</code></td>
+    <td>.SRCINFO is what the AUR web interface and helpers display; the PKGBUILD is what executes. A mismatch means reviewers saw different metadata than the build uses — sometimes a stale regeneration, sometimes deliberate misdirection.</td>
+  </tr>
+  
+  <tr>
+    <td class="rid"><a href="PB602.html">PB602</a></td>
+    <td><code>network-in-pkgver</code></td>
+    <td>pkgver() should derive a version from the already-fetched sources (git describe, cat VERSION). Downloading inside pkgver() executes network-dependent code on every makepkg invocation, including ones the user thought were offline.</td>
+  </tr>
+  
+  </tbody>
+</table>
+</div>
+
+
+
+<footer>
+  Generated by <a href="https://github.com/jmelahman/pkglint">pkglint</a> — a static hygiene
+  score for PKGBUILDs, not a malware verdict. A low grade means "worth reviewing", never
+  "malicious", and a high grade is not an endorsement.
+</footer>
+
+</main>
+</body>
+</html>

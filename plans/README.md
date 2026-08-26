@@ -33,7 +33,7 @@ bug from the audit:
 | [002](002-source-append-support.md) | Support `+=` append assignments | P1 | M | MED | 001 | C1 (`source+=`/`depends+=` ignored) | DONE (e2b73a7) |
 | [003](003-source-url-parsing.md) | Correct source-URL fragment/query + per-element positions | P1 | M | MED | 001, ~002 | C2 (VCS-pin false-neg; wrong columns) | DONE (9c3fd52, f4f3c42) |
 | [004](004-scriptlet-parse-errors.md) | Surface unparseable install scriptlets (new PB503) | P1 | S | LOW | — | C4 (root-run scriptlet silently skipped) | DONE (279931a) |
-| [005](005-suppressions-keyed-by-file.md) | Key inline suppressions by (file, line) | P1 | M | MED | 001 | C3 (cross-file suppression bleed) | TODO |
+| [005](005-suppressions-keyed-by-file.md) | Key inline suppressions by (file, line) | P1 | M | MED | 001 | C3 (cross-file suppression bleed) | DONE (bb81e80) |
 | [006](006-setuid-octal-parsing.md) | Detect setuid/setgid by octal parse, not leading digit | P1 | S | LOW | — | C7 (PB403 evadable via `04755`/`7755`) | DONE (21a5282) |
 | [007](007-hermeticity-coverage-gaps.md) | Close 3 hermeticity gaps (PB204 `go get`/vendor, PB205 `export`) | P1 | M | MED | — | C8, C12, C9 | DONE (f2b1a7e) |
 | [008](008-harden-untrusted-paths.md) | Contain `install=` paths; harden `git ls-remote` | P1/P2 | S | LOW | — | SEC2 (traversal/DoS), SEC1 (hardening) | DONE (2aa70a1, 1424ea5) |
@@ -41,7 +41,7 @@ bug from the audit:
 | [010](010-deterministic-findings.md) | Total-ordered, de-duplicated findings | P1 | S | LOW | — | C13 (unstable sort), C15 (PB502 dupes) | DONE (8fba363) |
 | [011](011-site-generator-hardening.md) | Sanitize package names; bound download/decompress | P2 | S–M | LOW | — | SEC4 (path traversal), SEC6 (DoS) | DONE (ebaaefd) |
 | [012](012-ci-credential-separation.md) | Split untrusted scan from credentialed push (site.yml) | P2 | S | LOW | — | SEC3 (co-resident push token) | DONE (55ca6c1) |
-| [013](013-lint-examples-regression-suite.md) | Bad/Good examples become a regression suite | P2 | M | LOW | ~004 | DIRECTION-03 (example-drift guard) | TODO |
+| [013](013-lint-examples-regression-suite.md) | Bad/Good examples become a regression suite | P2 | M | LOW | ~004 | DIRECTION-03 (example-drift guard) | DONE (071c3e9) |
 | [014](014-sarif-output.md) | Add `--format=sarif` (SARIF 2.1.0) | P2 | M | LOW | ~009, ~010 | DIRECTION-02 (interoperability) | DONE (15aa29e) |
 
 `~` = "sequence after if landing both, but not a hard dependency."
@@ -107,6 +107,46 @@ as an exploitable bug — see downgraded note below.
   `ext::`/`file::` transport tricks), **not a present exploit**: the ref is passed
   as a separate argv (no shell), and pkglint statically analyzes rather than builds.
   It is folded into **plan 008 Part B** at P2 rather than treated as a critical bug.
+
+### Follow-ups surfaced during execution (2026-08-26, all plans DONE)
+
+Found by executors while implementing the plans; deliberately NOT fixed because
+each was out of its finder's scope. Recorded here so they aren't lost.
+
+- **FU-01 — PB403 short-flag cluster evasion (from 006).** `install -Dm04755`
+  (5-digit mode in a clustered flag) still evades PB403: `shortFlagModeRe` in
+  `internal/rules/fs.go` caps the mode at `[0-7]{3,4}`. Likely fix `{3,5}`.
+  Same class of bypass plan 006 closed; deserves its own small plan + tests.
+- **FU-02 — PB403 Doc understates the rule (from 006).** The `Doc` still says
+  "4xxx/2xxx modes"; detection is now by octal mask (04755/7755 count).
+- **FU-03 — PB205 in-function findings are not auto-fixable (from 007).**
+  `fixGoEnvWeakening` only rewrites command-prefix and top-level assignments;
+  the new function-body `export GOSUMDB=off` findings are reported but `--fix`
+  leaves them. A FixSafe rule now emits findings its fixer ignores.
+- **FU-04 — PB306 blind spot / example mismatch (from 013; the one REVIEW
+  entry in `examples_test.go` knownGaps).** A command invoked as a bare `$var`
+  (assigned from a substitution on a previous line) trips nothing; the rule
+  only covers `${!indirect}` and directly-dynamic command words, and PB306's
+  Bad example uses exactly the uncovered shape. Maintainer call: rewrite the
+  example to invoke the substitution directly, or widen the rule (carefully —
+  a naive `hasVarRef` arm would flag benign `"$srcdir/configure"` calls).
+- **FU-05 — appended source elements lack their own positions (from 002/003).**
+  `mergeAppend` keeps only the first assignment's `Assign`, so findings on
+  `source+=` elements anchor to the base array's position (fixes DO target the
+  right element now, via the AST-side merged indexing). Exact positions need
+  per-element provenance in the `Var` model.
+- **FU-06 — `writeFixed` follows symlinks (pre-existing, re-flagged by 008).**
+  A symlinked PKGBUILD could redirect a `--fix` write; consider
+  `O_NOFOLLOW`/lstat in a hardening pass.
+- **FU-07 — SARIF URIs are not repo-relative (from 014).** Fine for local use;
+  GitHub code-scanning annotations would want repo-relative
+  `artifactLocation.uri` (+ `originalUriBaseIds`), and a CI `upload-sarif`
+  step is the natural pairing.
+- **FU-08 — `SumsFor` cross-algorithm order is map-random (from 001).** Only
+  observable when a source has sums under multiple algorithms; tests sort.
+- **FU-09 — site generator log flood (from 011, minor).** A wholly hostile
+  metadata dump would emit one `log.Printf` per rejected package base
+  (~100k lines worst case); aggregate if it ever matters.
 
 ### Tech-debt notes (no plan; recorded for the maintainer)
 

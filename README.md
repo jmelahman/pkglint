@@ -64,14 +64,19 @@ release pinned with a perfectly valid checksum.
 ## Report card site
 
 `site/` generates a static "AUR Report Card" — grades, per-package finding pages,
-per-rule documentation pages, `results.json`, and embeddable SVG badges:
+a [rule reference](https://jamison.lahman.dev/pkglint/rules/) with a flagged/preferred
+example for every check, `results.json`, and embeddable SVG badges:
 
 ```shell
-go run ./site -maintainer Jamison -top 500 -out public
+go run ./site -maintainer Jamison -top 500 -out docs
 ```
 
 It downloads the AUR metadata dump once a day, fetches package snapshots politely
 (throttled, cached by `LastModified`), and scans everything in-process.
+
+The generated site is checked into [`docs/`](docs/) and served at
+<https://jamison.lahman.dev/pkglint/>. The [`Report card site`](.github/workflows/site.yml)
+workflow regenerates it nightly and commits any changes.
 
 ## Roadmap
 

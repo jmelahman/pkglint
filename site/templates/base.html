@@ -44,6 +44,20 @@ code, .loc { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-
 .notice { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   padding: 0.7rem 1rem; color: var(--muted); font-size: 0.88rem; margin: 1.25rem 0; }
 .doc { max-width: 46rem; }
+.example { display: grid; gap: 1rem; margin: 1.25rem 0; grid-template-columns: 1fr 1fr; }
+@media (max-width: 44rem) { .example { grid-template-columns: 1fr; } }
+.example figure { margin: 0; }
+.example figcaption { font-size: 0.8rem; font-weight: 700; margin-bottom: 0.3rem;
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.example .bad figcaption { color: var(--f); }
+.example .good figcaption { color: var(--a); }
+.example pre { margin: 0; padding: 0.7rem 0.85rem; border-radius: 8px; overflow-x: auto;
+  border: 1px solid var(--line); background: var(--card);
+  font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 0.82rem; line-height: 1.5; }
+.example .bad pre { border-left: 3px solid var(--f); }
+.example .good pre { border-left: 3px solid var(--a); }
+.rulegroup { margin: 1.75rem 0 0.5rem; font-size: 1.05rem; }
+td.rid { white-space: nowrap; }
 footer { margin-top: 3rem; color: var(--muted); font-size: 0.8rem; }
 .overflow { overflow-x: auto; }
 </style>

@@ -7,14 +7,18 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: report-card-site
+  cancel-in-progress: false
+
 jobs:
-  build:
+  regenerate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       # TODO: pin actions by SHA with ratchet before enabling branch protection.
       - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -23,20 +27,15 @@ jobs:
           path: .cache
           key: aur-snapshots-${{ github.run_id }}
           restore-keys: aur-snapshots-
-      - run: go run ./site -maintainer Jamison -top 500 -out public
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: public
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - run: go run ./site -maintainer Jamison -top 500 -out docs
+      - name: Commit refreshed site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if git diff --cached --quiet; then
+            echo "No changes to the report card."
+          else
+            git commit -m "Regenerate report card site"
+            git push
+          fi

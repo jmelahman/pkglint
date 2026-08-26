@@ -6,9 +6,19 @@
 </head>
 <body>
 <main>
-<h1><a href="../index.html">AUR Report Card</a> / {{.Rule.ID}}</h1>
+<h1><a href="../index.html">AUR Report Card</a> / <a href="index.html">rules</a> / {{.Rule.ID}}</h1>
 <p class="sub"><code>{{.Rule.Name}}</code></p>
 <div class="doc"><p>{{.Rule.Doc}}</p></div>
+<div class="example">
+  <figure class="bad">
+    <figcaption>Flagged</figcaption>
+    <pre>{{.Rule.Bad}}</pre>
+  </figure>
+  <figure class="good">
+    <figcaption>Preferred</figcaption>
+    <pre>{{.Rule.Good}}</pre>
+  </figure>
+</div>
 <div class="notice">Suppress a reviewed, intentional case with
 <code># pkglint: ignore={{.Rule.ID}}</code> on (or above) the offending line, or skip the
 rule entirely with <code>--ignore {{.Rule.ID}}</code>.</div>

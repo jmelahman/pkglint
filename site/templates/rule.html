@@ -1,0 +1,19 @@
+{{define "rule.html"}}<!doctype html>
+<html lang="en">
+<head>
+<title>{{.Rule.ID}}: {{.Rule.Name}} — AUR Report Card</title>
+{{template "head" .}}
+</head>
+<body>
+<main>
+<h1><a href="../index.html">AUR Report Card</a> / {{.Rule.ID}}</h1>
+<p class="sub"><code>{{.Rule.Name}}</code></p>
+<div class="doc"><p>{{.Rule.Doc}}</p></div>
+<div class="notice">Suppress a reviewed, intentional case with
+<code># pkglint: ignore={{.Rule.ID}}</code> on (or above) the offending line, or skip the
+rule entirely with <code>--ignore {{.Rule.ID}}</code>.</div>
+{{template "footer" .}}
+</main>
+</body>
+</html>
+{{end}}

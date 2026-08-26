@@ -1,0 +1,55 @@
+{{define "index.html"}}<!doctype html>
+<html lang="en">
+<head>
+<title>AUR Report Card</title>
+{{template "head" .}}
+</head>
+<body>
+<main>
+<h1>AUR Report Card</h1>
+<p class="sub">Static security &amp; hygiene grades for AUR PKGBUILDs, generated {{.Generated}} by pkglint.</p>
+
+<div class="tiles">
+  <div class="tile"><b>{{.Total}}</b><span>packages</span></div>
+  <div class="tile"><b>{{.Findings}}</b><span>findings</span></div>
+  {{range $g := .Grades}}{{with index $.Counts $g}}
+  <div class="tile"><b><span class="grade grade-{{$g}}">{{$g}}</span> {{.}}</b><span>graded {{$g}}</span></div>
+  {{end}}{{end}}
+</div>
+
+<div class="notice">Grades are a <strong>static hygiene score</strong> — they measure how
+reviewable and reproducible a PKGBUILD is (pinned sources, no network during build, no
+opaque code paths). They are <strong>not</strong> a malware verdict: a C is "room for
+improvement", not an accusation, and an A is not an endorsement.</div>
+
+<input type="search" id="q" placeholder="Filter packages…" autocomplete="off">
+<div class="overflow">
+<table id="pkgs">
+  <thead><tr><th>Grade</th><th>Package</th><th>Findings</th><th>Votes</th><th>Description</th></tr></thead>
+  <tbody>
+  {{range .Results}}
+  <tr>
+    <td><span class="grade grade-{{.Grade}}">{{.Grade}}</span></td>
+    <td><a href="package/{{.Name}}.html">{{.Name}}</a></td>
+    <td>{{len .Findings}}</td>
+    <td>{{.Votes}}</td>
+    <td>{{.Description}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+
+{{template "footer" .}}
+</main>
+<script>
+document.getElementById('q').addEventListener('input', function () {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll('#pkgs tbody tr').forEach(function (tr) {
+    tr.style.display = tr.textContent.toLowerCase().indexOf(q) === -1 ? 'none' : '';
+  });
+});
+</script>
+</body>
+</html>
+{{end}}

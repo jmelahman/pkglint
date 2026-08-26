@@ -1,8 +1,10 @@
 package rules
 
 import (
+	"path"
 	"strings"
 
+	"github.com/jmelahman/pkglint/internal/pkgbuild"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -318,11 +320,27 @@ func goVendored(ctx *Context) bool {
 		}
 	}
 	for _, e := range ctx.Pkg.Sources() {
-		if strings.Contains(strings.ToLower(e.Expanded), "vendor") {
+		if isVendorArchive(e) {
 			return true
 		}
 	}
 	return false
+}
+
+// isVendorArchive reports whether a source looks like a bundled vendored-deps
+// archive (vendor.tar.gz, foo-1.0-vendor.tar.zst, a local "vendor" bundle),
+// rather than any URL that merely contains the substring "vendor" (e.g. a
+// GitHub org literally named "somevendor"). Only the file-name component is
+// considered.
+func isVendorArchive(e pkgbuild.SourceEntry) bool {
+	name := e.Filename // the `name::url` local name, when present
+	if name == "" {
+		name = path.Base(e.URL)
+	}
+	name = strings.ToLower(name)
+	return strings.HasPrefix(name, "vendor") ||
+		strings.Contains(name, "-vendor.") ||
+		strings.Contains(name, "vendor.tar")
 }
 
 // mutableGoRef reports whether a go package argument pins to a mutable
@@ -366,7 +384,7 @@ func checkGoDownloads(ctx *Context) []Finding {
 			continue
 		}
 		sub := c.Subcommand()
-		if sub != "build" && sub != "install" && sub != "test" && sub != "run" && !(sub == "mod" && c.HasArg("download")) {
+		if sub != "build" && sub != "install" && sub != "test" && sub != "run" && sub != "get" && !(sub == "mod" && c.HasArg("download")) {
 			continue
 		}
 		out = append(out, c.finding("PB204", Warn,
@@ -419,14 +437,31 @@ func checkGoEnvWeakening(ctx *Context) []Finding {
 				out = append(out, c.finding("PB205", Warn, "%s", msg))
 			}
 		}
-		if c.Name == "export" || c.Name == "declare" {
-			for _, a := range c.Args {
-				if name, val, ok := strings.Cut(a, "="); ok {
-					if msg, isBad := bad(name, val); isBad {
-						out = append(out, c.finding("PB205", Warn, "%s", msg))
+	}
+	// `export`/`declare`/`local`/`readonly` are DeclClause nodes, never
+	// CallExpr, so they never reach ctx.Commands(). Walk function bodies for
+	// them. Top-level ones are already handled via ctx.Pkg.Vars above.
+	for _, u := range ctx.Pkg.Units() {
+		for _, fn := range u.Functions {
+			syntax.Walk(fn.Body, func(n syntax.Node) bool {
+				decl, ok := n.(*syntax.DeclClause)
+				if !ok {
+					return true
+				}
+				for _, as := range decl.Args {
+					if as.Name == nil {
+						continue
+					}
+					val := ""
+					if as.Value != nil {
+						val, _ = renderPlain(as.Value)
+					}
+					if msg, isBad := bad(as.Name.Value, val); isBad {
+						out = append(out, findingAt("PB205", Warn, u.Path, as.Pos(), "%s", msg))
 					}
 				}
-			}
+				return true
+			})
 		}
 	}
 	return out

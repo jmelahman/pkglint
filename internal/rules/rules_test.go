@@ -498,6 +498,118 @@ build() {
 	})
 }
 
+// headerWithSource builds a PKGBUILD header whose source array is exactly src.
+func headerWithSource(src string) string {
+	return `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=(` + src + `)
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`
+}
+
+// TestHermeticityCoverageGaps covers three ways a PKGBUILD used to defeat the
+// hermeticity rules: a build-phase `go get`, a source URL merely containing
+// "vendor", and `export GOSUMDB=off` inside a build function.
+func TestHermeticityCoverageGaps(t *testing.T) {
+	// A — build-phase `go get` is an implicit download.
+	t.Run("PB204 bare go get in build", func(t *testing.T) {
+		expectRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go get example.com/m
+}`)})
+	})
+	t.Run("PB204 go get in prepare is fine", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  go get example.com/m
+}`)})
+	})
+	t.Run("PB204 mutable go get in build reports exactly once", func(t *testing.T) {
+		ids := ruleIDs(lint(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go get example.com/m@latest
+}`)}))
+		if ids["PB204"] != 1 {
+			t.Errorf("expected exactly one PB204, got %v", ids)
+		}
+	})
+
+	// B — a "vendor" substring in a source URL must not disable PB204.
+	t.Run("PB204 vendor substring in source URL does not suppress", func(t *testing.T) {
+		expectRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith(
+			headerWithSource(`"https://github.com/somevendor/proj/archive/v1.tar.gz"`), `
+build() {
+  go build -o demo .
+}`)})
+	})
+	t.Run("PB204 real vendor archive suppresses", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith(
+			headerWithSource(`"vendor.tar.gz"`), `
+build() {
+  go build -o demo .
+}`)})
+	})
+	t.Run("PB204 named vendor bundle suppresses", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith(
+			headerWithSource(`"vendor::https://example.com/demo-deps.tar.gz"`), `
+build() {
+  go build -o demo .
+}`)})
+	})
+	t.Run("PB204 suffixed vendor archive suppresses", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith(
+			headerWithSource(`"https://example.com/demo-1.0-vendor.tar.zst"`), `
+build() {
+  go build -o demo .
+}`)})
+	})
+
+	// C — export/declare inside a function is a DeclClause, not a Command.
+	t.Run("PB205 export GOSUMDB=off inside build", func(t *testing.T) {
+		expectRule(t, "PB205", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  export GOSUMDB=off
+  go build -mod=vendor -o demo .
+}`)})
+	})
+	t.Run("PB205 declare GOINSECURE inside build", func(t *testing.T) {
+		expectRule(t, "PB205", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  declare GOINSECURE='*.example.com'
+  go build -mod=vendor -o demo .
+}`)})
+	})
+	t.Run("PB205 top-level export reports exactly once", func(t *testing.T) {
+		ids := ruleIDs(lint(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+export GOSUMDB=off
+
+build() {
+  go build -mod=vendor -o demo .
+}`)}))
+		if ids["PB205"] != 1 {
+			t.Errorf("expected exactly one PB205, got %v", ids)
+		}
+	})
+	t.Run("PB205 bare top-level assignment still fires", func(t *testing.T) {
+		expectRule(t, "PB205", map[string]string{"PKGBUILD": pkgbuildWith("", `
+GOSUMDB=off
+
+build() {
+  go build -mod=vendor -o demo .
+}`)})
+	})
+	t.Run("PB205 benign export inside build is fine", func(t *testing.T) {
+		expectNoRule(t, "PB205", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  export GOFLAGS=-trimpath
+  go build -mod=vendor -o demo .
+}`)})
+	})
+}
+
 func TestExecRules(t *testing.T) {
 	t.Run("PB301 top-level command", func(t *testing.T) {
 		expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `curl https://example.com/beacon`)})

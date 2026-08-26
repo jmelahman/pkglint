@@ -269,4 +269,51 @@ makepkg --printsrcinfo > .SRCINFO`,
   git describe --tags | sed 's/^v//;s/-/./g'
 }`,
 	},
+	"PB701": {
+		Bad:  `pkgname=Foo:Bar   # ':' and uppercase are not allowed by makepkg`,
+		Good: `pkgname=foo-bar`,
+	},
+	"PB702": {
+		Bad:  `pkgver=1.2.3-beta   # '-' separates pkgver from pkgrel and is not allowed here`,
+		Good: `pkgver=1.2.3.beta`,
+	},
+	"PB703": {
+		Bad:  `pkgrel=1a   # pkgrel must be an integer, optionally with a .minor suffix`,
+		Good: `pkgrel=1`,
+	},
+	"PB704": {
+		Bad:  `epoch=1.0   # epoch must be a non-negative integer`,
+		Good: `epoch=1`,
+	},
+	"PB705": {
+		Bad:  `backup=('/etc/foo.conf')   # backup paths are relative to /`,
+		Good: `backup=('etc/foo.conf')`,
+	},
+	"PB706": {
+		Bad:  `options=('!striped')   # typo: not a known makepkg option`,
+		Good: `options=('!strip')`,
+	},
+	"PB707": {
+		Bad:  `provides=('libfoo<2')   # a provide is a concrete capability, not a range`,
+		Good: `provides=('libfoo=1.9')`,
+	},
+	"PB708": {
+		Bad:  `depends=gtk3   # list fields must be arrays`,
+		Good: `depends=('gtk3')`,
+	},
+	"PB709": {
+		Bad: `package() {
+  makedepends=('go')   # makedepends can't be overridden per-package
+  make DESTDIR="$pkgdir" install
+}`,
+		Good: `makedepends=('go')
+package() {
+  depends=('glibc')   # only packaging metadata may be set here
+  make DESTDIR="$pkgdir" install
+}`,
+	},
+	"PB710": {
+		Bad:  `arch=('any' 'x86_64')   # 'any' cannot be combined with concrete architectures`,
+		Good: `arch=('x86_64')`,
+	},
 }

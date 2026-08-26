@@ -153,6 +153,39 @@ package() {
 	mustNotContain(t, got, "4755")
 }
 
+func TestFixBackupSlash(t *testing.T) {
+	got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+backup=('/etc/foo.conf' 'etc/bar.conf')
+`}, FixSafe, nil)["PKGBUILD"]
+	mustContain(t, got, "'etc/foo.conf'")
+	mustContain(t, got, "'etc/bar.conf'")
+	mustNotContain(t, got, "'/etc/foo.conf'")
+}
+
+func TestFixVariableType(t *testing.T) {
+	t.Run("bare word wrapped in array", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+depends=gtk3
+`}, FixSafe, nil)["PKGBUILD"]
+		mustContain(t, got, "depends=(gtk3)")
+	})
+	t.Run("quoted scalar wrapped preserving the single element", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+license="MIT"
+`}, FixSafe, nil)["PKGBUILD"]
+		mustContain(t, got, `license=("MIT")`)
+	})
+}
+
 // Unsafe fixes must not run under the safe level.
 func TestFixLevelGating(t *testing.T) {
 	body := `

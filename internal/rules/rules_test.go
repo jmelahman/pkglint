@@ -591,6 +591,121 @@ pkgver() {
 	})
 }
 
+func TestCorrectnessRules(t *testing.T) {
+	// A minimal valid metadata header these tests vary one field at a time.
+	valid := `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')`
+
+	t.Run("PB701 invalid pkgname characters", func(t *testing.T) {
+		expectRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=Foo:Bar\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+	t.Run("PB701 leading hyphen", func(t *testing.T) {
+		expectRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=-demo\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+	t.Run("PB701 valid name is fine", func(t *testing.T) {
+		expectNoRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=foo-bar_2.0+git\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+	t.Run("PB701 array pkgname (split package) validated per element", func(t *testing.T) {
+		expectRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=('good' 'Bad:Name')\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+
+	t.Run("PB702 pkgver with hyphen", func(t *testing.T) {
+		expectRule(t, "PB702", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1.2.3-beta\npkgrel=1\narch=('any')\n"})
+	})
+	t.Run("PB702 pkgver with colon", func(t *testing.T) {
+		expectRule(t, "PB702", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1:2.3\npkgrel=1\narch=('any')\n"})
+	})
+	t.Run("PB702 valid pkgver is fine", func(t *testing.T) {
+		expectNoRule(t, "PB702", map[string]string{"PKGBUILD": valid + "\n"})
+	})
+	t.Run("PB702 skipped when pkgver() computes it", func(t *testing.T) {
+		expectNoRule(t, "PB702", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1.2.3-beta\npkgrel=1\narch=('any')\npkgver() {\n  echo 1\n}\n"})
+	})
+
+	t.Run("PB703 non-numeric pkgrel", func(t *testing.T) {
+		expectRule(t, "PB703", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1a\narch=('any')\n"})
+	})
+	t.Run("PB703 decimal pkgrel is fine", func(t *testing.T) {
+		expectNoRule(t, "PB703", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1.5\narch=('any')\n"})
+	})
+
+	t.Run("PB704 non-integer epoch", func(t *testing.T) {
+		expectRule(t, "PB704", map[string]string{"PKGBUILD": valid + "\nepoch=1.0\n"})
+	})
+	t.Run("PB704 integer epoch is fine", func(t *testing.T) {
+		expectNoRule(t, "PB704", map[string]string{"PKGBUILD": valid + "\nepoch=2\n"})
+	})
+
+	t.Run("PB705 backup leading slash", func(t *testing.T) {
+		expectRule(t, "PB705", map[string]string{"PKGBUILD": valid + "\nbackup=('/etc/foo.conf')\n"})
+	})
+	t.Run("PB705 relative backup is fine", func(t *testing.T) {
+		expectNoRule(t, "PB705", map[string]string{"PKGBUILD": valid + "\nbackup=('etc/foo.conf')\n"})
+	})
+
+	t.Run("PB706 unknown option", func(t *testing.T) {
+		expectRule(t, "PB706", map[string]string{"PKGBUILD": valid + "\noptions=('!striped')\n"})
+	})
+	t.Run("PB706 known options are fine", func(t *testing.T) {
+		expectNoRule(t, "PB706", map[string]string{"PKGBUILD": valid + "\noptions=('!strip' 'lto' '!debug')\n"})
+	})
+
+	t.Run("PB707 provides comparison operator", func(t *testing.T) {
+		expectRule(t, "PB707", map[string]string{"PKGBUILD": valid + "\nprovides=('libfoo<2')\n"})
+	})
+	t.Run("PB707 exact version provide is fine", func(t *testing.T) {
+		expectNoRule(t, "PB707", map[string]string{"PKGBUILD": valid + "\nprovides=('libfoo=1.9')\n"})
+	})
+
+	t.Run("PB708 scalar list field", func(t *testing.T) {
+		expectRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends=gtk3\n"})
+	})
+	t.Run("PB708 array scalar field", func(t *testing.T) {
+		expectRule(t, "PB708", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('any')\npkgdesc=('a demo')\n"})
+	})
+	t.Run("PB708 correct types are fine", func(t *testing.T) {
+		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends=('gtk3')\n"})
+	})
+	t.Run("PB708 scalar pkgname is allowed (not a schema array)", func(t *testing.T) {
+		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+
+	t.Run("PB709 non-override var in package function", func(t *testing.T) {
+		expectRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  makedepends=('go')\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
+	})
+	t.Run("PB709 override var in package function is fine", func(t *testing.T) {
+		expectNoRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  depends=('glibc')\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
+	})
+	t.Run("PB709 local var in package function is fine", func(t *testing.T) {
+		expectNoRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  somevar=1\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
+	})
+	t.Run("PB709 local-declared schema var is not a global override", func(t *testing.T) {
+		// makepkg's regex only matches bare assignments, not `local`/`declare`.
+		expectNoRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  local makedepends=('go')\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
+	})
+	t.Run("PB709 nested schema var is still flagged", func(t *testing.T) {
+		expectRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  if true; then\n    source=('x')\n  fi\n}\n"})
+	})
+
+	t.Run("PB710 missing arch", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\n"})
+	})
+	t.Run("PB710 any combined with concrete arch", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('any' 'x86_64')\n"})
+	})
+	t.Run("PB710 duplicate arch", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('x86_64' 'x86_64')\n"})
+	})
+	t.Run("PB710 invalid arch characters", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('x86-64')\n"})
+	})
+	t.Run("PB710 valid arch is fine", func(t *testing.T) {
+		expectNoRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('x86_64' 'aarch64')\n"})
+	})
+}
+
 func TestSuppression(t *testing.T) {
 	files := map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {

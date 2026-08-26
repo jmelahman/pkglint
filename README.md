@@ -4,7 +4,9 @@ A security-focused linter for Arch Linux PKGBUILDs.
 
 pkglint statically analyzes PKGBUILDs and their install scriptlets — **without ever
 sourcing them** — and reports findings about source integrity, build hermeticity, code
-execution, and persistence patterns, condensed into a letter grade per package. It is
+execution, and persistence patterns, condensed into a letter grade per package. It also
+reproduces makepkg's own build-breaking metadata checks, so a PKGBUILD that would fail to
+build is caught (and, where the fix is mechanical, rewritten) before you run makepkg. It is
 built on a real bash AST ([mvdan.cc/sh](https://github.com/mvdan/sh)), so the
 quoting/line-continuation tricks that evade regex-based scanners don't work here.
 
@@ -51,7 +53,7 @@ writing. Fixes come in two tiers:
 
 | Tier | Flag | Rules | What it does |
 |------|------|-------|--------------|
-| Safe | `--fix` | PB103, PB203, PB205 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings |
+| Safe | `--fix` | PB103, PB203, PB205, PB705, PB708 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`) |
 | Unsafe | `--unsafe-fix` | PB204, PB206, PB403 | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; drop setuid/setgid mode bits |
 
 Safe fixes preserve behavior or restore a security default; unsafe fixes are
@@ -70,6 +72,7 @@ suggestion (`updpkgsums`, `makepkg --printsrcinfo`) instead.
 | Filesystem | PB401–PB405 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files, install steps that skip `$pkgdir`, writes to pacman/dynamic-linker/sudoers config |
 | Scriptlets | PB501–PB502 | network access and persistence (crontabs, systemd units, shell profiles, login-capable users) in `.install` files running as root |
 | Consistency | PB601–PB602 | PKGBUILD / .SRCINFO drift, network access in `pkgver()` |
+| Correctness | PB701–PB710 | makepkg build-breakers: invalid pkgname/pkgver/pkgrel/epoch, backup leading slash, unknown `options`, `provides` comparison operators, scalar-vs-array field types, schema variables set inside `package()`, missing/duplicate/mixed `arch` |
 
 `pkglint --rules` prints the full documentation for each.
 

@@ -1,0 +1,542 @@
+package rules
+
+import (
+	"bytes"
+	"regexp"
+	"strings"
+
+	"github.com/jmelahman/pkglint/internal/pkgbuild"
+	"mvdan.cc/sh/v3/syntax"
+)
+
+// PB7xx: metadata correctness. These mirror the build-breaking checks makepkg's
+// own lint_pkgbuild performs (util/schema.sh, pkgname.sh, pkgver.sh, …), so a
+// PKGBUILD that makepkg would refuse to build is caught — and where the fix is
+// mechanical, rewritten — before the build is even attempted. They are not
+// security rules, but a package that will not build is not reviewable either,
+// and several of them (setuid-style bad backups, unknown options) are hygiene
+// issues in their own right.
+
+// makepkg's PKGBUILD schema (util/schema.sh). pkgname is deliberately ABSENT
+// from schemaArrayVars: makepkg accepts both scalar `pkgname=foo` and the array
+// form, so its type is never checked — only its characters are (PB701). Every
+// other array field errors the build when assigned a scalar.
+var hashAlgoSums = []string{
+	"cksums", "md5sums", "sha1sums", "sha224sums",
+	"sha256sums", "sha384sums", "sha512sums", "b2sums",
+}
+
+var schemaArrayVars = append([]string{
+	"arch", "backup", "checkdepends", "conflicts", "depends", "groups",
+	"license", "makedepends", "noextract", "optdepends", "options",
+	"provides", "replaces", "source", "validpgpkeys", "xdata",
+}, hashAlgoSums...)
+
+var schemaStringVars = []string{
+	"changelog", "epoch", "install", "pkgbase", "pkgdesc", "pkgrel", "pkgver", "url",
+}
+
+var (
+	schemaArraySet  = toSet(schemaArrayVars)
+	schemaStringSet = toSet(schemaStringVars)
+)
+
+// packageOverrideVars are the schema variables makepkg lets a package_*()
+// function override (util/schema.sh pkgbuild_schema_package_overrides). Setting
+// any other schema variable inside a package function is an error.
+var packageOverrideVars = map[string]bool{
+	"pkgdesc": true, "arch": true, "url": true, "license": true, "groups": true,
+	"depends": true, "optdepends": true, "provides": true, "conflicts": true,
+	"replaces": true, "backup": true, "options": true, "install": true, "changelog": true,
+}
+
+// validOptions are the accepted options=() entries: makepkg's packaging_options
+// plus build_options. Each is also valid with a leading "!" (disable).
+var validOptions = map[string]bool{
+	"docs": true, "emptydirs": true, "libtool": true, "pestrip": true, "purge": true,
+	"staticlibs": true, "strip": true, "debug": true, "zipkmod": true, "zipman": true,
+	"buildflags": true, "makeflags": true, "lto": true, "ccache": true, "distcc": true,
+}
+
+var correctnessRules = []Rule{
+	{
+		ID:   "PB701",
+		Name: "invalid-pkgname",
+		Doc: "pkgname and pkgbase may only contain the characters makepkg allows " +
+			"([a-z0-9@._+-]), must be ASCII, and must not start with a hyphen or dot. makepkg " +
+			"refuses to build a package whose name breaks these rules.",
+		Check: checkPkgName,
+	},
+	{
+		ID:   "PB702",
+		Name: "invalid-pkgver",
+		Doc: "pkgver must not be empty and may not contain colons, forward slashes, hyphens or " +
+			"whitespace — those characters have meaning in pacman's version syntax (epoch:, -pkgrel), " +
+			"so makepkg rejects them. Skipped when a pkgver() function computes the version at build time.",
+		Check: checkPkgVer,
+	},
+	{
+		ID:    "PB703",
+		Name:  "invalid-pkgrel",
+		Doc:   "pkgrel must be of the form 'integer[.integer]' (e.g. 1 or 1.5). makepkg errors otherwise.",
+		Check: checkPkgRel,
+	},
+	{
+		ID:    "PB704",
+		Name:  "invalid-epoch",
+		Doc:   "epoch, when set, must be a non-negative integer; makepkg refuses any other value.",
+		Check: checkEpoch,
+	},
+	{
+		ID:   "PB705",
+		Name: "backup-leading-slash",
+		Doc: "backup entries are paths relative to the filesystem root, so a leading slash is an " +
+			"error makepkg rejects. Drop it: `etc/foo.conf`, not `/etc/foo.conf`.",
+		Check:    checkBackupSlash,
+		FixLevel: FixSafe,
+		Fix:      fixBackupSlash,
+	},
+	{
+		ID:   "PB706",
+		Name: "unknown-option",
+		Doc: "The options array only accepts makepkg's known toggles (strip, debug, lto, " +
+			"staticlibs, emptydirs, …), each optionally prefixed with '!'. An unrecognized entry is " +
+			"usually a typo that silently does nothing; makepkg flags it as an error.",
+		Check: checkUnknownOptions,
+	},
+	{
+		ID:   "PB707",
+		Name: "provides-comparison",
+		Doc: "provides entries may pin an exact version with '=' but must not use '<' or '>' " +
+			"comparisons — a provide is a concrete capability, not a range. makepkg errors on comparison operators.",
+		Check: checkProvidesComparison,
+	},
+	{
+		ID:   "PB708",
+		Name: "variable-type",
+		Doc: "makepkg requires list fields (depends, source, sums, license, options, …) to be " +
+			"arrays and scalar fields (pkgver, url, pkgdesc, …) to be plain strings. A bare " +
+			"`depends=foo` builds by luck at best and errors under makepkg; wrap it: `depends=(foo)`.",
+		Check:    checkVariableTypes,
+		FixLevel: FixSafe,
+		Fix:      fixVariableTypes,
+	},
+	{
+		ID:   "PB709",
+		Name: "package-function-variable",
+		Doc: "A package_*() function may only override packaging metadata (pkgdesc, depends, " +
+			"optdepends, provides, backup, install, …). Setting pkgver, source, makedepends, or the " +
+			"checksums there is an error: those are resolved before packaging runs.",
+		Check: checkPackageFunctionVars,
+	},
+	{
+		ID:   "PB710",
+		Name: "invalid-arch",
+		Doc: "arch must be set and non-empty, must not combine 'any' with concrete architectures, " +
+			"must not repeat a value, and each entry may only contain [A-Za-z0-9_]. makepkg rejects " +
+			"a PKGBUILD that violates any of these.",
+		Check: checkArch,
+	},
+}
+
+// --- shared helpers --------------------------------------------------------
+
+func toSet(xs []string) map[string]bool {
+	m := make(map[string]bool, len(xs))
+	for _, x := range xs {
+		m[x] = true
+	}
+	return m
+}
+
+func firstValue(xs []string) string {
+	if len(xs) == 0 {
+		return ""
+	}
+	return xs[0]
+}
+
+func isASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return false
+		}
+	}
+	return true
+}
+
+// staticVal resolves rendered against known scalars and reports whether the
+// result is fully static — no command substitution (NUL marker) and no
+// unresolved $ references. Rules skip values they cannot see statically.
+func staticVal(pkg *pkgbuild.Package, rendered string) (string, bool) {
+	s := pkg.Expand(rendered)
+	if strings.ContainsRune(s, 0) || strings.Contains(s, "$") {
+		return "", false
+	}
+	return s, true
+}
+
+// varElem is one element of a variable assignment with its source position.
+type varElem struct {
+	Value string
+	Word  *syntax.Word
+	Pos   syntax.Pos
+}
+
+// varElems yields the elements of v: each array element, or the single scalar
+// value. Returns nil for empty assignments.
+func varElems(v *pkgbuild.Var) []varElem {
+	if v == nil || v.Assign == nil {
+		return nil
+	}
+	as := v.Assign
+	if as.Array != nil {
+		out := make([]varElem, 0, len(as.Array.Elems))
+		for _, el := range as.Array.Elems {
+			s, _ := pkgbuild.RenderWord(el.Value, nil)
+			out = append(out, varElem{Value: s, Word: el.Value, Pos: el.Value.Pos()})
+		}
+		return out
+	}
+	if as.Value != nil {
+		s, _ := pkgbuild.RenderWord(as.Value, nil)
+		return []varElem{{Value: s, Word: as.Value, Pos: as.Value.Pos()}}
+	}
+	return nil
+}
+
+// --- PB701: pkgname / pkgbase characters -----------------------------------
+
+var pkgnameBadChars = regexp.MustCompile(`[^A-Za-z0-9@._+-]`)
+
+func nameProblem(name string) string {
+	switch {
+	case name == "":
+		return "must not be empty"
+	case strings.HasPrefix(name, "-"):
+		return "must not start with a hyphen"
+	case strings.HasPrefix(name, "."):
+		return "must not start with a dot"
+	case !isASCII(name):
+		return "may only contain ASCII characters"
+	}
+	if bad := pkgnameBadChars.FindAllString(name, -1); len(bad) > 0 {
+		seen := map[string]bool{}
+		var uniq []string
+		for _, c := range bad {
+			if !seen[c] {
+				seen[c] = true
+				uniq = append(uniq, c)
+			}
+		}
+		return "contains invalid characters: " + strings.Join(uniq, "")
+	}
+	return ""
+}
+
+func checkPkgName(ctx *Context) []Finding {
+	var out []Finding
+	path := ctx.Pkg.PKGBUILD.Path
+	for _, field := range []string{"pkgname", "pkgbase"} {
+		v := ctx.Pkg.Vars[field]
+		if v == nil {
+			continue
+		}
+		for _, e := range varElems(v) {
+			val, ok := staticVal(ctx.Pkg, e.Value)
+			if !ok {
+				continue
+			}
+			if prob := nameProblem(val); prob != "" {
+				out = append(out, findingAt("PB701", Error, path, e.Pos, "%s %q %s", field, val, prob))
+			}
+		}
+	}
+	return out
+}
+
+// --- PB702/703/704: pkgver / pkgrel / epoch --------------------------------
+
+var (
+	pkgverBadChars = regexp.MustCompile(`[ \t/:-]`)
+	pkgrelRe       = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
+	digitsRe       = regexp.MustCompile(`^[0-9]+$`)
+)
+
+func checkPkgVer(ctx *Context) []Finding {
+	// A pkgver() function computes the version at build time; the literal is a placeholder.
+	if _, ok := ctx.Pkg.PKGBUILD.Functions["pkgver"]; ok {
+		return nil
+	}
+	v := ctx.Pkg.Vars["pkgver"]
+	if v == nil || v.Array { // array type is PB708's concern
+		return nil
+	}
+	val, ok := staticVal(ctx.Pkg, firstValue(v.Values))
+	if !ok {
+		return nil
+	}
+	var msg string
+	switch {
+	case val == "":
+		msg = "must not be empty"
+	case pkgverBadChars.MatchString(val):
+		msg = "must not contain colons, forward slashes, hyphens, or whitespace"
+	case !isASCII(val):
+		msg = "may only contain ASCII characters"
+	}
+	if msg == "" {
+		return nil
+	}
+	return []Finding{findingAt("PB702", Error, ctx.Pkg.PKGBUILD.Path, v.Pos, "pkgver %q %s", val, msg)}
+}
+
+func checkPkgRel(ctx *Context) []Finding {
+	v := ctx.Pkg.Vars["pkgrel"]
+	if v == nil || v.Array {
+		return nil
+	}
+	val, ok := staticVal(ctx.Pkg, firstValue(v.Values))
+	if !ok {
+		return nil
+	}
+	if val == "" {
+		return []Finding{findingAt("PB703", Error, ctx.Pkg.PKGBUILD.Path, v.Pos, "pkgrel must not be empty")}
+	}
+	if !pkgrelRe.MatchString(val) {
+		return []Finding{findingAt("PB703", Error, ctx.Pkg.PKGBUILD.Path, v.Pos,
+			"pkgrel %q must be of the form 'integer[.integer]'", val)}
+	}
+	return nil
+}
+
+func checkEpoch(ctx *Context) []Finding {
+	v := ctx.Pkg.Vars["epoch"]
+	if v == nil || v.Array {
+		return nil
+	}
+	val, ok := staticVal(ctx.Pkg, firstValue(v.Values))
+	if !ok || val == "" { // unset/empty epoch is valid (the default)
+		return nil
+	}
+	if !digitsRe.MatchString(val) {
+		return []Finding{findingAt("PB704", Error, ctx.Pkg.PKGBUILD.Path, v.Pos,
+			"epoch %q must be a non-negative integer", val)}
+	}
+	return nil
+}
+
+// --- PB705: backup leading slash -------------------------------------------
+
+func checkBackupSlash(ctx *Context) []Finding {
+	v := ctx.Pkg.Vars["backup"]
+	if v == nil {
+		return nil
+	}
+	var out []Finding
+	for _, e := range varElems(v) {
+		val, ok := staticVal(ctx.Pkg, e.Value)
+		if !ok || !strings.HasPrefix(val, "/") {
+			continue
+		}
+		out = append(out, findingAt("PB705", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+			"backup entry %q must not have a leading slash (paths are relative to /)", val))
+	}
+	return out
+}
+
+func fixBackupSlash(ctx *Context, _ *FixEnv) []Edit {
+	v := ctx.Pkg.Vars["backup"]
+	if v == nil {
+		return nil
+	}
+	raw := ctx.Pkg.PKGBUILD.Raw
+	path := ctx.Pkg.PKGBUILD.Path
+	var edits []Edit
+	for _, e := range varElems(v) {
+		// Only fix var-free literals, so the leading '/' is literally present in Raw.
+		if strings.ContainsRune(e.Value, 0) || strings.Contains(e.Value, "$") || !strings.HasPrefix(e.Value, "/") {
+			continue
+		}
+		start, end := off(e.Word.Pos()), off(e.Word.End())
+		if start < 0 || end > len(raw) || start >= end {
+			continue
+		}
+		sub := raw[start:end]
+		i := bytes.IndexByte(sub, '/')
+		if i < 0 {
+			continue
+		}
+		j := i
+		for j < len(sub) && sub[j] == '/' {
+			j++
+		}
+		edits = append(edits, Edit{
+			Path: path, Start: start + i, End: start + j, New: "",
+			Line: int(e.Pos.Line()),
+			Desc: "remove leading slash from backup entry",
+		})
+	}
+	return edits
+}
+
+// --- PB706: unknown options ------------------------------------------------
+
+func checkUnknownOptions(ctx *Context) []Finding {
+	v := ctx.Pkg.Vars["options"]
+	if v == nil {
+		return nil
+	}
+	var out []Finding
+	for _, e := range varElems(v) {
+		val, ok := staticVal(ctx.Pkg, e.Value)
+		if !ok || val == "" {
+			continue
+		}
+		if !validOptions[strings.TrimPrefix(val, "!")] {
+			out = append(out, findingAt("PB706", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+				"options array contains unknown option %q", val))
+		}
+	}
+	return out
+}
+
+// --- PB707: provides comparison operators ----------------------------------
+
+func checkProvidesComparison(ctx *Context) []Finding {
+	v := ctx.Pkg.Vars["provides"]
+	if v == nil {
+		return nil
+	}
+	var out []Finding
+	for _, e := range varElems(v) {
+		val, ok := staticVal(ctx.Pkg, e.Value)
+		if !ok {
+			continue
+		}
+		if strings.ContainsAny(val, "<>") {
+			out = append(out, findingAt("PB707", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+				"provides entry %q cannot use a '<' or '>' comparison operator", val))
+		}
+	}
+	return out
+}
+
+// --- PB708: variable array/scalar type -------------------------------------
+
+func checkVariableTypes(ctx *Context) []Finding {
+	path := ctx.Pkg.PKGBUILD.Path
+	var out []Finding
+	for _, name := range schemaArrayVars {
+		if v := ctx.Pkg.Vars[name]; v != nil && !v.Array {
+			out = append(out, findingAt("PB708", Error, path, v.Pos,
+				"%s should be an array (makepkg refuses to build otherwise)", name))
+		}
+	}
+	for _, name := range schemaStringVars {
+		if v := ctx.Pkg.Vars[name]; v != nil && v.Array {
+			out = append(out, findingAt("PB708", Error, path, v.Pos, "%s should not be an array", name))
+		}
+	}
+	return out
+}
+
+func fixVariableTypes(ctx *Context, _ *FixEnv) []Edit {
+	path := ctx.Pkg.PKGBUILD.Path
+	raw := ctx.Pkg.PKGBUILD.Raw
+	var edits []Edit
+	for _, name := range schemaArrayVars {
+		v := ctx.Pkg.Vars[name]
+		if v == nil || v.Array || v.Assign == nil || v.Assign.Value == nil {
+			continue
+		}
+		vs, ve := off(v.Assign.Value.Pos()), off(v.Assign.Value.End())
+		if vs < 0 || ve > len(raw) || vs > ve {
+			continue
+		}
+		edits = append(edits, Edit{
+			Path: path, Start: vs, End: ve, New: "(" + string(raw[vs:ve]) + ")",
+			Line: int(v.Assign.Value.Pos().Line()),
+			Desc: "wrap " + name + " value in an array",
+		})
+	}
+	return edits
+}
+
+// --- PB709: schema variables set inside package functions -------------------
+
+func checkPackageFunctionVars(ctx *Context) []Finding {
+	u := ctx.Pkg.PKGBUILD
+	var out []Finding
+	for name, fd := range u.Functions {
+		if name != "package" && !strings.HasPrefix(name, "package_") {
+			continue
+		}
+		// makepkg greps the function body for bare `name=` / `name+=`
+		// assignments (util/pkgbuild.sh:extract_function_variable). Prefixed
+		// forms — local/declare/export/readonly — are DeclClause nodes here,
+		// not CallExpr.Assigns, so matching only the latter mirrors makepkg and
+		// avoids flagging a local shadow. Walk descends into nested blocks, as
+		// makepkg's grep-the-whole-body does.
+		syntax.Walk(fd, func(node syntax.Node) bool {
+			call, ok := node.(*syntax.CallExpr)
+			if !ok {
+				return true
+			}
+			for _, as := range call.Assigns {
+				if as.Name == nil {
+					continue
+				}
+				v := as.Name.Value
+				if (schemaArraySet[v] || schemaStringSet[v]) && !packageOverrideVars[v] {
+					out = append(out, findingAt("PB709", Error, u.Path, as.Pos(),
+						"%s cannot be set inside a package function", v))
+				}
+			}
+			return true
+		})
+	}
+	return out
+}
+
+// --- PB710: arch ------------------------------------------------------------
+
+var archBadChars = regexp.MustCompile(`[^A-Za-z0-9_]`)
+
+func checkArch(ctx *Context) []Finding {
+	path := ctx.Pkg.PKGBUILD.Path
+	v := ctx.Pkg.Vars["arch"]
+	if v == nil {
+		return []Finding{{RuleID: "PB710", Severity: Error, Path: path, Line: 1, Col: 1,
+			Message: "arch is not set; makepkg requires it (e.g. arch=('x86_64') or arch=('any'))"}}
+	}
+	var out []Finding
+	seen := map[string]bool{}
+	staticCount, anyCount := 0, 0
+	for _, e := range varElems(v) {
+		val, ok := staticVal(ctx.Pkg, e.Value)
+		if !ok {
+			staticCount++ // count it as present but unvalidatable
+			continue
+		}
+		staticCount++
+		if val == "any" {
+			anyCount++
+		}
+		if seen[val] {
+			out = append(out, findingAt("PB710", Error, path, e.Pos, "arch contains duplicate value %q", val))
+		}
+		seen[val] = true
+		if val != "" && archBadChars.MatchString(val) {
+			out = append(out, findingAt("PB710", Error, path, e.Pos, "arch value %q contains invalid characters", val))
+		}
+	}
+	if staticCount == 0 {
+		out = append(out, findingAt("PB710", Error, path, v.Pos, "arch is not allowed to be empty"))
+	}
+	if anyCount > 0 && staticCount > 1 {
+		out = append(out, findingAt("PB710", Error, path, v.Pos,
+			"the 'any' architecture cannot be combined with other architectures"))
+	}
+	return out
+}

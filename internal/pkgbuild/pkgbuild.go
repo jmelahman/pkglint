@@ -22,6 +22,7 @@ type Var struct {
 	Values []string // rendered values; one element for scalar assignments
 	Array  bool
 	Pos    syntax.Pos
+	Assign *syntax.Assign // underlying AST node, for byte-offset edits
 }
 
 // Unit is a single bash file under analysis: the PKGBUILD itself or an
@@ -135,7 +136,7 @@ func (p *Package) extractTopLevel() {
 		if as.Name == nil {
 			return
 		}
-		v := &Var{Name: as.Name.Value, Pos: as.Pos()}
+		v := &Var{Name: as.Name.Value, Pos: as.Pos(), Assign: as}
 		if as.Array != nil {
 			v.Array = true
 			for _, el := range as.Array.Elems {

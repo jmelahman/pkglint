@@ -261,7 +261,7 @@ func findingAt(id string, sev Severity, path string, pos syntax.Pos, format stri
 
 // Registry is every rule, in ID order.
 func Registry() []Rule {
-	all := [][]Rule{integrityRules, hermeticRules, execRules, fsRules, scriptletRules, consistencyRules}
+	all := [][]Rule{integrityRules, hermeticRules, execRules, fsRules, scriptletRules, consistencyRules, correctnessRules}
 	var out []Rule
 	for _, group := range all {
 		out = append(out, group...)

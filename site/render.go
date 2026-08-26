@@ -95,6 +95,7 @@ func groupRules(all []rules.Rule) []ruleGroup {
 		{"PB4", "PB4xx — Filesystem & privilege"},
 		{"PB5", "PB5xx — Install scriptlets"},
 		{"PB6", "PB6xx — Metadata consistency"},
+		{"PB7", "PB7xx — Correctness & metadata"},
 	}
 	var groups []ruleGroup
 	for _, t := range titles {

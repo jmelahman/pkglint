@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 )
 
@@ -122,6 +121,8 @@ func TestParseSourceEntry(t *testing.T) {
 			fragment: map[string]string{"commit": "abc123"},
 		},
 		{
+			// Canonical makepkg order. Guard against regressing the common
+			// case while making the reversed order work.
 			name:     "fragment then query",
 			raw:      "git+https://x/y.git#tag=v1?signed",
 			url:      "git+https://x/y.git",
@@ -129,6 +130,47 @@ func TestParseSourceEntry(t *testing.T) {
 			vcs:      "git",
 			fragment: map[string]string{"tag": "v1"},
 			query:    "signed",
+		},
+		{
+			// The reversed order used to swallow the whole "#commit=abc" into
+			// Query, leaving Fragment empty — so a commit-pin check saw an
+			// unpinned VCS source and misfired.
+			name:     "query then fragment",
+			raw:      "git+https://x/y.git?signed#commit=abc",
+			url:      "git+https://x/y.git",
+			proto:    "git+https",
+			vcs:      "git",
+			fragment: map[string]string{"commit": "abc"},
+			query:    "signed",
+		},
+		{
+			name:     "query only",
+			raw:      "git+https://x/y.git?signed",
+			url:      "git+https://x/y.git",
+			proto:    "git+https",
+			vcs:      "git",
+			fragment: map[string]string{},
+			query:    "signed",
+		},
+		{
+			name:     "fragment only",
+			raw:      "git+https://x/y.git#branch=main",
+			url:      "git+https://x/y.git",
+			proto:    "git+https",
+			vcs:      "git",
+			fragment: map[string]string{"branch": "main"},
+		},
+		{
+			// Pathological, not valid makepkg input. Pinned only to prove the
+			// tail loop consumes one delimiter per iteration and terminates:
+			// the URL stops at the first delimiter, valueless "#b"/"#c"
+			// segments add no fragment, and the last query wins.
+			name:     "repeated delimiters terminate",
+			raw:      "a#b#c?d?e",
+			url:      "a",
+			local:    true,
+			fragment: map[string]string{},
+			query:    "e",
 		},
 		{
 			name:     "proto is lowercased",
@@ -173,7 +215,7 @@ func TestParseSourceEntry(t *testing.T) {
 			if !reflect.DeepEqual(e.Fragment, tc.fragment) {
 				t.Errorf("Fragment = %v, want %v", e.Fragment, tc.fragment)
 			}
-			if !strings.Contains(e.Query, tc.query) || (tc.query == "" && e.Query != "") {
+			if e.Query != tc.query {
 				t.Errorf("Query = %q, want %q", e.Query, tc.query)
 			}
 			if e.Local != tc.local {
@@ -181,6 +223,86 @@ func TestParseSourceEntry(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSourcePositions pins that each entry carries its own written element's
+// position. Every entry used to report the position of the `source=(` token,
+// so a finding about the third source pointed at the first line of the array.
+func TestSourcePositions(t *testing.T) {
+	t.Run("one element per line", func(t *testing.T) {
+		// `source=(` opens on line 3; the three elements sit on lines 3, 4, 5,
+		// each indented to column 9.
+		pkg := loadPKGBUILD(t, `pkgname=demo
+pkgver=1.0.0
+source=("https://example.com/a.tar.gz"
+        "https://example.com/b.tar.gz"
+        "https://example.com/c.tar.gz")
+`)
+		srcs := pkg.Sources()
+		if len(srcs) != 3 {
+			t.Fatalf("Sources() = %d entries, want 3: %+v", len(srcs), srcs)
+		}
+		for i, want := range []struct{ line, col uint }{{3, 9}, {4, 9}, {5, 9}} {
+			if got := srcs[i].Pos; got.Line() != want.line || got.Col() != want.col {
+				t.Errorf("Sources()[%d] (%s) at %d:%d, want %d:%d",
+					i, srcs[i].URL, got.Line(), got.Col(), want.line, want.col)
+			}
+		}
+	})
+
+	t.Run("brace expansion shares the element position", func(t *testing.T) {
+		// Both expansions come from one written element, so both report it:
+		// they genuinely occupy the same source line.
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source=("https://example.com/a.tar.gz"
+        "https://example.com/b.tar.gz"{,.sig})
+`)
+		srcs := pkg.Sources()
+		if len(srcs) != 3 {
+			t.Fatalf("Sources() = %d entries, want 3: %+v", len(srcs), srcs)
+		}
+		for i, want := range []struct{ line, col uint }{{2, 9}, {3, 9}, {3, 9}} {
+			if got := srcs[i].Pos; got.Line() != want.line || got.Col() != want.col {
+				t.Errorf("Sources()[%d] (%s) at %d:%d, want %d:%d",
+					i, srcs[i].URL, got.Line(), got.Col(), want.line, want.col)
+			}
+		}
+	})
+
+	t.Run("appended elements fall back to the array position", func(t *testing.T) {
+		// A merged `+=` Var keeps the first assignment's Assign, so appended
+		// values have no AST element to take a position from. They report the
+		// base array's position rather than a wrong one — the accepted
+		// limitation of merging appends.
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source=("https://example.com/a.tar.gz")
+source+=("https://example.com/b.tar.gz")
+`)
+		srcs := pkg.Sources()
+		if len(srcs) != 2 {
+			t.Fatalf("Sources() = %d entries, want 2: %+v", len(srcs), srcs)
+		}
+		if got := srcs[0].Pos; got.Line() != 2 || got.Col() != 9 {
+			t.Errorf("base element at %d:%d, want 2:9", got.Line(), got.Col())
+		}
+		if got := srcs[1].Pos; got.Line() != 2 || got.Col() != 1 {
+			t.Errorf("appended element at %d:%d, want the array position 2:1", got.Line(), got.Col())
+		}
+	})
+
+	t.Run("scalar source keeps the assignment position", func(t *testing.T) {
+		// A scalar `source=` has no Array, so there is no element to index.
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source=https://example.com/a.tar.gz
+`)
+		srcs := pkg.Sources()
+		if len(srcs) != 1 {
+			t.Fatalf("Sources() = %d entries, want 1: %+v", len(srcs), srcs)
+		}
+		if got := srcs[0].Pos; got.Line() != 2 || got.Col() != 1 {
+			t.Errorf("scalar source at %d:%d, want 2:1", got.Line(), got.Col())
+		}
+	})
 }
 
 // TestSourceEntryHost pins hostname extraction, including the VCS prefix strip.

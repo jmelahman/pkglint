@@ -10,7 +10,8 @@ import (
 // (and its checksums) is spelled: one writes every entry in a single
 // `source=(...)`, the other appends with `source+=(...)`. The `+=` variants
 // keep the first `source=` on the same line as the reference, which is where a
-// merged Var anchors its position, so findings compare byte-for-byte.
+// merged Var anchors its position, so findings land on the same line either
+// way.
 const appendDiffHeader = `pkgname=demo
 pkgver=1.0.0
 pkgrel=1
@@ -30,11 +31,21 @@ const (
 )
 
 // findingsAt strips the temp-dir prefix from Path so findings produced in two
-// different package dirs are directly comparable.
+// different package dirs are directly comparable, and drops the column.
+//
+// Columns cannot match across the two spellings: a merged `+=` Var keeps only
+// the first assignment's Assign, so an appended element has no AST element to
+// take a position from and falls back to the array's own position (the column
+// of `source=`). The reference spelling writes that same entry inside the base
+// array, where it gets its own column. Line still matches, because the
+// fallback position is the base `source=` line and the reference lists every
+// source on that line. Which findings are reported — the property this test
+// exists to pin — is compared exactly.
 func findingsAt(fs []Finding) []Finding {
 	out := make([]Finding, 0, len(fs))
 	for _, f := range fs {
 		f.Path = filepath.Base(f.Path)
+		f.Col = 0
 		out = append(out, f)
 	}
 	return out
@@ -49,7 +60,8 @@ func findingsAt(fs []Finding) []Finding {
 //
 // Each case pairs a reference PKGBUILD that spells the whole array at once
 // with a `+=` variant containing exactly the same sources. Every rule must
-// report identical findings for both, positions included.
+// report identical findings for both, lines included (see findingsAt for why
+// columns are exempt).
 func TestAppendedSourceLintsIdenticallyToBaseArray(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

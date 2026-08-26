@@ -1,7 +1,7 @@
 malicious: grade F, 15 finding(s)
-  PKGBUILD:11:1: error [PB101] remote source "http://cdn.not-github.example/badpkg.tar.gz" has no checksum (SKIP): the download is never verified
-  PKGBUILD:11:1: error [PB104] source "http://cdn.not-github.example/badpkg.tar.gz" is fetched over unencrypted http://
-  PKGBUILD:11:1: info [PB105] source host "cdn.not-github.example" differs from project url host "github.com"
+  PKGBUILD:11:9: error [PB101] remote source "http://cdn.not-github.example/badpkg.tar.gz" has no checksum (SKIP): the download is never verified
+  PKGBUILD:11:9: error [PB104] source "http://cdn.not-github.example/badpkg.tar.gz" is fetched over unencrypted http://
+  PKGBUILD:11:9: info [PB105] source host "cdn.not-github.example" differs from project url host "github.com"
   PKGBUILD:16:3: warn [PB201] curl downloads during build(); network access belongs in prepare() with pinned hashes
   PKGBUILD:16:3: critical [PB304] a network download is piped straight into bash and executed
   PKGBUILD:17:3: critical [PB302] eval executes the output of a network download

@@ -38,12 +38,22 @@ func (p *Package) Sources() []SourceEntry {
 		}
 		arch := strings.TrimPrefix(strings.TrimPrefix(name, "source"), "_")
 		idx := 0
-		for _, raw := range v.Values {
+		for rawIdx, raw := range v.Values {
+			// Each entry reports its own written element's position. Values
+			// beyond Assign.Array.Elems (scalar-derived, or appended by a
+			// `+=` assignment the merge did not keep an Assign for) fall back
+			// to the array's own position.
+			pos := v.Pos
+			if v.Assign != nil && v.Assign.Array != nil && rawIdx < len(v.Assign.Array.Elems) {
+				if el := v.Assign.Array.Elems[rawIdx]; el.Value != nil {
+					pos = el.Value.Pos()
+				}
+			}
 			for _, expanded := range expandBraces(p.Expand(raw)) {
 				e := parseSourceEntry(raw, expanded)
 				e.Index = idx
 				e.Arch = arch
-				e.Pos = v.Pos
+				e.Pos = pos
 				out = append(out, e)
 				idx++
 			}
@@ -93,15 +103,28 @@ func parseSourceEntry(raw, expanded string) SourceEntry {
 		e.Filename = name
 		rest = url
 	}
-	if u, q, ok := strings.Cut(rest, "?"); ok {
-		// Fragments come before the query in makepkg URLs; handle both orders.
-		e.Query = q
-		rest = u
+	// URL ends at the first '#' (fragment) or '?' (query); makepkg allows
+	// either order (…#frag?query or …?query#frag), so parse them positionally.
+	tail := ""
+	if i := strings.IndexAny(rest, "#?"); i >= 0 {
+		tail = rest[i:]
+		rest = rest[:i]
 	}
-	if u, frag, ok := strings.Cut(rest, "#"); ok {
-		rest = u
-		if k, v, ok := strings.Cut(frag, "="); ok {
-			e.Fragment[k] = v
+	for tail != "" {
+		delim := tail[0]
+		seg := tail[1:]
+		if j := strings.IndexAny(seg, "#?"); j >= 0 {
+			tail = seg[j:]
+			seg = seg[:j]
+		} else {
+			tail = ""
+		}
+		if delim == '#' {
+			if k, v, ok := strings.Cut(seg, "="); ok {
+				e.Fragment[k] = v
+			}
+		} else {
+			e.Query = seg
 		}
 	}
 	e.URL = rest

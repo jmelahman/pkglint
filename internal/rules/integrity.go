@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/jmelahman/pkglint/internal/pkgbuild"
 )
 
 // PB1xx: source integrity.
@@ -13,7 +15,9 @@ var integrityRules = []Rule{
 		Name: "skipped-checksum",
 		Doc: "Every remote, non-VCS source should carry a real checksum. `SKIP` means makepkg " +
 			"performs no integrity verification at all: if the upstream file or the connection is " +
-			"tampered with, nothing notices. Pin the artifact with a sha256 or stronger digest.",
+			"tampered with, nothing notices. Pin the artifact with a sha256 or stronger digest. " +
+			"Detached signature files and the artifacts they verify are exempt — there the PGP " +
+			"machinery does the verifying, and PB111 flags it when that machinery is unanchored.",
 		Check: checkSkippedChecksums,
 	},
 	{
@@ -39,7 +43,8 @@ var integrityRules = []Rule{
 		Name: "insecure-transport",
 		Doc: "Sources fetched over http://, git:// or ftp:// can be modified in transit. With a " +
 			"strong checksum this downgrades availability rather than integrity, but combined with " +
-			"SKIP or weak sums it is a working man-in-the-middle vector. Use https:// (or git+https://).",
+			"SKIP or weak sums it is a working man-in-the-middle vector. Use https:// (or git+https://). " +
+			"Signature files fetched insecurely are PB112's concern.",
 		Check: checkInsecureTransport,
 	},
 	{
@@ -92,6 +97,138 @@ var integrityRules = []Rule{
 			"makepkg errors on this; regenerate with updpkgsums.",
 		Check: checkChecksumCounts,
 	},
+	{
+		ID:   "PB111",
+		Name: "signature-without-key",
+		Doc: "A detached signature (.sig/.asc) or a ?signed VCS source is only as strong as the key " +
+			"it is checked against. With validpgpkeys empty, makepkg accepts any key already present " +
+			"in the builder's keyring — whatever the user was last told to import — instead of a " +
+			"maintainer-pinned fingerprint, so the strongest verification the PKGBUILD declares is " +
+			"never actually anchored. Pin the upstream signing key's full fingerprint in validpgpkeys.",
+		Check: checkSignatureKeys,
+	},
+	{
+		ID:   "PB112",
+		Name: "insecure-signature-transport",
+		Doc: "This signature file is fetched over an unencrypted transport. With validpgpkeys pinned " +
+			"the signature still verifies cryptographically — hence a warning where PB104 errors for " +
+			"ordinary sources — but a man-in-the-middle can strip or swap the file to break builds, " +
+			"and combined with an unpinned key (PB111) it is a working bypass. Use https://.",
+		Check: checkSignatureTransport,
+	},
+	{
+		ID:   "PB113",
+		Name: "unused-validpgpkeys",
+		Doc: "validpgpkeys pins signing keys, but no source carries a detached signature (.sig/.asc) " +
+			"and no VCS source requests ?signed verification, so nothing is ever checked against the " +
+			"keys. Either dead configuration or a signature source was dropped — confusing at review " +
+			"time either way.",
+		Check: checkUnusedPGPKeys,
+	},
+}
+
+// signatureExts are the filename extensions makepkg's check_pgpsigs treats as
+// detached PGP signatures.
+var signatureExts = []string{".sig", ".asc", ".sign"}
+
+// effectiveFilename is the local name makepkg gives a fetched source entry.
+func effectiveFilename(e pkgbuild.SourceEntry) string {
+	if e.Filename != "" {
+		return e.Filename
+	}
+	return basename(e.URL)
+}
+
+// isSignatureSource reports whether the entry is a detached PGP signature.
+func isSignatureSource(e pkgbuild.SourceEntry) bool {
+	name := strings.ToLower(effectiveFilename(e))
+	for _, ext := range signatureExts {
+		if strings.HasSuffix(name, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// signatureTarget returns the filename a signature source verifies (its own
+// name minus the signature extension).
+func signatureTarget(e pkgbuild.SourceEntry) string {
+	name := effectiveFilename(e)
+	lower := strings.ToLower(name)
+	for _, ext := range signatureExts {
+		if strings.HasSuffix(lower, ext) {
+			return name[:len(name)-len(ext)]
+		}
+	}
+	return ""
+}
+
+// isSignedVCS reports whether the entry is a VCS source with ?signed
+// verification of its tag/commit.
+func isSignedVCS(e pkgbuild.SourceEntry) bool {
+	return e.VCS != "" && strings.Contains(e.Query, "signed")
+}
+
+// pgpKeysPinned reports whether validpgpkeys declares at least one key.
+func (ctx *Context) pgpKeysPinned() bool {
+	v, ok := ctx.Pkg.Vars["validpgpkeys"]
+	if !ok {
+		return false
+	}
+	for _, val := range v.Values {
+		if strings.TrimSpace(val) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func checkSignatureKeys(ctx *Context) []Finding {
+	if ctx.pgpKeysPinned() {
+		return nil
+	}
+	var out []Finding
+	for _, e := range ctx.Pkg.Sources() {
+		switch {
+		case isSignatureSource(e):
+			out = append(out, findingAt("PB111", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+				"signature %q is declared but validpgpkeys is empty: makepkg checks it against whatever "+
+					"key the builder's keyring happens to hold, not a maintainer-pinned one", e.Raw))
+		case isSignedVCS(e):
+			out = append(out, findingAt("PB111", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+				"VCS source %q requests ?signed verification but validpgpkeys is empty: any key in the "+
+					"builder's keyring satisfies it", e.Raw))
+		}
+	}
+	return out
+}
+
+func checkSignatureTransport(ctx *Context) []Finding {
+	var out []Finding
+	for _, e := range ctx.Pkg.Sources() {
+		if e.Local || !isSignatureSource(e) {
+			continue
+		}
+		if proto, insecure := insecureProto(e); insecure {
+			out = append(out, findingAt("PB112", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
+				"signature %q is fetched over unencrypted %s://; the signature itself can be stripped or swapped in transit", e.Raw, proto))
+		}
+	}
+	return out
+}
+
+func checkUnusedPGPKeys(ctx *Context) []Finding {
+	if !ctx.pgpKeysPinned() {
+		return nil
+	}
+	for _, e := range ctx.Pkg.Sources() {
+		if isSignatureSource(e) || isSignedVCS(e) {
+			return nil
+		}
+	}
+	v := ctx.Pkg.Vars["validpgpkeys"]
+	return []Finding{findingAt("PB113", Info, ctx.Pkg.PKGBUILD.Path, v.Pos,
+		"validpgpkeys is set but no source has a detached signature (.sig/.asc) and no VCS source uses ?signed; nothing is verified against these keys")}
 }
 
 // makepkgConfExec are makepkg.conf variables whose values makepkg executes as
@@ -213,9 +350,22 @@ func checkChecksumCounts(ctx *Context) []Finding {
 func isSkip(s string) bool { return strings.EqualFold(s, "SKIP") }
 
 func checkSkippedChecksums(ctx *Context) []Finding {
+	// Filenames covered by a detached signature: those artifacts are verified
+	// by the signature (SKIP is the convention), and the signature file itself
+	// never gets a meaningful digest. PB111 owns the case where the signature
+	// is not anchored to a pinned key.
+	sigVerified := map[string]bool{}
+	for _, e := range ctx.Pkg.Sources() {
+		if t := signatureTarget(e); t != "" {
+			sigVerified[t] = true
+		}
+	}
 	var out []Finding
 	for _, e := range ctx.Pkg.Sources() {
 		if e.VCS != "" || e.Local {
+			continue
+		}
+		if isSignatureSource(e) || sigVerified[effectiveFilename(e)] {
 			continue
 		}
 		sums := ctx.Pkg.SumsFor(e)
@@ -310,18 +460,27 @@ func checkVCSPins(ctx *Context) []Finding {
 	return out
 }
 
+// insecureProto returns the entry's transport protocol and whether it is
+// unencrypted.
+func insecureProto(e pkgbuild.SourceEntry) (string, bool) {
+	proto := e.Proto
+	if _, rest, ok := strings.Cut(proto, "+"); ok {
+		proto = rest
+	}
+	switch proto {
+	case "http", "ftp", "git", "svn", "rsync":
+		return proto, true
+	}
+	return proto, false
+}
+
 func checkInsecureTransport(ctx *Context) []Finding {
 	var out []Finding
 	for _, e := range ctx.Pkg.Sources() {
-		if e.Local {
+		if e.Local || isSignatureSource(e) { // signature transport is PB112's concern
 			continue
 		}
-		proto := e.Proto
-		if _, rest, ok := strings.Cut(proto, "+"); ok {
-			proto = rest
-		}
-		switch proto {
-		case "http", "ftp", "git", "svn", "rsync":
+		if proto, insecure := insecureProto(e); insecure {
 			out = append(out, findingAt("PB104", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
 				"source %q is fetched over unencrypted %s://", e.Raw, proto))
 		}

@@ -1,6 +1,10 @@
 package rules
 
-import "strings"
+import (
+	"strings"
+
+	"mvdan.cc/sh/v3/syntax"
+)
 
 // PB2xx: hermeticity — network access belongs in the fetch/prepare phase,
 // pinned by hashes, so that build()/package()/check() can eventually run
@@ -39,7 +43,8 @@ var hermeticRules = []Rule{
 		Doc: "`go build` fetches modules on demand unless they were vendored or pre-downloaded. " +
 			"That download happens inside build() with no makepkg-level verification (go.sum " +
 			"verifies content, but resolution still depends on network state). Vendor the modules, " +
-			"or run `go mod download` in prepare().",
+			"or run `go mod download` in prepare(). `go install pkg@latest` is worse still: the ref " +
+			"is mutable, so what gets built depends on whatever upstream published most recently.",
 		Check:    checkGoDownloads,
 		FixLevel: FixUnsafe,
 		Fix:      fixGoDownloads,
@@ -57,11 +62,46 @@ var hermeticRules = []Rule{
 	{
 		ID:   "PB206",
 		Name: "npm-install-unlocked",
-		Doc: "`npm install` may rewrite the dependency tree; `npm ci` (and yarn --immutable) " +
-			"installs exactly what the committed lockfile specifies and fails otherwise.",
+		Doc: "`npm install` may rewrite the dependency tree; `npm ci` (and yarn --immutable, " +
+			"pnpm/bun --frozen-lockfile) installs exactly what the committed lockfile specifies " +
+			"and fails otherwise.",
 		Check:    checkNpmCI,
 		FixLevel: FixUnsafe,
 		Fix:      fixNpmCI,
+	},
+	{
+		ID:   "PB207",
+		Name: "composer-unlocked",
+		Doc: "`composer update` re-resolves and fetches dependency versions, abandoning the " +
+			"committed composer.lock — use `composer install`, which installs exactly what the lock " +
+			"pins. And either way, composer runs hook scripts and plugins from composer.json and the " +
+			"dependency tree during install; pass --no-scripts so fetching packages does not also " +
+			"mean executing them, then run any needed build step explicitly.",
+		Check:    checkComposer,
+		FixLevel: FixUnsafe,
+		Fix:      fixComposer,
+	},
+	{
+		ID:   "PB208",
+		Name: "bundler-unlocked",
+		Doc: "`bundle install` without --frozen (or deployment mode) silently rewrites Gemfile.lock " +
+			"when it drifts from the Gemfile, fetching versions nobody reviewed; --frozen makes the " +
+			"committed lock authoritative and fails otherwise. Plain `gem install` has no lockfile " +
+			"at all — it installs whatever RubyGems serves at build time.",
+		Check:    checkBundler,
+		FixLevel: FixUnsafe,
+		Fix:      fixBundler,
+	},
+	{
+		ID:   "PB209",
+		Name: "uv-poetry-unlocked",
+		Doc: "uv and poetry re-resolve dependencies unless told the committed lockfile is " +
+			"authoritative: `uv sync`/`uv run` without --frozen or --locked may rewrite uv.lock, and " +
+			"`poetry update`/`poetry add` abandon poetry.lock outright. Pass --frozen, and prefer " +
+			"`poetry install` against the committed lock.",
+		Check:    checkUvPoetry,
+		FixLevel: FixUnsafe,
+		Fix:      fixUvFrozen,
 	},
 }
 
@@ -114,9 +154,31 @@ var networkCommands = map[string]func(Command) bool{
 		return c.Subcommand() == "fetch" && !c.HasArg("--offline")
 	},
 	"composer": func(c Command) bool { sub := c.Subcommand(); return sub == "install" || sub == "update" },
-	"gem":      func(c Command) bool { return c.Subcommand() == "install" },
-	"dotnet":   func(c Command) bool { return c.Subcommand() == "restore" },
-	"nuget":    func(c Command) bool { return c.Subcommand() == "restore" },
+	"gem":      gemInstallFetches,
+	"bundle": func(c Command) bool {
+		sub := c.Subcommand()
+		return sub == "" || sub == "install" || sub == "update" // bare `bundle` runs install
+	},
+	"uv": func(c Command) bool {
+		switch c.Subcommand() {
+		case "sync", "add", "lock", "run":
+			return true
+		case "pip":
+			return uvPipFetches(c)
+		case "tool":
+			return c.HasArg("install") || c.HasArg("run")
+		}
+		return false
+	},
+	"poetry": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "update", "add", "lock":
+			return true
+		}
+		return false
+	},
+	"dotnet": func(c Command) bool { return c.Subcommand() == "restore" },
+	"nuget":  func(c Command) bool { return c.Subcommand() == "restore" },
 }
 
 func always(Command) bool { return true }
@@ -142,6 +204,44 @@ func pipFetches(c Command) bool {
 		return remote
 	}
 	return true
+}
+
+// uvPipFetches mirrors pipFetches for `uv pip install/download`.
+func uvPipFetches(c Command) bool {
+	if c.Subcommand() != "pip" || (!c.HasArg("install") && !c.HasArg("download")) {
+		return false
+	}
+	if c.HasArg("--no-index") {
+		return false
+	}
+	if c.HasArg("--no-deps") {
+		remote := false
+		for _, a := range c.Args {
+			if a == "pip" || a == "install" || a == "download" ||
+				hasPrefixAny(a, "-", ".", "/", "$") || strings.HasSuffix(a, ".whl") {
+				continue
+			}
+			remote = true
+		}
+		return remote
+	}
+	return true
+}
+
+// gemInstallFetches reports whether a gem install hits RubyGems rather than
+// installing local .gem files.
+func gemInstallFetches(c Command) bool {
+	if c.Subcommand() != "install" || c.HasArg("--local") || c.HasArg("-l") {
+		return false
+	}
+	remote := false
+	for _, a := range c.Args {
+		if a == "install" || hasPrefixAny(a, "-", ".", "/", "$") || strings.HasSuffix(a, ".gem") {
+			continue
+		}
+		remote = true
+	}
+	return remote
 }
 
 func checkNetworkInBuild(ctx *Context) []Finding {
@@ -174,6 +274,13 @@ func checkPipHashes(ctx *Context) []Finding {
 		}
 		out = append(out, c.finding("PB202", Warn,
 			"pip install without --require-hashes: downloads are not verified against pinned digests"))
+	}
+	for _, c := range ctx.CommandsNamed("uv") {
+		if !c.HasArg("install") || !uvPipFetches(c) || c.HasArg("--require-hashes") {
+			continue
+		}
+		out = append(out, c.finding("PB202", Warn,
+			"uv pip install without --require-hashes: downloads are not verified against pinned digests"))
 	}
 	return out
 }
@@ -218,13 +325,44 @@ func goVendored(ctx *Context) bool {
 	return false
 }
 
-func checkGoDownloads(ctx *Context) []Finding {
-	if goVendored(ctx) {
-		return nil
+// mutableGoRef reports whether a go package argument pins to a mutable
+// @version suffix (latest, a branch name, ...).
+func mutableGoRef(arg string) (string, bool) {
+	i := strings.LastIndexByte(arg, '@')
+	if i < 0 {
+		return "", false
 	}
+	switch ref := arg[i+1:]; ref {
+	case "latest", "upgrade", "patch", "master", "main", "HEAD", "tip":
+		return ref, true
+	}
+	return "", false
+}
+
+func checkGoDownloads(ctx *Context) []Finding {
 	var out []Finding
+	// A mutable @ref is a problem in any phase: even fetched in prepare(),
+	// what gets built depends on whatever upstream published most recently.
+	mutable := map[*syntax.Stmt]bool{}
 	for _, c := range ctx.CommandsNamed("go") {
-		if !c.InBuildPhase() {
+		sub := c.Subcommand()
+		if sub != "install" && sub != "run" && sub != "get" {
+			continue
+		}
+		for _, a := range c.Args {
+			if ref, ok := mutableGoRef(a); ok {
+				out = append(out, c.finding("PB204", Warn,
+					"go %s %s resolves mutable ref @%s over the network; pin an exact version or commit", sub, a, ref))
+				mutable[c.Stmt] = true
+				break
+			}
+		}
+	}
+	if goVendored(ctx) {
+		return out
+	}
+	for _, c := range ctx.CommandsNamed("go") {
+		if !c.InBuildPhase() || mutable[c.Stmt] {
 			continue
 		}
 		sub := c.Subcommand()
@@ -310,6 +448,80 @@ func checkNpmCI(ctx *Context) []Finding {
 					"yarn install without --immutable/--frozen-lockfile may rewrite the dependency tree"))
 			}
 		}
+	}
+	for _, name := range []string{"pnpm", "bun"} {
+		for _, c := range ctx.CommandsNamed(name) {
+			if sub := c.Subcommand(); sub == "install" || sub == "i" {
+				if !c.HasArg("--frozen-lockfile") && !c.HasArg("--offline") {
+					out = append(out, c.finding("PB206", Info,
+						"%s %s without --frozen-lockfile may rewrite the dependency tree", name, sub))
+				}
+			}
+		}
+	}
+	return out
+}
+
+func checkComposer(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range ctx.CommandsNamed("composer") {
+		switch sub := c.Subcommand(); sub {
+		case "update", "upgrade":
+			out = append(out, c.finding("PB207", Warn,
+				"composer %s re-resolves dependencies away from the committed composer.lock; use `composer install`", sub))
+		case "install":
+			if !c.HasArg("--no-scripts") {
+				out = append(out, c.finding("PB207", Warn,
+					"composer install without --no-scripts executes hook scripts and plugins from the dependency tree"))
+			}
+		}
+	}
+	return out
+}
+
+func checkBundler(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range ctx.CommandsNamed("bundle", "bundler") {
+		sub := c.Subcommand()
+		if sub != "install" && sub != "" { // bare `bundle` runs install
+			continue
+		}
+		if c.HasArg("--frozen") || c.HasArg("--deployment") || c.HasArg("--local") {
+			continue
+		}
+		out = append(out, c.finding("PB208", Info,
+			"bundle install without --frozen may rewrite Gemfile.lock and fetch unreviewed versions"))
+	}
+	for _, c := range ctx.CommandsNamed("gem") {
+		if !gemInstallFetches(c) {
+			continue
+		}
+		out = append(out, c.finding("PB208", Warn,
+			"gem install fetches from RubyGems with no lockfile or checksum pinning; install local .gem files (--local) or use bundler against a committed Gemfile.lock"))
+	}
+	return out
+}
+
+func checkUvPoetry(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range ctx.CommandsNamed("uv") {
+		sub := c.Subcommand()
+		if sub != "sync" && sub != "run" {
+			continue
+		}
+		if c.HasArg("--frozen") || c.HasArg("--locked") || c.HasArg("--offline") || c.HasArg("--no-sync") {
+			continue
+		}
+		out = append(out, c.finding("PB209", Warn,
+			"uv %s without --frozen/--locked may re-resolve dependencies and rewrite uv.lock", sub))
+	}
+	for _, c := range ctx.CommandsNamed("poetry") {
+		sub := c.Subcommand()
+		if sub != "update" && sub != "add" {
+			continue
+		}
+		out = append(out, c.finding("PB209", Warn,
+			"poetry %s re-resolves dependencies away from the committed poetry.lock; use `poetry install`", sub))
 	}
 	return out
 }

@@ -27,7 +27,9 @@ type SourceEntry struct {
 var vcsProtos = map[string]bool{"git": true, "hg": true, "svn": true, "bzr": true, "fossil": true}
 
 // Sources parses every source array (source, source_x86_64, ...) in the
-// PKGBUILD.
+// PKGBUILD. Brace groups expand to one entry each — `foo.tar.gz{,.sig}` is
+// two sources to makepkg — and Index counts expanded entries, matching how
+// makepkg pairs sources with checksums.
 func (p *Package) Sources() []SourceEntry {
 	var out []SourceEntry
 	for name, v := range p.Vars {
@@ -35,15 +37,52 @@ func (p *Package) Sources() []SourceEntry {
 			continue
 		}
 		arch := strings.TrimPrefix(strings.TrimPrefix(name, "source"), "_")
-		for i, raw := range v.Values {
-			e := parseSourceEntry(raw, p.Expand(raw))
-			e.Index = i
-			e.Arch = arch
-			e.Pos = v.Pos
-			out = append(out, e)
+		idx := 0
+		for _, raw := range v.Values {
+			for _, expanded := range expandBraces(p.Expand(raw)) {
+				e := parseSourceEntry(raw, expanded)
+				e.Index = idx
+				e.Arch = arch
+				e.Pos = v.Pos
+				out = append(out, e)
+				idx++
+			}
 		}
 	}
 	return out
+}
+
+// expandBraces performs bash-style brace expansion for the simple {a,b,c}
+// groups that appear in source arrays. ${var} parameter braces and groups
+// without a comma (which bash leaves literal too) are skipped; nested groups
+// are rare enough to leave as-is.
+func expandBraces(s string) []string {
+	for i := 0; i < len(s); i++ {
+		if s[i] != '{' {
+			continue
+		}
+		if i > 0 && s[i-1] == '$' { // ${var}: not a brace group
+			if j := strings.IndexByte(s[i:], '}'); j >= 0 {
+				i += j
+			}
+			continue
+		}
+		j := strings.IndexByte(s[i:], '}')
+		if j < 0 {
+			return []string{s}
+		}
+		j += i
+		inner := s[i+1 : j]
+		if strings.Contains(inner, "{") || !strings.Contains(inner, ",") {
+			continue
+		}
+		var out []string
+		for alt := range strings.SplitSeq(inner, ",") {
+			out = append(out, expandBraces(s[:i]+alt+s[j+1:])...)
+		}
+		return out
+	}
+	return []string{s}
 }
 
 func parseSourceEntry(raw, expanded string) SourceEntry {

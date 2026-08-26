@@ -30,8 +30,10 @@ var fsRules = []Rule{
 		ID:   "PB403",
 		Name: "setuid-file",
 		Doc: "chmod u+s/g+s (or 4xxx/2xxx modes), and `install -m` with such a mode, create " +
-			"setuid/setgid binaries — a privilege boundary that deserves explicit review whenever a " +
-			"package ships one.",
+			"setuid/setgid binaries, and `setcap` grants file capabilities (cap_setuid, cap_net_raw, " +
+			"…) — the capability-based equivalent of setuid. Each is a privilege boundary that " +
+			"deserves explicit review whenever a package ships one. The auto-fix drops setuid/setgid " +
+			"mode bits; capability grants are never rewritten automatically.",
 		Check:    checkSetuid,
 		FixLevel: FixUnsafe,
 		Fix:      fixSetuid,
@@ -195,6 +197,30 @@ func checkSetuid(ctx *Context) []Finding {
 		if mode, _, _ := installModeArg(c); isSetuidNumeric(mode) {
 			out = append(out, c.finding("PB403", Warn,
 				"install with mode %s creates a setuid/setgid file", mode))
+		}
+	}
+	for _, c := range ctx.CommandsNamed("setcap") {
+		if c.HasArg("-r") { // -r removes capabilities
+			continue
+		}
+		// The first non-flag argument is the capability clause, e.g.
+		// cap_net_raw+ep; a bare "-" means the clause comes from stdin.
+		caps := ""
+		for _, a := range c.Args {
+			if a == "-" || !hasPrefixAny(a, "-") {
+				caps = a
+				break
+			}
+		}
+		if caps == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(caps), "cap_") {
+			out = append(out, c.finding("PB403", Warn,
+				"setcap grants file capabilities (%s) — the capability-based equivalent of a setuid binary", caps))
+		} else {
+			out = append(out, c.finding("PB403", Warn,
+				"setcap grants file capabilities — the capability-based equivalent of a setuid binary"))
 		}
 	}
 	return out

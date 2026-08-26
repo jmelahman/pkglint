@@ -54,7 +54,7 @@ writing. Fixes come in two tiers:
 | Tier | Flag | Rules | What it does |
 |------|------|-------|--------------|
 | Safe | `--fix` | PB103, PB203, PB205, PB705, PB708 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`) |
-| Unsafe | `--unsafe-fix` | PB204, PB206, PB403 | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; drop setuid/setgid mode bits |
+| Unsafe | `--unsafe-fix` | PB204, PB206–PB209, PB403 | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits |
 
 Safe fixes preserve behavior or restore a security default; unsafe fixes are
 mechanical but change what the build does, so review them. An inline
@@ -66,12 +66,12 @@ suggestion (`updpkgsums`, `makepkg --printsrcinfo`) instead.
 
 | Group | Rules | What they catch |
 |-------|-------|-----------------|
-| Integrity | PB101–PB110 | SKIP/weak checksums, unpinned VCS sources, unencrypted transports, source/url domain and forge-owner mismatches, DLAGENTS and other makepkg.conf overrides, checksum-count mismatches, missing install scripts |
-| Hermeticity | PB201–PB206 | network access outside `prepare()`, `pip` without `--require-hashes`, unlocked `cargo`, implicit Go module downloads, disabled checksum databases |
+| Integrity | PB101–PB113 | SKIP/weak checksums, unpinned VCS sources, unencrypted transports, source/url domain and forge-owner mismatches, DLAGENTS and other makepkg.conf overrides, checksum-count mismatches, missing install scripts, PGP signatures without pinned keys, insecure signature transport, unused validpgpkeys |
+| Hermeticity | PB201–PB209 | network access outside `prepare()`, `pip`/`uv pip` without `--require-hashes`, unlocked `cargo`/npm/yarn/pnpm/bun/composer/bundler/uv/poetry installs, implicit Go module downloads and mutable `@latest` refs, disabled checksum databases |
 | Execution | PB301–PB309 | top-level code, `eval`, decode-and-execute, download-and-execute (including `eval "$(curl ...)"` and `source <(wget ...)"` variants), `/dev/tcp`, unresolvable command names, embedded payloads, makepkg-internal function overrides, hidden bidi/zero-width characters |
-| Filesystem | PB401–PB405 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files, install steps that skip `$pkgdir`, writes to pacman/dynamic-linker/sudoers config |
+| Filesystem | PB401–PB405 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files and setcap capability grants, install steps that skip `$pkgdir`, writes to pacman/dynamic-linker/sudoers config |
 | Scriptlets | PB501–PB502 | network access and persistence (crontabs, systemd units, shell profiles, login-capable users) in `.install` files running as root |
-| Consistency | PB601–PB602 | PKGBUILD / .SRCINFO drift, network access in `pkgver()` |
+| Consistency | PB601–PB603 | PKGBUILD / .SRCINFO drift, network access in `pkgver()`, provides/replaces/conflicts claims on core system packages |
 | Correctness | PB701–PB710 | makepkg build-breakers: invalid pkgname/pkgver/pkgrel/epoch, backup leading slash, unknown `options`, `provides` comparison operators, scalar-vs-array field types, schema variables set inside `package()`, missing/duplicate/mixed `arch` |
 
 `pkglint --rules` prints the full documentation for each.
@@ -98,6 +98,13 @@ go run ./site -maintainer Jamison -top 500 -out docs
 
 It downloads the AUR metadata dump once a day, fetches package snapshots politely
 (throttled, cached by `LastModified`), and scans everything in-process.
+
+Between runs it also remembers each package's source fingerprints (checksums per URL,
+VCS commit pins, pkgver) in `.cache/state.json` and flags **drift**: a checksum changing
+under an unchanged URL, or a commit pin moving without a version bump — the shape a
+hijacked upstream release takes. Drifted packages get a warning box on their page, a ⚠
+marker on the index, and a `drift` array in `results.json`. This is a stateful,
+cross-scan signal, so it lives in the site generator rather than the per-file linter.
 
 The generated site is checked into [`docs/`](docs/) and served at
 <https://jamison.lahman.dev/pkglint/>. The [`Report card site`](.github/workflows/site.yml)

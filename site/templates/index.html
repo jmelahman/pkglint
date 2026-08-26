@@ -14,6 +14,7 @@ See the <a href="rules/index.html">rule reference</a> for every check, with exam
   <div class="tile"><b>{{.Total}}</b><span>packages</span></div>
   <div class="tile"><b>{{.Findings}}</b><span>findings</span></div>
   <div class="tile"><b>{{.Fixable}}</b><span>auto-fixable</span></div>
+  {{if .Drifted}}<div class="tile"><b>{{.Drifted}}</b><span>drifted</span></div>{{end}}
   {{range $g := .Grades}}{{with index $.Counts $g}}
   <div class="tile"><b><span class="grade grade-{{$g}}">{{$g}}</span> {{.}}</b><span>graded {{$g}}</span></div>
   {{end}}{{end}}
@@ -32,7 +33,7 @@ improvement", not an accusation, and an A is not an endorsement.</div>
   {{range .Results}}
   <tr>
     <td><span class="grade grade-{{.Grade}}">{{.Grade}}</span></td>
-    <td><a href="package/{{.Name}}.html">{{.Name}}</a></td>
+    <td><a href="package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}} <span title="source drift since the previous scan">⚠</span>{{end}}</td>
     <td>{{len .Findings}}</td>
     <td>{{.Votes}}</td>
     <td>{{.Description}}</td>

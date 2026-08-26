@@ -64,6 +64,31 @@ sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`
 sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
             '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')`,
 	},
+	"PB111": {
+		Bad: `source=("https://example.com/foo-$pkgver.tar.gz"
+        "https://example.com/foo-$pkgver.tar.gz.sig")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' 'SKIP')
+# validpgpkeys is never set: any key in the builder's keyring passes`,
+		Good: `source=("https://example.com/foo-$pkgver.tar.gz"
+        "https://example.com/foo-$pkgver.tar.gz.sig")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' 'SKIP')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')   # upstream's release key`,
+	},
+	"PB112": {
+		Bad: `source=("https://example.com/foo-$pkgver.tar.gz"
+        "http://example.com/foo-$pkgver.tar.gz.sig")   # signature over plain http`,
+		Good: `source=("https://example.com/foo-$pkgver.tar.gz"
+        "https://example.com/foo-$pkgver.tar.gz.sig")`,
+	},
+	"PB113": {
+		Bad: `source=("https://example.com/foo-$pkgver.tar.gz")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')   # verifies nothing`,
+		Good: `source=("https://example.com/foo-$pkgver.tar.gz"
+        "https://example.com/foo-$pkgver.tar.gz.sig")   # now the key has something to check
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' 'SKIP')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')`,
+	},
 	"PB201": {
 		Bad: `build() {
   curl -O https://example.com/extra-asset.bin
@@ -116,6 +141,30 @@ build() {
 }`,
 		Good: `build() {
   npm ci   # installs exactly what package-lock.json pins
+}`,
+	},
+	"PB207": {
+		Bad: `build() {
+  composer install   # runs hook scripts and plugins while fetching
+}`,
+		Good: `build() {
+  composer install --no-scripts   # fetch exactly the lock, run nothing
+}`,
+	},
+	"PB208": {
+		Bad: `build() {
+  gem install rails   # whatever RubyGems serves right now
+}`,
+		Good: `build() {
+  bundle install --frozen   # exactly what Gemfile.lock pins
+}`,
+	},
+	"PB209": {
+		Bad: `build() {
+  uv sync   # may re-resolve and rewrite uv.lock
+}`,
+		Good: `build() {
+  uv sync --frozen   # the committed lock is authoritative
 }`,
 	},
 	"PB301": {
@@ -269,8 +318,15 @@ makepkg --printsrcinfo > .SRCINFO`,
   git describe --tags | sed 's/^v//;s/-/./g'
 }`,
 	},
+	"PB603": {
+		Bad: `pkgname=fancy-tool
+provides=('pacman')    # dependency resolution now treats this package as pacman
+replaces=('systemd')   # sysupgrade swaps systemd out for this package`,
+		Good: `pkgname=pacman-git
+provides=("pacman=$pkgver")   # a -git/-bin variant legitimately provides its parent`,
+	},
 	"PB701": {
-		Bad:  `pkgname=Foo:Bar   # ':' and uppercase are not allowed by makepkg`,
+		Bad:  `pkgname=foo:bar   # ':' is not allowed by makepkg`,
 		Good: `pkgname=foo-bar`,
 	},
 	"PB702": {

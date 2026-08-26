@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,6 +59,7 @@ type siteResult struct {
 	Votes        int             `json:"votes"`
 	Grade        string          `json:"grade"`
 	Findings     []rules.Finding `json:"findings"`
+	Drift        []string        `json:"drift,omitempty"` // provenance drift vs. the previous scan
 	Err          string          `json:"error,omitempty"`
 	LastModified int64           `json:"last_modified"`
 }
@@ -100,7 +102,10 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 	}
 	log.Printf("scanning %d package bases (maintainer=%q top=%d)", len(seed), maintainer, top)
 
-	results := scanAll(seed, cache, jobs)
+	results, state := scanAll(seed, cache, jobs, loadState(cache))
+	if err := saveState(cache, state); err != nil {
+		return err
+	}
 
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].Grade != results[j].Grade {
@@ -187,8 +192,12 @@ func selectSeed(meta []metaPackage, maintainer string, top int) []metaPackage {
 	return seed
 }
 
-func scanAll(seed []metaPackage, cache string, jobs int) []siteResult {
+// scanAll lints every seed package and returns the results plus the updated
+// drift state: prev's fingerprints with every successfully scanned base
+// overwritten, so packages that drop out of the seed keep their history.
+func scanAll(seed []metaPackage, cache string, jobs int, prev map[string]sourceState) ([]siteResult, map[string]sourceState) {
 	results := make([]siteResult, len(seed))
+	states := make([]*sourceState, len(seed))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, jobs)
 	for i, m := range seed {
@@ -197,14 +206,21 @@ func scanAll(seed []metaPackage, cache string, jobs int) []siteResult {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[i] = scanOne(m, cache)
+			results[i], states[i] = scanOne(m, cache, prev)
 		}(i, m)
 	}
 	wg.Wait()
-	return results
+	next := make(map[string]sourceState, len(prev)+len(seed))
+	maps.Copy(next, prev)
+	for i, st := range states {
+		if st != nil {
+			next[seed[i].PackageBase] = *st
+		}
+	}
+	return results, next
 }
 
-func scanOne(m metaPackage, cache string) siteResult {
+func scanOne(m metaPackage, cache string, prev map[string]sourceState) (siteResult, *sourceState) {
 	res := siteResult{
 		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
 		Description: m.Description, Votes: m.NumVotes, LastModified: m.LastModified,
@@ -216,13 +232,15 @@ func scanOne(m metaPackage, cache string) siteResult {
 	dir, err := fetchSnapshot(m, cache)
 	if err != nil {
 		res.Grade, res.Err = "?", err.Error()
-		return res
+		return res, nil
 	}
 	pkg, err := pkgbuild.Load(dir)
 	if err != nil {
 		res.Grade, res.Err = "?", err.Error()
-		return res
+		return res, nil
 	}
+	cur := extractState(pkg, m.LastModified)
+	res.Drift = driftNotes(prev[m.PackageBase], cur)
 	res.Findings = rules.Run(pkg, nil)
 	if res.Findings == nil {
 		res.Findings = []rules.Finding{}
@@ -232,7 +250,7 @@ func scanOne(m metaPackage, cache string) siteResult {
 		res.Findings[i].Path = strings.TrimPrefix(res.Findings[i].Path, dir+string(filepath.Separator))
 	}
 	res.Grade = report.Grade(res.Findings)
-	return res
+	return res, &cur
 }
 
 // fetchSnapshot downloads and extracts a package base's snapshot, cached by

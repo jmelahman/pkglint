@@ -33,9 +33,13 @@ func renderSite(out string, results []siteResult) error {
 	counts := map[string]int{}
 	findingsTotal := 0
 	fixableTotal := 0
+	driftedTotal := 0
 	for _, r := range results {
 		counts[r.Grade]++
 		findingsTotal += len(r.Findings)
+		if len(r.Drift) > 0 {
+			driftedTotal++
+		}
 		for _, f := range r.Findings {
 			if rl, ok := ruleIndex[f.RuleID]; ok && rl.FixLevel.Fixable() {
 				fixableTotal++
@@ -49,6 +53,7 @@ func renderSite(out string, results []siteResult) error {
 		"Total":     len(results),
 		"Findings":  findingsTotal,
 		"Fixable":   fixableTotal,
+		"Drifted":   driftedTotal,
 		"Generated": time.Now().UTC().Format("2006-01-02 15:04 UTC"),
 	}
 	if err := renderTo(tmpl, "index.html", filepath.Join(out, "index.html"), indexData); err != nil {

@@ -15,6 +15,16 @@
 </p>
 {{with .R.Description}}<p>{{.}}</p>{{end}}
 
+{{with .R.Drift}}
+<div class="notice"><strong>⚠ Source drift since the previous scan:</strong>
+<ul>
+  {{range .}}<li>{{.}}</li>{{end}}
+</ul>
+A changed artifact behind an unchanged URL, or a moved commit pin without a version bump,
+is how hijacked upstream releases look. It can also be an innocent re-tag — but it is
+exactly the kind of change worth re-reviewing.</div>
+{{end}}
+
 {{if .R.Err}}
 <div class="notice">This package could not be scanned: <code>{{.R.Err}}</code></div>
 {{else if not .R.Findings}}

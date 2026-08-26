@@ -130,9 +130,33 @@ func TestFixNpmCI(t *testing.T) {
 build() {
   npm install
   yarn install
+  pnpm install
+  bun install
 }`, FixUnsafe, nil)
 	mustContain(t, got, "npm ci")
 	mustContain(t, got, "yarn install --immutable")
+	mustContain(t, got, "pnpm install --frozen-lockfile")
+	mustContain(t, got, "bun install --frozen-lockfile")
+}
+
+func TestFixLockfileManagers(t *testing.T) {
+	got := fixPKGBUILD(t, `
+build() {
+  composer install
+  bundle install
+  uv sync
+}`, FixUnsafe, nil)
+	mustContain(t, got, "composer install --no-scripts")
+	mustContain(t, got, "bundle install --frozen")
+	mustContain(t, got, "uv sync --frozen")
+}
+
+func TestFixUvRunNotTouched(t *testing.T) {
+	got := fixPKGBUILD(t, `
+build() {
+  uv run make
+}`, FixUnsafe, nil)
+	mustNotContain(t, got, "uv run make --frozen")
 }
 
 func TestFixSetuid(t *testing.T) {

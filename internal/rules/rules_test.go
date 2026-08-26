@@ -228,6 +228,81 @@ sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`
 	t.Run("PB110 matched counts are fine", func(t *testing.T) {
 		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith("", "")})
 	})
+
+	sigNoKeys := `pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("https://example.com/demo-1.tar.gz"
+        "https://example.com/demo-1.tar.gz.sig")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' 'SKIP')`
+	sigWithKeys := sigNoKeys + `
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')`
+
+	t.Run("PB111 signature without validpgpkeys", func(t *testing.T) {
+		expectRule(t, "PB111", map[string]string{"PKGBUILD": pkgbuildWith(sigNoKeys, "")})
+	})
+	t.Run("PB111 not when keys are pinned", func(t *testing.T) {
+		expectNoRule(t, "PB111", map[string]string{"PKGBUILD": pkgbuildWith(sigWithKeys, "")})
+	})
+	t.Run("PB111 signed VCS source without keys", func(t *testing.T) {
+		expectRule(t, "PB111", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/demo.git?signed#tag=v1")
+sha256sums=('SKIP')`, "")})
+	})
+	t.Run("PB101 not for the signature file or its signed artifact", func(t *testing.T) {
+		expectNoRule(t, "PB101", map[string]string{"PKGBUILD": pkgbuildWith(sigWithKeys, "")})
+	})
+	t.Run("PB112 signature over http", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("https://example.com/demo-1.tar.gz"
+        "http://example.com/demo-1.tar.gz.sig")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' 'SKIP')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')`, "")}
+		expectRule(t, "PB112", files)
+		expectNoRule(t, "PB104", files) // PB112 owns signature transport
+	})
+	t.Run("PB112 not for https signature", func(t *testing.T) {
+		expectNoRule(t, "PB112", map[string]string{"PKGBUILD": pkgbuildWith(sigWithKeys, "")})
+	})
+	t.Run("PB113 keys pinned but nothing signed", func(t *testing.T) {
+		expectRule(t, "PB113", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("https://example.com/demo-1.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')`, "")})
+	})
+	t.Run("PB113 not when a signature source exists", func(t *testing.T) {
+		expectNoRule(t, "PB113", map[string]string{"PKGBUILD": pkgbuildWith(sigWithKeys, "")})
+	})
+	t.Run("PB113 not for a brace-expanded signature pair", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("https://example.com/demo-1.tar.gz{,.sig}")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' 'SKIP')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')`, "")}
+		expectNoRule(t, "PB113", files)
+		expectNoRule(t, "PB110", files) // two sums pair with the two expanded sources
+	})
+	t.Run("PB113 not when a signed VCS source exists", func(t *testing.T) {
+		expectNoRule(t, "PB113", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/demo.git?signed#tag=v1")
+sha256sums=('SKIP')
+validpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')`, "")})
+	})
 }
 
 func TestHermeticRules(t *testing.T) {
@@ -298,6 +373,126 @@ build() {
 		expectRule(t, "PB206", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   npm install
+}`)})
+	})
+	t.Run("PB206 pnpm install unlocked", func(t *testing.T) {
+		expectRule(t, "PB206", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  pnpm install
+}`)})
+	})
+	t.Run("PB206 pnpm frozen lockfile ok", func(t *testing.T) {
+		expectNoRule(t, "PB206", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  pnpm install --frozen-lockfile
+}`)})
+	})
+	t.Run("PB206 bun install unlocked", func(t *testing.T) {
+		expectRule(t, "PB206", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  bun install
+}`)})
+	})
+	t.Run("PB202 uv pip install without hashes", func(t *testing.T) {
+		expectRule(t, "PB202", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  uv pip install -r requirements.txt
+}`)})
+	})
+	t.Run("PB202 uv pip install with hashes ok", func(t *testing.T) {
+		expectNoRule(t, "PB202", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  uv pip install --require-hashes -r requirements.txt
+}`)})
+	})
+	t.Run("PB204 go install mutable @latest even in prepare", func(t *testing.T) {
+		expectRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  go install github.com/example/tool@latest
+}`)})
+	})
+	t.Run("PB204 pinned @version in prepare is fine", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  go install github.com/example/tool@v1.2.3
+}`)})
+	})
+	t.Run("PB207 composer install without --no-scripts", func(t *testing.T) {
+		expectRule(t, "PB207", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  composer install
+}`)})
+	})
+	t.Run("PB207 composer install --no-scripts ok", func(t *testing.T) {
+		expectNoRule(t, "PB207", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  composer install --no-scripts
+}`)})
+	})
+	t.Run("PB207 composer update re-resolves", func(t *testing.T) {
+		expectRule(t, "PB207", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  composer update --no-scripts
+}`)})
+	})
+	t.Run("PB208 bundle install unlocked", func(t *testing.T) {
+		expectRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  bundle install
+}`)})
+	})
+	t.Run("PB208 bundle install --frozen ok", func(t *testing.T) {
+		expectNoRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  bundle install --frozen
+}`)})
+	})
+	t.Run("PB208 gem install from RubyGems", func(t *testing.T) {
+		expectRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  gem install rails
+}`)})
+	})
+	t.Run("PB208 gem install local .gem ok", func(t *testing.T) {
+		expectNoRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  gem install --local demo-1.0.gem
+}`)})
+	})
+	t.Run("PB209 uv sync unlocked", func(t *testing.T) {
+		expectRule(t, "PB209", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  uv sync
+}`)})
+	})
+	t.Run("PB209 uv sync --frozen ok", func(t *testing.T) {
+		expectNoRule(t, "PB209", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  uv sync --frozen
+}`)})
+	})
+	t.Run("PB209 poetry add re-resolves", func(t *testing.T) {
+		expectRule(t, "PB209", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  poetry add requests
+}`)})
+	})
+	t.Run("PB209 poetry install against lock is fine", func(t *testing.T) {
+		expectNoRule(t, "PB209", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  poetry install
+}`)})
+	})
+	t.Run("PB201 uv sync in build is a network download", func(t *testing.T) {
+		expectRule(t, "PB201", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  uv sync --frozen
+}`)})
+	})
+	t.Run("PB201 bundle install in build is a network download", func(t *testing.T) {
+		expectRule(t, "PB201", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  bundle install --frozen
 }`)})
 	})
 }
@@ -460,6 +655,26 @@ package() {
 	t.Run("PB403 ordinary install mode fine", func(t *testing.T) {
 		expectNoRule(t, "PB403", map[string]string{"PKGBUILD": cleanPKGBUILD})
 	})
+	t.Run("PB403 setcap in package()", func(t *testing.T) {
+		expectRule(t, "PB403", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  setcap cap_net_raw+ep "$pkgdir/usr/bin/demo"
+}`)})
+	})
+	t.Run("PB403 setcap in post_install scriptlet", func(t *testing.T) {
+		expectRule(t, "PB403", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=demo.install"),
+			"demo.install": `post_install() {
+  setcap cap_setuid+ep /usr/bin/demo
+}`,
+		})
+	})
+	t.Run("PB403 setcap -r removal is fine", func(t *testing.T) {
+		expectNoRule(t, "PB403", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  setcap -r "$pkgdir/usr/bin/demo"
+}`)})
+	})
 	t.Run("PB404 make install without destdir", func(t *testing.T) {
 		expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
 package() {
@@ -588,6 +803,32 @@ pkgname = demo
 pkgver() {
   curl -s https://example.com/latest
 }`)})
+	})
+	t.Run("PB603 provides claiming pacman", func(t *testing.T) {
+		expectRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith("", `provides=('pacman')`)})
+	})
+	t.Run("PB603 versioned provides claiming glibc", func(t *testing.T) {
+		expectRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith("", `provides=('glibc=2.39')`)})
+	})
+	t.Run("PB603 replaces claiming systemd", func(t *testing.T) {
+		expectRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith("", `replaces=('systemd')`)})
+	})
+	t.Run("PB603 conflicts claiming sudo", func(t *testing.T) {
+		expectRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith("", `conflicts=('sudo')`)})
+	})
+	t.Run("PB603 arch-specific provides claiming pacman", func(t *testing.T) {
+		expectRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith("", `provides_x86_64=('pacman')`)})
+	})
+	t.Run("PB603 variant package providing its parent is fine", func(t *testing.T) {
+		expectNoRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=pacman-git
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=()`, `provides=("pacman=$pkgver")
+conflicts=('pacman')`)})
+	})
+	t.Run("PB603 ordinary provides is fine", func(t *testing.T) {
+		expectNoRule(t, "PB603", map[string]string{"PKGBUILD": pkgbuildWith("", `provides=('libfoo.so')`)})
 	})
 }
 

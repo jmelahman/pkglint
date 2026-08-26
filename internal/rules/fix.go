@@ -486,6 +486,99 @@ func fixNpmCI(ctx *Context, _ *FixEnv) []Edit {
 			Desc:  "append --immutable to `yarn install`",
 		})
 	}
+	for _, name := range []string{"pnpm", "bun"} {
+		for _, c := range ctx.CommandsNamed(name) {
+			sub := c.Subcommand()
+			if sub != "install" && sub != "i" {
+				continue
+			}
+			// With package args the command adds a dependency; freezing the
+			// lockfile is not equivalent.
+			if c.HasArg("--frozen-lockfile") || c.HasArg("--offline") || npmHasPackageArg(c) {
+				continue
+			}
+			at := off(c.Call.End())
+			edits = append(edits, Edit{
+				Path:  c.Unit.Path,
+				Start: at,
+				End:   at,
+				New:   " --frozen-lockfile",
+				Line:  int(c.Stmt.Pos().Line()),
+				Desc:  fmt.Sprintf("append --frozen-lockfile to `%s %s`", name, sub),
+			})
+		}
+	}
+	return edits
+}
+
+// --- PB207: composer without --no-scripts ----------------------------------
+
+func fixComposer(ctx *Context, _ *FixEnv) []Edit {
+	var edits []Edit
+	for _, c := range ctx.CommandsNamed("composer") {
+		if c.Subcommand() != "install" || c.HasArg("--no-scripts") {
+			continue
+		}
+		at := off(c.Call.End())
+		edits = append(edits, Edit{
+			Path:  c.Unit.Path,
+			Start: at,
+			End:   at,
+			New:   " --no-scripts",
+			Line:  int(c.Stmt.Pos().Line()),
+			Desc:  "append --no-scripts to `composer install`",
+		})
+	}
+	return edits
+}
+
+// --- PB208: bundle install without --frozen --------------------------------
+
+func fixBundler(ctx *Context, _ *FixEnv) []Edit {
+	var edits []Edit
+	for _, c := range ctx.CommandsNamed("bundle", "bundler") {
+		if c.Subcommand() != "install" { // leave bare `bundle` alone
+			continue
+		}
+		if c.HasArg("--frozen") || c.HasArg("--deployment") || c.HasArg("--local") {
+			continue
+		}
+		at := off(c.Call.End())
+		edits = append(edits, Edit{
+			Path:  c.Unit.Path,
+			Start: at,
+			End:   at,
+			New:   " --frozen",
+			Line:  int(c.Stmt.Pos().Line()),
+			Desc:  "append --frozen to `bundle install`",
+		})
+	}
+	return edits
+}
+
+// --- PB209: uv sync without --frozen ----------------------------------------
+
+func fixUvFrozen(ctx *Context, _ *FixEnv) []Edit {
+	var edits []Edit
+	for _, c := range ctx.CommandsNamed("uv") {
+		// Only `uv sync`: for `uv run` a trailing flag would land on the
+		// command being run, not on uv.
+		if c.Subcommand() != "sync" {
+			continue
+		}
+		if c.HasArg("--frozen") || c.HasArg("--locked") || c.HasArg("--offline") || c.HasArg("--no-sync") {
+			continue
+		}
+		at := off(c.Call.End())
+		edits = append(edits, Edit{
+			Path:  c.Unit.Path,
+			Start: at,
+			End:   at,
+			New:   " --frozen",
+			Line:  int(c.Stmt.Pos().Line()),
+			Desc:  "append --frozen to `uv sync`",
+		})
+	}
 	return edits
 }
 

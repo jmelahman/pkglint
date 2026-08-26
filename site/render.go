@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jmelahman/pkglint/internal/rules"
@@ -51,6 +52,11 @@ func renderSite(out string, results []siteResult) error {
 		}
 	}
 
+	rulesData := map[string]any{"Groups": groupRules(rules.Registry())}
+	if err := renderTo(tmpl, "rulesindex.html", filepath.Join(out, "rules", "index.html"), rulesData); err != nil {
+		return err
+	}
+
 	for _, r := range results {
 		data := map[string]any{"R": r, "Rules": ruleIndex}
 		if err := renderTo(tmpl, "package.html", filepath.Join(out, "package", r.Name+".html"), data); err != nil {
@@ -58,6 +64,41 @@ func renderSite(out string, results []siteResult) error {
 		}
 	}
 	return nil
+}
+
+// ruleGroup is a titled section of the rule reference.
+type ruleGroup struct {
+	Title string
+	Rules []rules.Rule
+}
+
+// groupRules buckets the registry by the PB-hundreds prefix (PB1xx, PB2xx, …),
+// in ID order. Registry() already returns rules sorted by ID.
+func groupRules(all []rules.Rule) []ruleGroup {
+	titles := []struct {
+		prefix string
+		title  string
+	}{
+		{"PB1", "PB1xx — Integrity & provenance"},
+		{"PB2", "PB2xx — Hermeticity"},
+		{"PB3", "PB3xx — Execution & obfuscation"},
+		{"PB4", "PB4xx — Filesystem & privilege"},
+		{"PB5", "PB5xx — Install scriptlets"},
+		{"PB6", "PB6xx — Metadata consistency"},
+	}
+	var groups []ruleGroup
+	for _, t := range titles {
+		g := ruleGroup{Title: t.title}
+		for _, r := range all {
+			if strings.HasPrefix(r.ID, t.prefix) {
+				g.Rules = append(g.Rules, r)
+			}
+		}
+		if len(g.Rules) > 0 {
+			groups = append(groups, g)
+		}
+	}
+	return groups
 }
 
 func renderTo(tmpl *template.Template, name, path string, data any) error {

@@ -70,6 +70,9 @@ func TestRegistryIsWellFormed(t *testing.T) {
 		if r.Name == "" || r.Doc == "" || r.Check == nil {
 			t.Errorf("rule %s is missing name, doc, or check", r.ID)
 		}
+		if r.Bad == "" || r.Good == "" {
+			t.Errorf("rule %s is missing a Bad/Good example", r.ID)
+		}
 	}
 }
 

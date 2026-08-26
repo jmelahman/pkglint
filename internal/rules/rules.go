@@ -55,6 +55,12 @@ type Rule struct {
 	Name  string // short slug, e.g. "unpinned-vcs-source"
 	Doc   string // one-paragraph explanation, rendered on the report card site
 	Check func(*Context) []Finding
+
+	// Bad and Good are illustrative PKGBUILD snippets shown on the report
+	// card site: Bad is a construct the rule flags, Good the preferred
+	// alternative. Attached from the examples table in Registry().
+	Bad  string
+	Good string
 }
 
 // Context carries the package under analysis plus precomputed command
@@ -253,6 +259,12 @@ func Registry() []Rule {
 	var out []Rule
 	for _, group := range all {
 		out = append(out, group...)
+	}
+	for i := range out {
+		if ex, ok := examples[out[i].ID]; ok {
+			out[i].Bad = ex.Bad
+			out[i].Good = ex.Good
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out

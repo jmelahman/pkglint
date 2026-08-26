@@ -82,6 +82,11 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 			return err
 		}
 	}
+	// Serve the tree verbatim on GitHub Pages: no Jekyll processing, and don't
+	// drop paths beginning with an underscore.
+	if err := os.WriteFile(filepath.Join(out, ".nojekyll"), nil, 0o644); err != nil {
+		return err
+	}
 
 	meta, err := loadMeta(cache)
 	if err != nil {

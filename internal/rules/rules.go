@@ -288,7 +288,7 @@ func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 			continue
 		}
 		for _, f := range rule.Check(ctx) {
-			if pkg.Suppressed(f.RuleID, f.Line) {
+			if pkg.Suppressed(f.RuleID, f.Path, f.Line) {
 				continue
 			}
 			out = append(out, f)

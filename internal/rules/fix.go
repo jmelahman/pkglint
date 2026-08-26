@@ -97,7 +97,10 @@ func CollectEdits(ctx *Context, ignore map[string]bool, level FixLevel, env *Fix
 		}
 		for _, e := range rule.Fix(ctx, env) {
 			e.RuleID = rule.ID
-			if ctx.Pkg.Suppressed(rule.ID, e.Line) {
+			// e.Path is the unit the edit rewrites: usually the PKGBUILD, but
+			// command-driven fixers also edit scriptlets. Check the directive in
+			// that file, not a fixed one.
+			if ctx.Pkg.Suppressed(rule.ID, e.Path, e.Line) {
 				continue
 			}
 			edits = append(edits, e)

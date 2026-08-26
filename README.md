@@ -46,6 +46,10 @@ Suppress a reviewed, intentional finding inline:
 go build -o "$pkgname" .
 ```
 
+The directive covers its own line and the line below it, in the file it appears
+in only: an `ignore=` in an `.install` scriptlet never affects the `PKGBUILD`,
+or vice versa.
+
 ### Auto-fixing
 
 `--fix` rewrites what it can and prints every change; `--diff` previews without

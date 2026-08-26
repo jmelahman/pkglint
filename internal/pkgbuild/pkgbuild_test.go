@@ -301,26 +301,81 @@ func TestParseSuppressions(t *testing.T) {
 	}
 }
 
-// TestSuppressed pins the "same line or the line above" window.
+// TestSuppressed pins the "same line or the line above" window, scoped to the
+// file the directive lives in.
 func TestSuppressed(t *testing.T) {
 	pkg := loadPKGBUILD(t, "pkgname=demo\n# pkglint: ignore=PB204\npkgver=1.0\n")
 	for _, tc := range []struct {
 		name string
 		id   string
+		path string
 		line int
 		want bool
 	}{
-		{name: "directive line", id: "PB204", line: 2, want: true},
-		{name: "line below directive", id: "PB204", line: 3, want: true},
-		{name: "line above directive", id: "PB204", line: 1},
-		{name: "two lines below directive", id: "PB204", line: 4},
-		{name: "other rule id", id: "PB206", line: 2},
+		{name: "directive line", id: "PB204", path: pkg.PKGBUILD.Path, line: 2, want: true},
+		{name: "line below directive", id: "PB204", path: pkg.PKGBUILD.Path, line: 3, want: true},
+		{name: "line above directive", id: "PB204", path: pkg.PKGBUILD.Path, line: 1},
+		{name: "two lines below directive", id: "PB204", path: pkg.PKGBUILD.Path, line: 4},
+		{name: "other rule id", id: "PB206", path: pkg.PKGBUILD.Path, line: 2},
+		{name: "other file, same line", id: "PB204", path: filepath.Join(pkg.Dir, "demo.install"), line: 2},
+		{name: "unknown file", id: "PB204", path: "nowhere", line: 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := pkg.Suppressed(tc.id, tc.line); got != tc.want {
-				t.Errorf("Suppressed(%q, %d) = %v, want %v", tc.id, tc.line, got, tc.want)
+			if got := pkg.Suppressed(tc.id, tc.path, tc.line); got != tc.want {
+				t.Errorf("Suppressed(%q, %q, %d) = %v, want %v", tc.id, tc.path, tc.line, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestSuppressionsKeyedByFile pins that each file's directives are stored under
+// that file's own path, including a scriptlet that fails to parse (its PB503
+// finding reports at that path, so it must be suppressible from within it).
+func TestSuppressionsKeyedByFile(t *testing.T) {
+	// A scriptlet whose body cannot be parsed (an `if` with no `then`/`fi`),
+	// carrying a directive on line 1 — the line PB503 reports.
+	const brokenScriptlet = "# pkglint: ignore=PB503\npost_install() {\n  if [ -z ]\n}\n"
+
+	dir := t.TempDir()
+	for name, content := range map[string]string{
+		"PKGBUILD":     "pkgname=demo\n# pkglint: ignore=PB204\npkgver=1.0\ninstall=demo.install\n",
+		"demo.install": "# pkglint: ignore=PB501\npost_install() {\n  echo hi\n}\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pkg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	want := map[string]map[int]map[string]bool{
+		filepath.Join(dir, "PKGBUILD"):     {2: {"PB204": true}},
+		filepath.Join(dir, "demo.install"): {1: {"PB501": true}},
+	}
+	if !reflect.DeepEqual(pkg.Suppressions, want) {
+		t.Errorf("Suppressions = %v, want %v", pkg.Suppressions, want)
+	}
+
+	brokenDir := t.TempDir()
+	for name, content := range map[string]string{
+		"PKGBUILD":       "pkgname=demo\npkgver=1.0\ninstall=broken.install\n",
+		"broken.install": brokenScriptlet,
+	} {
+		if err := os.WriteFile(filepath.Join(brokenDir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bpkg, err := Load(brokenDir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(bpkg.ScriptletErrors) != 1 {
+		t.Fatalf("ScriptletErrors = %+v, want one entry", bpkg.ScriptletErrors)
+	}
+	brokenPath := filepath.Join(brokenDir, "broken.install")
+	if !bpkg.Suppressed("PB503", brokenPath, 1) {
+		t.Errorf("Suppressed(PB503, %q, 1) = false, want true: an unparseable scriptlet must still contribute its own directives", brokenPath)
 	}
 }
 

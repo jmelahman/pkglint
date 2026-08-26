@@ -54,9 +54,12 @@ type Package struct {
 	Vars            map[string]*Var
 	SrcInfo         *SrcInfo // nil when no .SRCINFO is present
 
-	// Suppressions maps line number -> rule IDs disabled on that line via
-	// "# pkglint: ignore=PB123[,PB456]" (applies to the same and next line).
-	Suppressions map[int]map[string]bool
+	// Suppressions maps a file path to that file's inline
+	// "# pkglint: ignore=PB123[,PB456]" directives (line number -> rule IDs
+	// disabled on that line; a directive applies to the same and next line).
+	// Keying by path keeps a directive in one file from suppressing findings in
+	// another file that happens to share a line number.
+	Suppressions map[string]map[int]map[string]bool
 }
 
 // newParser returns a fresh parser per parse: syntax.Parser is not safe for
@@ -89,10 +92,12 @@ func Load(path string) (*Package, error) {
 	}
 
 	pkg := &Package{
-		Dir:          dir,
-		PKGBUILD:     unit,
-		Vars:         map[string]*Var{},
-		Suppressions: parseSuppressions(raw),
+		Dir:      dir,
+		PKGBUILD: unit,
+		Vars:     map[string]*Var{},
+		// Keyed by unit.Path (== pkgPath), the same string findings on the
+		// PKGBUILD carry, so Suppressed lookups match exactly.
+		Suppressions: map[string]map[int]map[string]bool{unit.Path: parseSuppressions(raw)},
 	}
 	pkg.extractTopLevel()
 
@@ -106,6 +111,11 @@ func Load(path string) (*Package, error) {
 		if err != nil {
 			continue // missing scriptlet is reported by a rule
 		}
+		// Record the scriptlet's directives before parsing it. parseSuppressions
+		// is a plain byte scan that needs no bash AST, and a scriptlet that fails
+		// to parse still has to be able to waive its own PB503 finding (which
+		// reports at this path).
+		pkg.Suppressions[p] = parseSuppressions(data)
 		su, err := parseUnit(p, data, true)
 		if err != nil {
 			// The file runs as root at install time but no rule can walk it;
@@ -120,9 +130,6 @@ func Load(path string) (*Package, error) {
 			continue
 		}
 		pkg.Scriptlets = append(pkg.Scriptlets, su)
-		for line, ids := range parseSuppressions(data) {
-			pkg.Suppressions[line] = ids // best effort; line collisions across files are acceptable
-		}
 	}
 	return pkg, nil
 }
@@ -307,11 +314,16 @@ func parseSuppressions(raw []byte) map[int]map[string]bool {
 	return out
 }
 
-// Suppressed reports whether ruleID is suppressed at the given line by a
-// directive on that line or the line above it.
-func (p *Package) Suppressed(ruleID string, line int) bool {
+// Suppressed reports whether ruleID is suppressed at path:line by a directive
+// on that line or the line above it, within the same file. A directive in one
+// file never suppresses findings in another.
+func (p *Package) Suppressed(ruleID, path string, line int) bool {
+	perLine, ok := p.Suppressions[path]
+	if !ok {
+		return false
+	}
 	for _, l := range []int{line, line - 1} {
-		if ids, ok := p.Suppressions[l]; ok && ids[ruleID] {
+		if ids, ok := perLine[l]; ok && ids[ruleID] {
 			return true
 		}
 	}

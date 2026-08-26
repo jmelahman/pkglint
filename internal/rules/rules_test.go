@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -1082,6 +1083,85 @@ build() {
   go build -o demo .
 }`)}
 	expectNoRule(t, "PB204", files)
+}
+
+// findingLine returns the line of the first finding for id, failing the test if
+// the fixture no longer trips the rule.
+func findingLine(t *testing.T, id string, files map[string]string) int {
+	t.Helper()
+	fs := lint(t, files)
+	for _, f := range fs {
+		if f.RuleID == id {
+			return f.Line
+		}
+	}
+	t.Fatalf("fixture no longer trips %s: %v", id, ruleIDs(fs))
+	return 0
+}
+
+// directiveOnLine returns src with "# pkglint: ignore=<id>" inserted so it
+// occupies 1-based line n, padding with blank lines when src is shorter.
+func directiveOnLine(src, id string, n int) string {
+	lines := strings.Split(src, "\n")
+	for len(lines) < n-1 {
+		lines = append(lines, "")
+	}
+	out := append([]string{}, lines[:n-1]...)
+	out = append(out, "# pkglint: ignore="+id)
+	return strings.Join(append(out, lines[n-1:]...), "\n")
+}
+
+// TestSuppressionIsPerFile pins that an inline directive only waives findings
+// in the file it appears in. Line numbers collide constantly between a PKGBUILD
+// and its scriptlets, so a directive matched across files would hide findings
+// its author never waived — and would let a benign-looking comment in one file
+// silence a finding in another.
+func TestSuppressionIsPerFile(t *testing.T) {
+	const cleanScriptlet = "post_install() {\n  echo hi\n}\n"
+	const netScriptlet = "post_install() {\n  curl -s https://example.com/track\n}\n"
+	base := pkgbuildWith("", "install=demo.install")
+
+	t.Run("scriptlet directive does not suppress a PKGBUILD finding", func(t *testing.T) {
+		files := map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=demo.install\nbuild() {\n  go build -o demo .\n}"),
+			// demo.install must parse, so keep a real body under the directive.
+			"demo.install": cleanScriptlet,
+		}
+		n := findingLine(t, "PB204", files)
+		files["demo.install"] = strings.Repeat("\n", n-1) + "# pkglint: ignore=PB204\n" + cleanScriptlet
+		expectRule(t, "PB204", files)
+	})
+
+	t.Run("PKGBUILD directive suppresses its own finding", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "build() {\n  go build -o demo . # pkglint: ignore=PB204\n}"),
+		})
+	})
+
+	t.Run("scriptlet directive suppresses its own finding", func(t *testing.T) {
+		expectNoRule(t, "PB501", map[string]string{
+			"PKGBUILD":     base,
+			"demo.install": "post_install() {\n  # pkglint: ignore=PB501\n  curl -s https://example.com/track\n}\n",
+		})
+	})
+
+	t.Run("PKGBUILD directive does not suppress a scriptlet finding", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": base, "demo.install": netScriptlet}
+		n := findingLine(t, "PB501", files)
+		files["PKGBUILD"] = directiveOnLine(base, "PB501", n)
+		expectRule(t, "PB501", files)
+	})
+
+	t.Run("scriptlet directive suppresses its own PB503", func(t *testing.T) {
+		// An `if` with no then/fi: the scriptlet cannot be parsed, so its
+		// directives must still be collected for PB503 (reported at line 1).
+		const broken = "post_install() {\n  if [ -z ]\n}\n"
+		expectRule(t, "PB503", map[string]string{"PKGBUILD": base, "demo.install": broken})
+		expectNoRule(t, "PB503", map[string]string{
+			"PKGBUILD":     base,
+			"demo.install": "# pkglint: ignore=PB503\n" + broken,
+		})
+	})
 }
 
 func TestIgnoreFlag(t *testing.T) {

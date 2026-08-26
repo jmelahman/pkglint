@@ -54,9 +54,8 @@ func flattenPipe(stmt *syntax.Stmt) []*syntax.Stmt {
 	return out
 }
 
-// pipelines yields every pipeline in a unit along with its enclosing
-// function name.
-func pipelines(u *syntax.File, fns map[string]*syntax.FuncDecl) [][]*syntax.Stmt {
+// pipelines yields every pipeline in a unit.
+func pipelines(u *syntax.File) [][]*syntax.Stmt {
 	var out [][]*syntax.Stmt
 	seen := map[*syntax.Stmt]bool{}
 	syntax.Walk(u, func(node syntax.Node) bool {

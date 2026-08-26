@@ -260,7 +260,7 @@ func (ctx *Context) checkPipeInto(sources map[string]bool, qualify func(Command)
 	units := ctx.Pkg.Units()
 	for i := range units {
 		u := &units[i]
-		for _, segs := range pipelines(u.File, u.Functions) {
+		for _, segs := range pipelines(u.File) {
 			var sink string
 			last := segs[len(segs)-1]
 			sinkName := stmtCommandName(last, ctx.vars)

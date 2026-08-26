@@ -36,10 +36,13 @@ var schemaStringVars = []string{
 	"changelog", "epoch", "install", "pkgbase", "pkgdesc", "pkgrel", "pkgver", "url",
 }
 
-var (
-	schemaArraySet  = toSet(schemaArrayVars)
-	schemaStringSet = toSet(schemaStringVars)
-)
+// schemaArchArrayVars are the schema arrays makepkg also recognizes with an
+// _$arch suffix for each declared architecture (util/schema.sh
+// pkgbuild_schema_arch_arrays).
+var schemaArchArrayVars = append([]string{
+	"checkdepends", "conflicts", "depends", "makedepends", "optdepends",
+	"options", "provides", "replaces", "source",
+}, hashAlgoSums...)
 
 // packageOverrideVars are the schema variables makepkg lets a package_*()
 // function override (util/schema.sh pkgbuild_schema_package_overrides). Setting
@@ -63,7 +66,7 @@ var correctnessRules = []Rule{
 		ID:   "PB701",
 		Name: "invalid-pkgname",
 		Doc: "pkgname and pkgbase may only contain the characters makepkg allows " +
-			"([a-z0-9@._+-]), must be ASCII, and must not start with a hyphen or dot. makepkg " +
+			"([A-Za-z0-9@._+-]), must be ASCII, and must not start with a hyphen or dot. makepkg " +
 			"refuses to build a package whose name breaks these rules.",
 		Check: checkPkgName,
 	},
@@ -72,7 +75,8 @@ var correctnessRules = []Rule{
 		Name: "invalid-pkgver",
 		Doc: "pkgver must not be empty and may not contain colons, forward slashes, hyphens or " +
 			"whitespace — those characters have meaning in pacman's version syntax (epoch:, -pkgrel), " +
-			"so makepkg rejects them. Skipped when a pkgver() function computes the version at build time.",
+			"so makepkg rejects them. makepkg lints the literal value before any pkgver() function " +
+			"runs, so even VCS packages need a valid placeholder.",
 		Check: checkPkgVer,
 	},
 	{
@@ -140,14 +144,6 @@ var correctnessRules = []Rule{
 }
 
 // --- shared helpers --------------------------------------------------------
-
-func toSet(xs []string) map[string]bool {
-	m := make(map[string]bool, len(xs))
-	for _, x := range xs {
-		m[x] = true
-	}
-	return m
-}
 
 func firstValue(xs []string) string {
 	if len(xs) == 0 {
@@ -264,10 +260,8 @@ var (
 )
 
 func checkPkgVer(ctx *Context) []Finding {
-	// A pkgver() function computes the version at build time; the literal is a placeholder.
-	if _, ok := ctx.Pkg.PKGBUILD.Functions["pkgver"]; ok {
-		return nil
-	}
+	// Even with a pkgver() function, makepkg lints the literal value first,
+	// so an invalid placeholder still breaks the build.
 	v := ctx.Pkg.Vars["pkgver"]
 	if v == nil || v.Array { // array type is PB708's concern
 		return nil
@@ -424,10 +418,33 @@ func checkProvidesComparison(ctx *Context) []Finding {
 
 // --- PB708: variable array/scalar type -------------------------------------
 
+// concreteArches returns the statically-known arch values other than "any".
+func concreteArches(ctx *Context) []string {
+	var out []string
+	for _, e := range varElems(ctx.Pkg.Vars["arch"]) {
+		if val, ok := staticVal(ctx.Pkg, e.Value); ok && val != "" && val != "any" {
+			out = append(out, val)
+		}
+	}
+	return out
+}
+
+// schemaArrayNames yields every array field name makepkg type-checks: the base
+// schema arrays plus the _$arch variants for each declared architecture.
+func schemaArrayNames(ctx *Context) []string {
+	names := append([]string(nil), schemaArrayVars...)
+	for _, a := range concreteArches(ctx) {
+		for _, n := range schemaArchArrayVars {
+			names = append(names, n+"_"+a)
+		}
+	}
+	return names
+}
+
 func checkVariableTypes(ctx *Context) []Finding {
 	path := ctx.Pkg.PKGBUILD.Path
 	var out []Finding
-	for _, name := range schemaArrayVars {
+	for _, name := range schemaArrayNames(ctx) {
 		if v := ctx.Pkg.Vars[name]; v != nil && !v.Array {
 			out = append(out, findingAt("PB708", Error, path, v.Pos,
 				"%s should be an array (makepkg refuses to build otherwise)", name))
@@ -445,9 +462,14 @@ func fixVariableTypes(ctx *Context, _ *FixEnv) []Edit {
 	path := ctx.Pkg.PKGBUILD.Path
 	raw := ctx.Pkg.PKGBUILD.Raw
 	var edits []Edit
-	for _, name := range schemaArrayVars {
+	for _, name := range schemaArrayNames(ctx) {
 		v := ctx.Pkg.Vars[name]
 		if v == nil || v.Array || v.Assign == nil || v.Assign.Value == nil {
+			continue
+		}
+		// A scalar assignment never word-splits, but an unquoted expansion
+		// inside an array does; only wrap values that are fully static.
+		if hasVarRef(firstValue(v.Values)) {
 			continue
 		}
 		vs, ve := off(v.Assign.Value.Pos()), off(v.Assign.Value.End())
@@ -467,6 +489,18 @@ func fixVariableTypes(ctx *Context, _ *FixEnv) []Edit {
 
 func checkPackageFunctionVars(ctx *Context) []Finding {
 	u := ctx.Pkg.PKGBUILD
+	// Non-override schema variables plus their _$arch variants; makepkg
+	// rejects both forms inside a package function.
+	disallowed := map[string]bool{}
+	for _, name := range append(append([]string(nil), schemaArrayVars...), schemaStringVars...) {
+		if packageOverrideVars[name] {
+			continue
+		}
+		disallowed[name] = true
+		for _, a := range concreteArches(ctx) {
+			disallowed[name+"_"+a] = true
+		}
+	}
 	var out []Finding
 	for name, fd := range u.Functions {
 		if name != "package" && !strings.HasPrefix(name, "package_") {
@@ -487,10 +521,9 @@ func checkPackageFunctionVars(ctx *Context) []Finding {
 				if as.Name == nil {
 					continue
 				}
-				v := as.Name.Value
-				if (schemaArraySet[v] || schemaStringSet[v]) && !packageOverrideVars[v] {
+				if disallowed[as.Name.Value] {
 					out = append(out, findingAt("PB709", Error, u.Path, as.Pos(),
-						"%s cannot be set inside a package function", v))
+						"%s cannot be set inside a package function", as.Name.Value))
 				}
 			}
 			return true
@@ -512,14 +545,13 @@ func checkArch(ctx *Context) []Finding {
 	}
 	var out []Finding
 	seen := map[string]bool{}
-	staticCount, anyCount := 0, 0
-	for _, e := range varElems(v) {
+	elems := varElems(v)
+	anyCount := 0
+	for _, e := range elems {
 		val, ok := staticVal(ctx.Pkg, e.Value)
 		if !ok {
-			staticCount++ // count it as present but unvalidatable
-			continue
+			continue // present but not statically validatable
 		}
-		staticCount++
 		if val == "any" {
 			anyCount++
 		}
@@ -531,10 +563,10 @@ func checkArch(ctx *Context) []Finding {
 			out = append(out, findingAt("PB710", Error, path, e.Pos, "arch value %q contains invalid characters", val))
 		}
 	}
-	if staticCount == 0 {
+	if len(elems) == 0 {
 		out = append(out, findingAt("PB710", Error, path, v.Pos, "arch is not allowed to be empty"))
 	}
-	if anyCount > 0 && staticCount > 1 {
+	if anyCount > 0 && len(elems) > 1 {
 		out = append(out, findingAt("PB710", Error, path, v.Pos,
 			"the 'any' architecture cannot be combined with other architectures"))
 	}

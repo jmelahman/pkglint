@@ -184,6 +184,17 @@ license="MIT"
 `}, FixSafe, nil)["PKGBUILD"]
 		mustContain(t, got, `license=("MIT")`)
 	})
+	t.Run("dynamic scalar is left alone (wrapping would change word splitting)", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+depends=$_deps
+`}, FixSafe, nil)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("dynamic scalar should not be wrapped, got:\n%s", got["PKGBUILD"])
+		}
+	})
 }
 
 // Unsafe fixes must not run under the safe level.

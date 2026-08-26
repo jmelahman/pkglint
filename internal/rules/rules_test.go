@@ -620,8 +620,8 @@ arch=('x86_64')`
 	t.Run("PB702 valid pkgver is fine", func(t *testing.T) {
 		expectNoRule(t, "PB702", map[string]string{"PKGBUILD": valid + "\n"})
 	})
-	t.Run("PB702 skipped when pkgver() computes it", func(t *testing.T) {
-		expectNoRule(t, "PB702", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1.2.3-beta\npkgrel=1\narch=('any')\npkgver() {\n  echo 1\n}\n"})
+	t.Run("PB702 flagged even with a pkgver() function (makepkg lints the literal first)", func(t *testing.T) {
+		expectRule(t, "PB702", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1.2.3-beta\npkgrel=1\narch=('any')\npkgver() {\n  echo 1\n}\n"})
 	})
 
 	t.Run("PB703 non-numeric pkgrel", func(t *testing.T) {
@@ -671,6 +671,15 @@ arch=('x86_64')`
 	t.Run("PB708 scalar pkgname is allowed (not a schema array)", func(t *testing.T) {
 		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('any')\n"})
 	})
+	t.Run("PB708 arch-specific scalar list field", func(t *testing.T) {
+		expectRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends_x86_64=gtk3\n"})
+	})
+	t.Run("PB708 arch-specific array is fine", func(t *testing.T) {
+		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends_x86_64=('gtk3')\n"})
+	})
+	t.Run("PB708 suffix for an undeclared arch is ignored", func(t *testing.T) {
+		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends_aarch64=gtk3\n"})
+	})
 
 	t.Run("PB709 non-override var in package function", func(t *testing.T) {
 		expectRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  makedepends=('go')\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
@@ -680,6 +689,12 @@ arch=('x86_64')`
 	})
 	t.Run("PB709 local var in package function is fine", func(t *testing.T) {
 		expectNoRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  somevar=1\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
+	})
+	t.Run("PB709 local declaration of a schema var is fine", func(t *testing.T) {
+		expectNoRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  local pkgver=tmp\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
+	})
+	t.Run("PB709 arch-specific non-override var in package function", func(t *testing.T) {
+		expectRule(t, "PB709", map[string]string{"PKGBUILD": valid + "\npackage() {\n  makedepends_x86_64=('go')\n  make DESTDIR=\"$pkgdir\" install\n}\n"})
 	})
 	t.Run("PB709 local-declared schema var is not a global override", func(t *testing.T) {
 		// makepkg's regex only matches bare assignments, not `local`/`declare`.

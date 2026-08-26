@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -57,4 +59,215 @@ sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' '
 	if sums := pkg.SumsFor(srcs[1]); len(sums) != 1 || sums[0] != "SKIP" {
 		t.Errorf("sig source should pair with the SKIP sum, got %v", sums)
 	}
+}
+
+// TestParseSourceEntry pins makepkg's [filename::]url[#fragment][?query]
+// splitting for the well-defined orderings.
+func TestParseSourceEntry(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		raw      string
+		filename string
+		url      string
+		proto    string
+		vcs      string
+		fragment map[string]string
+		query    string
+		local    bool
+	}{
+		{
+			name:     "plain https tarball",
+			raw:      "https://example.com/foo.tar.gz",
+			url:      "https://example.com/foo.tar.gz",
+			proto:    "https",
+			fragment: map[string]string{},
+		},
+		{
+			name:     "plain http tarball",
+			raw:      "http://example.com/x.tar.gz",
+			url:      "http://example.com/x.tar.gz",
+			proto:    "http",
+			fragment: map[string]string{},
+		},
+		{
+			name:     "explicit filename",
+			raw:      "foo.tar.gz::https://example.com/x.tar.gz",
+			filename: "foo.tar.gz",
+			url:      "https://example.com/x.tar.gz",
+			proto:    "https",
+			fragment: map[string]string{},
+		},
+		{
+			name:     "vcs proto",
+			raw:      "git+https://github.com/example/foo.git",
+			url:      "git+https://github.com/example/foo.git",
+			proto:    "git+https",
+			vcs:      "git",
+			fragment: map[string]string{},
+		},
+		{
+			name:     "bare vcs proto",
+			raw:      "git://github.com/example/foo.git",
+			url:      "git://github.com/example/foo.git",
+			proto:    "git",
+			vcs:      "git",
+			fragment: map[string]string{},
+		},
+		{
+			name:     "vcs with commit fragment",
+			raw:      "git+https://github.com/example/foo.git#commit=abc123",
+			url:      "git+https://github.com/example/foo.git",
+			proto:    "git+https",
+			vcs:      "git",
+			fragment: map[string]string{"commit": "abc123"},
+		},
+		{
+			name:     "fragment then query",
+			raw:      "git+https://x/y.git#tag=v1?signed",
+			url:      "git+https://x/y.git",
+			proto:    "git+https",
+			vcs:      "git",
+			fragment: map[string]string{"tag": "v1"},
+			query:    "signed",
+		},
+		{
+			name:     "proto is lowercased",
+			raw:      "HTTPS://example.com/x.tar.gz",
+			url:      "HTTPS://example.com/x.tar.gz",
+			proto:    "https",
+			fragment: map[string]string{},
+		},
+		{
+			name:     "local file",
+			raw:      "local-file.patch",
+			url:      "local-file.patch",
+			local:    true,
+			fragment: map[string]string{},
+		},
+		{
+			name:     "local file with explicit name",
+			raw:      "renamed.patch::local-file.patch",
+			filename: "renamed.patch",
+			url:      "local-file.patch",
+			local:    true,
+			fragment: map[string]string{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := parseSourceEntry(tc.raw, tc.raw)
+			if e.Raw != tc.raw || e.Expanded != tc.raw {
+				t.Errorf("Raw/Expanded = %q/%q, want %q", e.Raw, e.Expanded, tc.raw)
+			}
+			if e.Filename != tc.filename {
+				t.Errorf("Filename = %q, want %q", e.Filename, tc.filename)
+			}
+			if e.URL != tc.url {
+				t.Errorf("URL = %q, want %q", e.URL, tc.url)
+			}
+			if e.Proto != tc.proto {
+				t.Errorf("Proto = %q, want %q", e.Proto, tc.proto)
+			}
+			if e.VCS != tc.vcs {
+				t.Errorf("VCS = %q, want %q", e.VCS, tc.vcs)
+			}
+			if !reflect.DeepEqual(e.Fragment, tc.fragment) {
+				t.Errorf("Fragment = %v, want %v", e.Fragment, tc.fragment)
+			}
+			if !strings.Contains(e.Query, tc.query) || (tc.query == "" && e.Query != "") {
+				t.Errorf("Query = %q, want %q", e.Query, tc.query)
+			}
+			if e.Local != tc.local {
+				t.Errorf("Local = %v, want %v", e.Local, tc.local)
+			}
+		})
+	}
+}
+
+// TestSourceEntryHost pins hostname extraction, including the VCS prefix strip.
+func TestSourceEntryHost(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want string
+	}{
+		{"https://Example.COM/foo.tar.gz", "example.com"},
+		{"git+https://github.com/example/foo.git", "github.com"},
+		{"local-file.patch", ""},
+	} {
+		if got := parseSourceEntry(tc.raw, tc.raw).Host(); got != tc.want {
+			t.Errorf("Host(%q) = %q, want %q", tc.raw, got, tc.want)
+		}
+	}
+}
+
+// TestChecksums pins how sums arrays are collected per arch and paired with
+// source entries by index.
+func TestChecksums(t *testing.T) {
+	t.Run("base arrays pair by index", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+pkgver=1.0.0
+source=('a.tar.gz' 'b.tar.gz')
+sha256sums=('aaaa' 'bbbb')
+`)
+		sums := pkg.Checksums("")
+		if !reflect.DeepEqual(sums, map[string][]string{"sha256": {"aaaa", "bbbb"}}) {
+			t.Fatalf(`Checksums("") = %v, want {sha256: [aaaa bbbb]}`, sums)
+		}
+		srcs := pkg.Sources()
+		if len(srcs) != 2 {
+			t.Fatalf("Sources() = %d entries, want 2", len(srcs))
+		}
+		for i, want := range []string{"aaaa", "bbbb"} {
+			if got := pkg.SumsFor(srcs[i]); !reflect.DeepEqual(got, []string{want}) {
+				t.Errorf("SumsFor(index %d) = %v, want [%s]", i, got, want)
+			}
+		}
+	})
+
+	t.Run("multiple algorithms", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source=('a.tar.gz')
+md5sums=('mmmm')
+sha256sums=('aaaa')
+`)
+		sums := pkg.Checksums("")
+		if !reflect.DeepEqual(sums, map[string][]string{"md5": {"mmmm"}, "sha256": {"aaaa"}}) {
+			t.Fatalf(`Checksums("") = %v, want {md5: [mmmm], sha256: [aaaa]}`, sums)
+		}
+		got := pkg.SumsFor(pkg.Sources()[0])
+		sort.Strings(got) // SumsFor iterates a map; order is not part of the contract
+		if !reflect.DeepEqual(got, []string{"aaaa", "mmmm"}) {
+			t.Errorf("SumsFor = %v, want [aaaa mmmm]", got)
+		}
+	})
+
+	t.Run("arch-suffixed arrays", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source_x86_64=('a.tar.gz')
+sha256sums_x86_64=('cccc')
+`)
+		if sums := pkg.Checksums("x86_64"); !reflect.DeepEqual(sums, map[string][]string{"sha256": {"cccc"}}) {
+			t.Fatalf(`Checksums("x86_64") = %v, want {sha256: [cccc]}`, sums)
+		}
+		if sums := pkg.Checksums(""); len(sums) != 0 {
+			t.Errorf(`Checksums("") = %v, want empty`, sums)
+		}
+		srcs := pkg.Sources()
+		if len(srcs) != 1 || srcs[0].Arch != "x86_64" {
+			t.Fatalf("Sources() = %+v, want one entry with Arch=x86_64", srcs)
+		}
+		if got := pkg.SumsFor(srcs[0]); !reflect.DeepEqual(got, []string{"cccc"}) {
+			t.Errorf("SumsFor = %v, want [cccc]", got)
+		}
+	})
+
+	t.Run("missing sum for index yields none", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source=('a.tar.gz' 'b.tar.gz')
+sha256sums=('aaaa')
+`)
+		srcs := pkg.Sources()
+		if got := pkg.SumsFor(srcs[1]); len(got) != 0 {
+			t.Errorf("SumsFor(index 1) = %v, want none", got)
+		}
+	})
 }

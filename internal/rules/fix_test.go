@@ -117,6 +117,83 @@ sha256sums=('SKIP')
 	})
 }
 
+// TestFixVCSPinsElementIndexing pins that PB103 edits the element the finding
+// is actually about.
+//
+// sourceElems keys the AST words by the element's index *within its own
+// assignment*, restarting at 0 for every `source+=(...)`. Sources() reports
+// merged indices spanning all assignments of the name. The two index spaces
+// disagreed as soon as a PKGBUILD used `+=` or a brace group, and the lookup
+// silently returned the wrong word (or none).
+const vcsPinHeader = `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+url='https://example.com'
+`
+
+func TestFixVCSPinsElementIndexing(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+
+	t.Run("appended array elements are pinned", func(t *testing.T) {
+		// The lookup for merged index 0 hit the appended assignment's element
+		// 0 (b.git), whose text does not contain "#tag=v1", so no edit was
+		// emitted; merged index 1 had no key at all. The fix silently stopped
+		// firing for every package using source+=.
+		got := fixAll(t, map[string]string{"PKGBUILD": vcsPinHeader +
+			`source=("git+https://example.com/a.git#tag=v1")
+source+=("git+https://example.com/b.git#tag=v2")
+sha256sums=('SKIP')
+sha256sums+=('SKIP')
+`}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "git+https://example.com/a.git#commit="+sha)
+		mustContain(t, got, "git+https://example.com/b.git#commit="+sha)
+		mustNotContain(t, got, "#tag=")
+	})
+
+	t.Run("identical refs do not cross-edit", func(t *testing.T) {
+		// The dangerous variant: both entries carry "#tag=v1", so the
+		// containment guard passed and the edit computed for the *base*
+		// element was written over the *appended* element's byte range —
+		// rewriting a URL the finding was not about while leaving the real
+		// one unpinned.
+		got := fixAll(t, map[string]string{"PKGBUILD": vcsPinHeader +
+			`source=("git+https://example.com/a.git#tag=v1")
+source+=("git+https://example.com/b.git#tag=v1")
+sha256sums=('SKIP')
+sha256sums+=('SKIP')
+`}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "git+https://example.com/a.git#commit="+sha)
+		mustContain(t, got, "git+https://example.com/b.git#commit="+sha)
+		mustNotContain(t, got, "#tag=")
+	})
+
+	t.Run("brace expansion does not shift later elements", func(t *testing.T) {
+		// The brace group expands to two entries from one written element, so
+		// the git source is merged index 2 but written element 1.
+		got := fixAll(t, map[string]string{"PKGBUILD": vcsPinHeader +
+			`source=("https://example.com/x.tar.gz"{,.sig}
+        "git+https://example.com/a.git#tag=v1")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+`}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "git+https://example.com/a.git#commit="+sha)
+		mustNotContain(t, got, "#tag=")
+	})
+
+	t.Run("plain reassignment resets the numbering", func(t *testing.T) {
+		// A second `source=` (no +=) replaces the array, exactly as in bash,
+		// so only the surviving element is a source at all. The shadowed line
+		// must be left alone.
+		got := fixAll(t, map[string]string{"PKGBUILD": vcsPinHeader +
+			`source=("git+https://example.com/old.git#tag=v0")
+source=("git+https://example.com/new.git#tag=v1")
+sha256sums=('SKIP')
+`}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "git+https://example.com/new.git#commit="+sha)
+		mustContain(t, got, "git+https://example.com/old.git#tag=v0")
+	})
+}
+
 func TestFixGoDownloads(t *testing.T) {
 	got := fixPKGBUILD(t, `
 build() {

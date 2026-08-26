@@ -48,10 +48,12 @@ sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' '
 	if len(srcs) != 2 {
 		t.Fatalf("expected 2 expanded sources, got %d: %+v", len(srcs), srcs)
 	}
-	if srcs[0].URL != "https://example.com/demo-1.0.0.tar.gz" || srcs[0].Index != 0 {
+	// Both entries expand from the single written element, so they share an
+	// ElemIndex while getting distinct Index values.
+	if srcs[0].URL != "https://example.com/demo-1.0.0.tar.gz" || srcs[0].Index != 0 || srcs[0].ElemIndex != 0 {
 		t.Errorf("first source wrong: %+v", srcs[0])
 	}
-	if srcs[1].URL != "https://example.com/demo-1.0.0.tar.gz.sig" || srcs[1].Index != 1 {
+	if srcs[1].URL != "https://example.com/demo-1.0.0.tar.gz.sig" || srcs[1].Index != 1 || srcs[1].ElemIndex != 0 {
 		t.Errorf("second source wrong: %+v", srcs[1])
 	}
 	// Checksums pair by expanded index, exactly as makepkg pairs them.
@@ -265,6 +267,11 @@ source=("https://example.com/a.tar.gz"
 			if got := srcs[i].Pos; got.Line() != want.line || got.Col() != want.col {
 				t.Errorf("Sources()[%d] (%s) at %d:%d, want %d:%d",
 					i, srcs[i].URL, got.Line(), got.Col(), want.line, want.col)
+			}
+		}
+		for i, want := range []int{0, 1, 1} {
+			if got := srcs[i].ElemIndex; got != want {
+				t.Errorf("Sources()[%d].ElemIndex = %d, want %d", i, got, want)
 			}
 		}
 	})

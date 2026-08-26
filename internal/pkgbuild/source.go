@@ -22,6 +22,14 @@ type SourceEntry struct {
 	Index    int
 	Arch     string // "" for the plain source array, else e.g. "x86_64"
 	Pos      syntax.Pos
+
+	// ElemIndex is the index of the written array element this entry came
+	// from, counting across every assignment merged into the array. It
+	// differs from Index whenever an element expands to more than one entry:
+	// `foo{,.sig}` is two entries (Index 0 and 1) written as one element
+	// (ElemIndex 0 for both). Use Index to pair with checksums, ElemIndex to
+	// address the source text.
+	ElemIndex int
 }
 
 var vcsProtos = map[string]bool{"git": true, "hg": true, "svn": true, "bzr": true, "fossil": true}
@@ -52,6 +60,7 @@ func (p *Package) Sources() []SourceEntry {
 			for _, expanded := range expandBraces(p.Expand(raw)) {
 				e := parseSourceEntry(raw, expanded)
 				e.Index = idx
+				e.ElemIndex = rawIdx
 				e.Arch = arch
 				e.Pos = pos
 				out = append(out, e)

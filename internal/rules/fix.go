@@ -209,7 +209,7 @@ func fixVCSPins(ctx *Context, env *FixEnv) []Edit {
 		} else {
 			continue // no named ref to resolve into a commit deterministically
 		}
-		w := elems[elemKey(e.Arch, e.Index)]
+		w := elems[elemKey(e.Arch, e.ElemIndex)]
 		if w == nil {
 			continue
 		}
@@ -243,12 +243,22 @@ func shortSHA(s string) string {
 
 func elemKey(arch string, idx int) string { return arch + "\x00" + strconv.Itoa(idx) }
 
-// sourceElems maps each source-array element to its AST word, keyed the same
-// way as SourceEntry's Arch/Index so findings can be matched back to source.
+// sourceElems maps each written source-array element to its AST word, keyed by
+// arch and SourceEntry.ElemIndex so a finding can be matched back to the text
+// it is about.
+//
+// Numbering must mirror how Package merges assignments, since that is what
+// ElemIndex counts: `source+=(...)` continues the preceding array's numbering,
+// while a plain `source=(...)` replaces the array and restarts at zero, exactly
+// as in bash. Keying each assignment's elements from zero instead made every
+// `+=` shadow the base array — usually losing the fix, and, when both entries
+// carried the same `#ref` text, computing an edit for one element and writing
+// it over another's byte range.
 func sourceElems(u *pkgbuild.Unit) map[string]*syntax.Word {
 	out := map[string]*syntax.Word{}
+	next := map[string]int{}
 	record := func(as *syntax.Assign) {
-		if as == nil || as.Name == nil || as.Array == nil {
+		if as == nil || as.Name == nil {
 			return
 		}
 		name := as.Name.Value
@@ -256,8 +266,23 @@ func sourceElems(u *pkgbuild.Unit) map[string]*syntax.Word {
 			return
 		}
 		arch := strings.TrimPrefix(strings.TrimPrefix(name, "source"), "_")
-		for i, el := range as.Array.Elems {
-			out[elemKey(arch, i)] = el.Value
+		if !as.Append {
+			for i := range next[arch] {
+				delete(out, elemKey(arch, i))
+			}
+			next[arch] = 0
+		}
+		switch {
+		case as.Array != nil:
+			for _, el := range as.Array.Elems {
+				out[elemKey(arch, next[arch])] = el.Value
+				next[arch]++
+			}
+		case as.Value != nil:
+			// A scalar assignment merges in as one value with no element of
+			// its own. Consume the index so later elements stay aligned; the
+			// missing key just means no edit, rather than a misdirected one.
+			next[arch]++
 		}
 	}
 	for _, stmt := range u.TopLevel {

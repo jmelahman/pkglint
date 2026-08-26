@@ -136,6 +136,165 @@ func RenderJSON(w io.Writer, reports []PackageReport) error {
 	return enc.Encode(reports)
 }
 
+// SARIF 2.1.0 (https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+// is the interchange format consumed by GitHub code scanning and other tools.
+// Only the subset pkglint populates is modeled here.
+type sarifLog struct {
+	Schema  string     `json:"$schema"`
+	Version string     `json:"version"`
+	Runs    []sarifRun `json:"runs"`
+}
+
+type sarifRun struct {
+	Tool        sarifTool         `json:"tool"`
+	Results     []sarifResult     `json:"results"`
+	Invocations []sarifInvocation `json:"invocations,omitempty"`
+}
+
+type sarifTool struct {
+	Driver sarifDriver `json:"driver"`
+}
+
+type sarifDriver struct {
+	Name           string      `json:"name"`
+	InformationURI string      `json:"informationUri,omitempty"`
+	Rules          []sarifRule `json:"rules"`
+}
+
+type sarifRule struct {
+	ID               string         `json:"id"`
+	Name             string         `json:"name,omitempty"`
+	ShortDescription sarifText      `json:"shortDescription"`
+	FullDescription  sarifText      `json:"fullDescription"`
+	Properties       map[string]any `json:"properties,omitempty"`
+}
+
+type sarifText struct {
+	Text string `json:"text"`
+}
+
+type sarifResult struct {
+	RuleID     string          `json:"ruleId"`
+	RuleIndex  int             `json:"ruleIndex"`
+	Level      string          `json:"level"`
+	Message    sarifText       `json:"message"`
+	Locations  []sarifLocation `json:"locations"`
+	Properties map[string]any  `json:"properties,omitempty"`
+}
+
+type sarifLocation struct {
+	PhysicalLocation sarifPhysical `json:"physicalLocation"`
+}
+
+type sarifPhysical struct {
+	ArtifactLocation sarifArtifact `json:"artifactLocation"`
+	Region           sarifRegion   `json:"region"`
+}
+
+type sarifArtifact struct {
+	URI string `json:"uri"`
+}
+
+type sarifRegion struct {
+	StartLine   int `json:"startLine"`
+	StartColumn int `json:"startColumn,omitempty"`
+}
+
+type sarifInvocation struct {
+	ExecutionSuccessful        bool                `json:"executionSuccessful"`
+	ToolExecutionNotifications []sarifNotification `json:"toolExecutionNotifications,omitempty"`
+}
+
+// sarifNotification is a notification object: the schema names the payload
+// field "message", not "text" (the message object nested inside it is what
+// carries "text").
+type sarifNotification struct {
+	Level   string    `json:"level"`
+	Message sarifText `json:"message"`
+}
+
+// sarifLevel maps a pkglint severity onto SARIF's level enum
+// (none|note|warning|error). SARIF has no level above "error", so Critical
+// collapses onto it; RenderSARIF preserves the distinction in properties.
+func sarifLevel(s rules.Severity) string {
+	switch s {
+	case rules.Info:
+		return "note"
+	case rules.Warn:
+		return "warning"
+	default: // Error, Critical
+		return "error"
+	}
+}
+
+// RenderSARIF writes findings in SARIF 2.1.0, suitable for GitHub code
+// scanning. Untrusted text needs no sanitizing here: encoding/json escapes
+// control characters itself (unlike RenderText, which writes to a terminal).
+func RenderSARIF(w io.Writer, reports []PackageReport) error {
+	reg := rules.Registry()
+	idx := make(map[string]int, len(reg))
+	driverRules := make([]sarifRule, len(reg))
+	for i, r := range reg {
+		idx[r.ID] = i
+		driverRules[i] = sarifRule{
+			ID:               r.ID,
+			Name:             r.Name,
+			ShortDescription: sarifText{Text: r.Name},
+			FullDescription:  sarifText{Text: r.Doc},
+		}
+	}
+
+	run := sarifRun{
+		Tool: sarifTool{Driver: sarifDriver{
+			Name:           "pkglint",
+			InformationURI: "https://github.com/jmelahman/pkglint",
+			Rules:          driverRules,
+		}},
+		Results:     []sarifResult{}, // non-nil → emits [] not null
+		Invocations: []sarifInvocation{{ExecutionSuccessful: true}},
+	}
+
+	for _, rep := range reports {
+		if rep.Err != "" {
+			run.Invocations[0].ExecutionSuccessful = false
+			run.Invocations[0].ToolExecutionNotifications = append(
+				run.Invocations[0].ToolExecutionNotifications,
+				sarifNotification{Level: "error", Message: sarifText{Text: rep.Path + ": " + rep.Err}})
+			continue
+		}
+		for _, f := range rep.Findings {
+			ri, ok := idx[f.RuleID]
+			if !ok {
+				ri = -1 // finding from a rule not in the registry (shouldn't happen)
+			}
+			line := f.Line
+			if line < 1 {
+				line = 1 // SARIF requires startLine >= 1
+			}
+			run.Results = append(run.Results, sarifResult{
+				RuleID:    f.RuleID,
+				RuleIndex: ri,
+				Level:     sarifLevel(f.Severity),
+				Message:   sarifText{Text: f.Message},
+				Locations: []sarifLocation{{PhysicalLocation: sarifPhysical{
+					ArtifactLocation: sarifArtifact{URI: f.Path},
+					Region:           sarifRegion{StartLine: line, StartColumn: f.Col},
+				}}},
+				Properties: map[string]any{"severity": f.Severity.String()},
+			})
+		}
+	}
+
+	doc := sarifLog{
+		Schema:  "https://json.schemastore.org/sarif-2.1.0.json",
+		Version: "2.1.0",
+		Runs:    []sarifRun{run},
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(doc)
+}
+
 // ExceedsThreshold reports whether any finding is at or above sev.
 func ExceedsThreshold(reports []PackageReport, sev rules.Severity) bool {
 	for _, r := range reports {

@@ -29,7 +29,7 @@ go install github.com/jmelahman/pkglint@latest
 ```shell
 pkglint [flags] [path ...]     # paths are package dirs or PKGBUILD files (default: .)
 
-  --format text|json           # output format
+  --format text|json|sarif     # output format (sarif = SARIF 2.1.0, for code scanning)
   --fail-on SEVERITY           # exit 1 at or above: info, warn, error (default), critical, never
   --ignore PB105,PB206         # disable rules
   --rules                      # list every rule with its documentation

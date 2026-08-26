@@ -72,7 +72,7 @@ paths are package directories or PKGBUILD files (default: .)`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "text", "output format: text or json")
+	cmd.Flags().StringVar(&format, "format", "text", "output format: text, json, or sarif")
 	cmd.Flags().StringVar(&failOn, "fail-on", "error", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
 	cmd.Flags().StringVar(&ignore, "ignore", "", "comma-separated rule IDs to disable, e.g. PB105,PB206")
 	cmd.Flags().BoolVar(&listRules, "rules", false, "print all rules and exit")
@@ -127,6 +127,11 @@ func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
 	switch format {
 	case "json":
 		if err := report.RenderJSON(stdout, reports); err != nil {
+			fmt.Fprintln(os.Stderr, "pkglint:", err)
+			return 2
+		}
+	case "sarif":
+		if err := report.RenderSARIF(stdout, reports); err != nil {
 			fmt.Fprintln(os.Stderr, "pkglint:", err)
 			return 2
 		}

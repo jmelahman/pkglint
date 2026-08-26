@@ -201,6 +201,184 @@ func TestNewErrorShape(t *testing.T) {
 	}
 }
 
+// renderSARIF renders reports and decodes the output both into the sarif
+// structs and into a generic map, so tests can assert on structure without
+// string-matching.
+func renderSARIF(t *testing.T, reports []PackageReport) (sarifLog, map[string]any, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := RenderSARIF(&buf, reports); err != nil {
+		t.Fatal(err)
+	}
+	var log sarifLog
+	if err := json.Unmarshal(buf.Bytes(), &log); err != nil {
+		t.Fatalf("invalid SARIF JSON: %v\n%s", err, buf.String())
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &generic); err != nil {
+		t.Fatalf("invalid SARIF JSON: %v\n%s", err, buf.String())
+	}
+	return log, generic, buf.String()
+}
+
+func TestRenderSARIFStructure(t *testing.T) {
+	reg := rules.Registry()
+	if len(reg) < 2 {
+		t.Fatalf("registry has %d rules, need at least 2", len(reg))
+	}
+	ok := New("/some/dir/demo", []rules.Finding{
+		{RuleID: reg[0].ID, Severity: rules.Critical, Message: "boom", Path: "demo/PKGBUILD", Line: 3, Col: 5},
+		{RuleID: reg[1].ID, Severity: rules.Info, Message: "fyi", Path: "demo/PKGBUILD", Line: 9, Col: 1},
+	})
+	bad := NewError("/some/dir/broken", errors.New("parse failed"))
+
+	log, generic, out := renderSARIF(t, []PackageReport{ok, bad})
+
+	if log.Version != "2.1.0" {
+		t.Errorf("version = %q, want %q", log.Version, "2.1.0")
+	}
+	if log.Schema == "" {
+		t.Error("$schema is empty")
+	}
+	if len(log.Runs) != 1 {
+		t.Fatalf("got %d runs, want 1", len(log.Runs))
+	}
+	run := log.Runs[0]
+	if run.Tool.Driver.Name != "pkglint" {
+		t.Errorf("driver name = %q, want %q", run.Tool.Driver.Name, "pkglint")
+	}
+	if len(run.Tool.Driver.Rules) != len(reg) {
+		t.Errorf("driver carries %d rules, want %d (the whole registry)", len(run.Tool.Driver.Rules), len(reg))
+	}
+	if len(run.Results) != 2 {
+		t.Fatalf("got %d results, want 2 (the errored package must not become a result)", len(run.Results))
+	}
+	for i, res := range run.Results {
+		// ruleIndex == -1 would mean a finding from an unregistered rule; the
+		// plan calls that out as a condition to investigate, so assert it here.
+		if res.RuleIndex < 0 || res.RuleIndex >= len(run.Tool.Driver.Rules) {
+			t.Fatalf("results[%d].ruleIndex = %d, out of range for %d driver rules", i, res.RuleIndex, len(run.Tool.Driver.Rules))
+		}
+		if got := run.Tool.Driver.Rules[res.RuleIndex].ID; got != res.RuleID {
+			t.Errorf("results[%d].ruleIndex points at rule %q, but ruleId is %q", i, got, res.RuleID)
+		}
+		if len(res.Locations) != 1 {
+			t.Fatalf("results[%d] has %d locations, want 1", i, len(res.Locations))
+		}
+	}
+	loc := run.Results[0].Locations[0].PhysicalLocation
+	if loc.ArtifactLocation.URI != "demo/PKGBUILD" {
+		t.Errorf("uri = %q, want %q", loc.ArtifactLocation.URI, "demo/PKGBUILD")
+	}
+	if loc.Region.StartLine != 3 || loc.Region.StartColumn != 5 {
+		t.Errorf("region = %d:%d, want 3:5", loc.Region.StartLine, loc.Region.StartColumn)
+	}
+	if run.Results[0].Message.Text != "boom" {
+		t.Errorf("message = %q, want %q", run.Results[0].Message.Text, "boom")
+	}
+
+	if len(run.Invocations) != 1 {
+		t.Fatalf("got %d invocations, want 1", len(run.Invocations))
+	}
+	inv := run.Invocations[0]
+	if inv.ExecutionSuccessful {
+		t.Error("executionSuccessful should be false when a package failed to load")
+	}
+	if len(inv.ToolExecutionNotifications) != 1 {
+		t.Fatalf("got %d notifications, want 1:\n%s", len(inv.ToolExecutionNotifications), out)
+	}
+	note := inv.ToolExecutionNotifications[0]
+	if note.Level != "error" {
+		t.Errorf("notification level = %q, want %q", note.Level, "error")
+	}
+	if !strings.Contains(note.Message.Text, "/some/dir/broken") || !strings.Contains(note.Message.Text, "parse failed") {
+		t.Errorf("notification lost the path or the error: %q", note.Message.Text)
+	}
+
+	// SARIF's notification object names its payload "message"; emitting it as
+	// "text" is rejected by the 2.1.0 schema (additionalProperties: false).
+	rawNote := generic["runs"].([]any)[0].(map[string]any)["invocations"].([]any)[0].(map[string]any)["toolExecutionNotifications"].([]any)[0].(map[string]any)
+	if _, ok := rawNote["message"]; !ok {
+		t.Errorf("notification has no \"message\" property: %v", rawNote)
+	}
+	if _, bad := rawNote["text"]; bad {
+		t.Errorf("notification carries a bare \"text\" property, which the schema forbids: %v", rawNote)
+	}
+}
+
+func TestRenderSARIFLevelMapping(t *testing.T) {
+	id := rules.Registry()[0].ID
+	cases := []struct {
+		sev   rules.Severity
+		level string
+		name  string
+	}{
+		{rules.Info, "note", "info"},
+		{rules.Warn, "warning", "warn"},
+		{rules.Error, "error", "error"},
+		{rules.Critical, "error", "critical"},
+	}
+	var findings []rules.Finding
+	for _, c := range cases {
+		findings = append(findings, rules.Finding{
+			RuleID: id, Severity: c.sev, Message: "m", Path: "p", Line: 1, Col: 1,
+		})
+	}
+	log, _, _ := renderSARIF(t, []PackageReport{New("demo", findings)})
+	results := log.Runs[0].Results
+	if len(results) != len(cases) {
+		t.Fatalf("got %d results, want %d", len(results), len(cases))
+	}
+	for i, c := range cases {
+		if results[i].Level != c.level {
+			t.Errorf("%v → level %q, want %q", c.sev, results[i].Level, c.level)
+		}
+		// SARIF collapses critical onto "error", so the pkglint severity has to
+		// survive in the properties bag.
+		if got := results[i].Properties["severity"]; got != c.name {
+			t.Errorf("%v → properties.severity %v, want %q", c.sev, got, c.name)
+		}
+	}
+}
+
+// TestRenderSARIFEmptyResults locks in that a findings-free run serializes
+// "results": [] — SARIF consumers reject a null there.
+func TestRenderSARIFEmptyResults(t *testing.T) {
+	log, generic, out := renderSARIF(t, []PackageReport{New("demo", nil)})
+	if len(log.Runs[0].Results) != 0 {
+		t.Fatalf("expected no results, got %d", len(log.Runs[0].Results))
+	}
+	if strings.Contains(out, `"results": null`) {
+		t.Errorf("results serialized as null:\n%s", out)
+	}
+	results, ok := generic["runs"].([]any)[0].(map[string]any)["results"]
+	if !ok {
+		t.Fatalf("no results key:\n%s", out)
+	}
+	if _, ok := results.([]any); !ok {
+		t.Errorf("results did not decode as an array: %#v", results)
+	}
+	if !log.Runs[0].Invocations[0].ExecutionSuccessful {
+		t.Error("executionSuccessful should be true when nothing failed to load")
+	}
+}
+
+// TestRenderSARIFClampsStartLine covers the schema's startLine >= 1 minimum:
+// findings without a position must not emit line 0.
+func TestRenderSARIFClampsStartLine(t *testing.T) {
+	id := rules.Registry()[0].ID
+	log, _, _ := renderSARIF(t, []PackageReport{New("demo", []rules.Finding{
+		{RuleID: id, Severity: rules.Warn, Message: "m", Path: "p"}, // Line and Col zero
+	})})
+	region := log.Runs[0].Results[0].Locations[0].PhysicalLocation.Region
+	if region.StartLine != 1 {
+		t.Errorf("startLine = %d, want 1", region.StartLine)
+	}
+	if region.StartColumn != 0 {
+		t.Errorf("startColumn = %d, want it omitted (0) rather than an invalid 0 in JSON", region.StartColumn)
+	}
+}
+
 func TestExceedsThreshold(t *testing.T) {
 	reports := []PackageReport{New("demo", []rules.Finding{{Severity: rules.Warn}})}
 	if ExceedsThreshold(reports, rules.Error) {

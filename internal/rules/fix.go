@@ -603,7 +603,7 @@ func fixSetuid(ctx *Context, _ *FixEnv) []Edit {
 	var edits []Edit
 	for _, c := range ctx.CommandsNamed("chmod") {
 		for _, a := range c.Args {
-			if !isSetuidNumeric(a) {
+			if !setuidNumericMode(a) {
 				continue
 			}
 			w := wordByValue(c, a)
@@ -627,7 +627,7 @@ func fixSetuid(ctx *Context, _ *FixEnv) []Edit {
 	}
 	for _, c := range ctx.CommandsNamed("install") {
 		mode, w, replacement := installModeArg(c)
-		if !isSetuidNumeric(mode) || w == nil || replacement == mode {
+		if !setuidNumericMode(mode) || w == nil || replacement == mode {
 			continue
 		}
 		orig, _ := pkgbuild.RenderWord(w, nil)
@@ -641,11 +641,6 @@ func fixSetuid(ctx *Context, _ *FixEnv) []Edit {
 		})
 	}
 	return edits
-}
-
-func isSetuidNumeric(a string) bool {
-	return setuidModeRe.MatchString(a) &&
-		(strings.HasPrefix(a, "4") || strings.HasPrefix(a, "2") || strings.HasPrefix(a, "6"))
 }
 
 func clearSetuidBits(mode string) string {

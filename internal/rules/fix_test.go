@@ -177,6 +177,43 @@ package() {
 	mustNotContain(t, got, "4755")
 }
 
+// Modes whose leading digit is not 4/2/6 still carry the setuid/setgid bit, so
+// the fixer must strip it there too.
+func TestFixSetuidOctalModes(t *testing.T) {
+	t.Run("leading-zero chmod mode", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+package() {
+  chmod 04755 "$pkgdir/usr/bin/demo"
+}`, FixUnsafe, nil)
+		mustContain(t, got, `chmod 0755 "$pkgdir/usr/bin/demo"`)
+		mustNotContain(t, got, "04755")
+	})
+	t.Run("setuid plus sticky keeps the sticky bit", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+package() {
+  chmod 7755 "$pkgdir/usr/bin/demo"
+}`, FixUnsafe, nil)
+		mustContain(t, got, `chmod 1755 "$pkgdir/usr/bin/demo"`)
+	})
+	t.Run("leading-zero install mode", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+package() {
+  install -m 02755 demo "$pkgdir/usr/bin/demo"
+}`, FixUnsafe, nil)
+		mustContain(t, got, `install -m 0755 demo "$pkgdir/usr/bin/demo"`)
+		mustNotContain(t, got, "02755")
+	})
+	t.Run("ordinary mode is left alone", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  chmod 0755 "$pkgdir/usr/bin/demo"
+}`)}, FixUnsafe, nil)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit for a non-setuid mode, got:\n%s", got["PKGBUILD"])
+		}
+	})
+}
+
 func TestFixBackupSlash(t *testing.T) {
 	got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
 pkgver=1

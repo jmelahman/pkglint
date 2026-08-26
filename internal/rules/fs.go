@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -178,14 +179,28 @@ func checkPrivilegeEscalation(ctx *Context) []Finding {
 	return out
 }
 
-var setuidModeRe = regexp.MustCompile(`^[0-7]?[4267][0-7]{3}$|^[24][0-7]{3}$`)
+// setuidNumericMode reports whether a numeric chmod/install mode sets the
+// setuid or setgid bit. It parses the octal value and tests the 0o6000 mask —
+// the same mask clearSetuidBits removes — rather than inspecting the leading
+// digit, so 04755, 2755, and 7755 are all caught. Non-octal arguments,
+// including symbolic modes like u+s, return false and are handled separately.
+func setuidNumericMode(mode string) bool {
+	if mode == "" || mode[0] == '+' || mode[0] == '-' {
+		return false // a sign is never part of a mode, but ParseInt would accept one
+	}
+	v, err := strconv.ParseInt(mode, 8, 32)
+	if err != nil {
+		return false
+	}
+	return v&0o6000 != 0
+}
 
 func checkSetuid(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.CommandsNamed("chmod") {
 		for _, a := range c.Args {
 			symbolic := strings.Contains(a, "+s")
-			numeric := setuidModeRe.MatchString(a) && (strings.HasPrefix(a, "4") || strings.HasPrefix(a, "2") || strings.HasPrefix(a, "6"))
+			numeric := setuidNumericMode(a)
 			if symbolic || numeric {
 				out = append(out, c.finding("PB403", Warn,
 					"chmod %s creates a setuid/setgid file", a))
@@ -194,7 +209,7 @@ func checkSetuid(ctx *Context) []Finding {
 		}
 	}
 	for _, c := range ctx.CommandsNamed("install") {
-		if mode, _, _ := installModeArg(c); isSetuidNumeric(mode) {
+		if mode, _, _ := installModeArg(c); setuidNumericMode(mode) {
 			out = append(out, c.finding("PB403", Warn,
 				"install with mode %s creates a setuid/setgid file", mode))
 		}

@@ -301,6 +301,15 @@ package() { make DESTDIR="$pkgdir" install; }`,
   echo "Enable the service with: systemctl enable foo.service"
 }`,
 	},
+	"PB503": {
+		Bad: `# foo.install with an unterminated function — makepkg still runs it as root:
+post_install() {
+  echo installing
+# (missing closing brace)`,
+		Good: `post_install() {
+  echo installing
+}`,
+	},
 	"PB601": {
 		Bad: `# PKGBUILD says one thing...
 pkgver=1.4.0

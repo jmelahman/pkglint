@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -30,6 +31,31 @@ var scriptletRules = []Rule{
 			"pattern.",
 		Check: checkScriptletPersistence,
 	},
+	{
+		ID:   "PB503",
+		Name: "unparseable-scriptlet",
+		Doc: "An install scriptlet pkglint cannot parse is analyzed by no rule, yet its code " +
+			"still runs as root at install time. A parse failure usually means the file is malformed " +
+			"or deliberately obfuscated to defeat static analysis; either way it must be reviewed by hand.",
+		Check: checkScriptletParseError,
+	},
+}
+
+func checkScriptletParseError(ctx *Context) []Finding {
+	var out []Finding
+	for _, se := range ctx.Pkg.ScriptletErrors {
+		out = append(out, Finding{
+			RuleID: "PB503",
+			// Error (not Warn) drops the package to grade D: a root-executed
+			// file that no rule could analyze is a blind spot, not a nit.
+			Severity: Error,
+			Path:     se.Path,
+			Line:     1,
+			Col:      1,
+			Message:  fmt.Sprintf("install scriptlet could not be parsed and was not analyzed: %s", se.Err),
+		})
+	}
+	return out
 }
 
 func checkScriptletNetwork(ctx *Context) []Finding {

@@ -36,13 +36,23 @@ type Unit struct {
 	TopLevel  []*syntax.Stmt // top-level statements that are not function declarations
 }
 
+// ScriptletError records an install scriptlet that was present but could not
+// be parsed. Such a file is analyzed by no rule yet still runs as root at
+// install time, so it must be surfaced rather than silently skipped.
+type ScriptletError struct {
+	Path string
+	Err  string
+}
+
 // Package is a fully loaded package directory.
 type Package struct {
 	Dir        string
 	PKGBUILD   Unit
 	Scriptlets []Unit
-	Vars       map[string]*Var
-	SrcInfo    *SrcInfo // nil when no .SRCINFO is present
+	// ScriptletErrors holds scriptlets that were read but failed to parse.
+	ScriptletErrors []ScriptletError
+	Vars            map[string]*Var
+	SrcInfo         *SrcInfo // nil when no .SRCINFO is present
 
 	// Suppressions maps line number -> rule IDs disabled on that line via
 	// "# pkglint: ignore=PB123[,PB456]" (applies to the same and next line).
@@ -98,6 +108,15 @@ func Load(path string) (*Package, error) {
 		}
 		su, err := parseUnit(p, data, true)
 		if err != nil {
+			// The file runs as root at install time but no rule can walk it;
+			// record it so PB503 can report the blind spot. Keep only the
+			// scriptlet's basename in the message: Path already carries the
+			// location, and the message is republished verbatim (e.g. by the
+			// site generator, which strips prefixes from paths but not
+			// messages).
+			msg := strings.TrimPrefix(err.Error(), "parse "+p+": ")
+			msg = strings.ReplaceAll(msg, p, name)
+			pkg.ScriptletErrors = append(pkg.ScriptletErrors, ScriptletError{Path: p, Err: msg})
 			continue
 		}
 		pkg.Scriptlets = append(pkg.Scriptlets, su)

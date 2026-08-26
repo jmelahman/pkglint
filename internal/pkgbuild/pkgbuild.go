@@ -209,6 +209,14 @@ func (p *Package) installFiles() []string {
 		if name == "" || seen[name] {
 			return
 		}
+		// An install scriptlet must be a plain file in the package directory.
+		// Reject "."/".."; any path separator; and anything whose basename
+		// differs from itself (parent traversal, absolute paths) so a hostile
+		// install= value cannot steer pkglint into reading files outside the
+		// package (traversal) or an unbounded device like /dev/zero (DoS).
+		if name == "." || name == ".." || name != filepath.Base(name) || strings.ContainsAny(name, `/\`) {
+			return
+		}
 		seen[name] = true
 		out = append(out, name)
 	}

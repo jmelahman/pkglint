@@ -263,3 +263,95 @@ func TestUnits(t *testing.T) {
 		t.Errorf("scriptlet functions = %v, want post_install", units[1].Functions)
 	}
 }
+
+// TestInstallFilesContainment pins the security contract that an install=
+// value can only ever name a plain file inside the package directory. A
+// hostile PKGBUILD must not be able to steer Load into reading a file outside
+// the package (traversal) or an unbounded device such as /dev/zero (DoS).
+//
+// Every case builds a real file at the location the hostile name points to, so
+// a regression would actually load it and the assertion would fail.
+func TestInstallFilesContainment(t *testing.T) {
+	const scriptlet = "post_install() {\n  echo pwned\n}\n"
+
+	for _, tc := range []struct {
+		name string
+		// install is the install= value; %s is replaced with the parent temp
+		// dir so absolute-path cases stay inside the test sandbox.
+		install string
+		// bait is the path, relative to the parent temp dir, of the file the
+		// hostile name is trying to reach. Empty means no bait file.
+		bait string
+	}{
+		{name: "parent traversal", install: "../evil.install", bait: "evil.install"},
+		{name: "deep parent traversal", install: "../../evil.install"},
+		{name: "separator", install: "sub/dir.install", bait: "pkg/sub/dir.install"},
+		{name: "backslash separator", install: `sub\dir.install`},
+		{name: "dot", install: "."},
+		{name: "dotdot", install: ".."},
+		{name: "trailing separator", install: "demo.install/", bait: "pkg/demo.install"},
+		{name: "absolute path", install: "%s/evil.install", bait: "evil.install"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "pkg")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if tc.bait != "" {
+				bait := filepath.Join(root, tc.bait)
+				if err := os.MkdirAll(filepath.Dir(bait), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(bait, []byte(scriptlet), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			install := strings.ReplaceAll(tc.install, "%s", root)
+			content := "pkgname=demo\npkgver=1.0\ninstall=" + install + "\n"
+			if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			pkg, err := Load(dir)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if got := pkg.installFiles(); len(got) != 0 {
+				t.Errorf("installFiles() = %v, want none for install=%q", got, install)
+			}
+			if len(pkg.Scriptlets) != 0 {
+				t.Errorf("loaded %d scriptlets for install=%q, want 0", len(pkg.Scriptlets), install)
+			}
+			if len(pkg.Units()) != 1 {
+				t.Errorf("Units() = %d, want 1 (PKGBUILD only) for install=%q", len(pkg.Units()), install)
+			}
+		})
+	}
+
+	// The containment check must not break the ordinary case.
+	t.Run("plain name still loads", func(t *testing.T) {
+		dir := t.TempDir()
+		files := map[string]string{
+			"PKGBUILD":     "pkgname=demo\npkgver=1.0\ninstall=demo.install\n",
+			"demo.install": scriptlet,
+		}
+		for name, content := range files {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		pkg, err := Load(dir)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if got := pkg.installFiles(); !reflect.DeepEqual(got, []string{"demo.install"}) {
+			t.Errorf("installFiles() = %v, want [demo.install]", got)
+		}
+		if len(pkg.Scriptlets) != 1 {
+			t.Fatalf("loaded %d scriptlets, want 1", len(pkg.Scriptlets))
+		}
+		if _, ok := pkg.Scriptlets[0].Functions["post_install"]; !ok {
+			t.Errorf("scriptlet functions = %v, want post_install", pkg.Scriptlets[0].Functions)
+		}
+	})
+}

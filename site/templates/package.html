@@ -1,0 +1,45 @@
+{{define "package.html"}}<!doctype html>
+<html lang="en">
+<head>
+<title>{{.R.Name}} — AUR Report Card</title>
+{{template "head" .}}
+</head>
+<body>
+<main>
+<h1><a href="../index.html">AUR Report Card</a> / {{.R.Name}}</h1>
+<p class="sub">
+  <span class="grade grade-{{.R.Grade}}">{{.R.Grade}}</span>
+  {{.R.Version}}{{with .R.Maintainer}} · maintained by {{.}}{{end}} · {{.R.Votes}} votes ·
+  <a href="https://aur.archlinux.org/pkgbase/{{.R.Base}}">view on AUR</a> ·
+  <a href="../badge/{{.R.Name}}.svg">badge</a>
+</p>
+{{with .R.Description}}<p>{{.}}</p>{{end}}
+
+{{if .R.Err}}
+<div class="notice">This package could not be scanned: <code>{{.R.Err}}</code></div>
+{{else if not .R.Findings}}
+<p>No findings. The PKGBUILD pins its sources, keeps the network out of the build, and has
+no opaque code paths that static analysis worries about.</p>
+{{else}}
+<div class="overflow">
+<table>
+  <thead><tr><th>Severity</th><th>Rule</th><th>Location</th><th>Finding</th></tr></thead>
+  <tbody>
+  {{range .R.Findings}}
+  <tr>
+    <td><span class="sev sev-{{sev .Severity}}">{{sev .Severity}}</span></td>
+    <td><a href="../rules/{{.RuleID}}.html">{{.RuleID}}</a></td>
+    <td class="loc">{{.Path}}:{{.Line}}</td>
+    <td>{{.Message}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+
+{{template "footer" .}}
+</main>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,42 @@
+name: Report card site
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # nightly, ~1am PT
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # TODO: pin actions by SHA with ratchet before enabling branch protection.
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: aur-snapshots-${{ github.run_id }}
+          restore-keys: aur-snapshots-
+      - run: go run ./site -maintainer Jamison -top 500 -out public
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -84,10 +84,13 @@ func checkScriptletPersistence(ctx *Context) []Finding {
 			continue
 		}
 		for _, a := range c.Args {
+			// The hints overlap (/etc/zsh and .zshrc both match /etc/zsh/.zshrc),
+			// so report the first match only.
 			for _, hint := range persistencePathHints {
 				if strings.Contains(a, hint) {
 					out = append(out, c.finding("PB502", Error,
 						"scriptlet touches %q, a persistence location outside pacman's tracking", a))
+					break
 				}
 			}
 		}
@@ -105,6 +108,7 @@ func checkScriptletPersistence(ctx *Context) []Finding {
 				if strings.Contains(target, hint) {
 					out = append(out, findingAt("PB502", Critical, u.Path, r.Pos(),
 						"scriptlet writes to %q, a persistence location outside pacman's tracking", target))
+					break
 				}
 			}
 			return true

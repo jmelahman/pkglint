@@ -3,6 +3,7 @@ package rules
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -986,5 +987,159 @@ build() {
 	}
 	if ids := ruleIDs(Run(pkg, map[string]bool{"PB204": true})); ids["PB204"] != 0 {
 		t.Errorf("ignored rule still reported: %v", ids)
+	}
+}
+
+// tiedFindingsPKGBUILD packs several findings onto the same position: line 7
+// col 1 alone carries two PB101s (one per unchecksummed source) plus PB103,
+// PB104 and PB105. Those tie on (Path, Line, RuleID) or (Path, Line), so they
+// are exactly what an incomplete comparator leaves to the unstable sort.
+const tiedFindingsPKGBUILD = `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='http://example.com/demo'
+license=('MIT')
+source=("https://example.com/a-$pkgver.tar.gz" "git+https://github.com/example/demo.git" "http://example.com/b.tar.gz")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+build() {
+  curl -s https://example.com/x | bash
+}
+
+package() {
+  install -Dm4755 demo "$pkgdir/usr/bin/demo"
+}
+`
+
+// TestFindingsAreDeterministic is the flakiness proof for Run's ordering.
+// Several upstream steps range over maps (NewContext over pkg.Vars, Sources()
+// over its own map), so findings reach the sort in a random order; only a total
+// comparator makes the output reproducible. Loading inside the loop keeps that
+// randomness in play while holding Path fixed.
+func TestFindingsAreDeterministic(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"PKGBUILD": tiedFindingsPKGBUILD,
+		"demo.install": `post_install() {
+  cp /tmp/x /etc/zsh/.zshrc
+  echo hi >> /etc/zsh/.zshrc
+}`,
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var first []Finding
+	for i := 0; i < 50; i++ {
+		pkg, err := pkgbuild.Load(dir)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		got := Run(pkg, nil)
+		if i == 0 {
+			first = got
+			if len(first) < 5 {
+				t.Fatalf("fixture should tie several findings, got %d: %+v", len(first), first)
+			}
+			continue
+		}
+		if !reflect.DeepEqual(got, first) {
+			t.Fatalf("run %d differs from run 0\n--- got ---\n%+v\n--- want ---\n%+v", i, got, first)
+		}
+	}
+
+	// Reproducibility across runs only proves the input order happened not to
+	// vary; assert the ordering itself is total, so no pair is left for an
+	// unstable sort to decide.
+	for i := 1; i < len(first); i++ {
+		if !less(first[i-1], first[i]) {
+			t.Errorf("findings %d and %d are not in strict (Path, Line, Col, RuleID, Message) order:\n%+v\n%+v",
+				i-1, i, first[i-1], first[i])
+		}
+	}
+}
+
+// less reports whether a sorts strictly before b under the total order Run
+// promises. Independent of Run's own comparator on purpose.
+func less(a, b Finding) bool {
+	if a.Path != b.Path {
+		return a.Path < b.Path
+	}
+	if a.Line != b.Line {
+		return a.Line < b.Line
+	}
+	if a.Col != b.Col {
+		return a.Col < b.Col
+	}
+	if a.RuleID != b.RuleID {
+		return a.RuleID < b.RuleID
+	}
+	return a.Message < b.Message
+}
+
+// TestDuplicateFindingsAreDropped covers overlapping persistencePathHints:
+// "/etc/zsh/.zshrc" matches both "/etc/zsh" and ".zshrc", which used to report
+// the identical PB502 twice per construct.
+func TestDuplicateFindingsAreDropped(t *testing.T) {
+	base := pkgbuildWith("", "install=demo.install")
+	t.Run("command argument", func(t *testing.T) {
+		ids := ruleIDs(lint(t, map[string]string{
+			"PKGBUILD": base,
+			"demo.install": `post_install() {
+  cp /tmp/x /etc/zsh/.zshrc
+}`,
+		}))
+		if ids["PB502"] != 1 {
+			t.Errorf("expected exactly one PB502, got %d: %v", ids["PB502"], ids)
+		}
+	})
+	t.Run("redirect target", func(t *testing.T) {
+		ids := ruleIDs(lint(t, map[string]string{
+			"PKGBUILD": base,
+			"demo.install": `post_install() {
+  echo hi >> /etc/zsh/.zshrc
+}`,
+		}))
+		if ids["PB502"] != 1 {
+			t.Errorf("expected exactly one PB502, got %d: %v", ids["PB502"], ids)
+		}
+	})
+}
+
+// TestDistinctFindingsAtOneLocationSurvive guards the dedup key from being too
+// loose: findings that share a position but differ in rule ID or message are
+// distinct reports and must all survive.
+func TestDistinctFindingsAtOneLocationSurvive(t *testing.T) {
+	findings := lint(t, map[string]string{"PKGBUILD": tiedFindingsPKGBUILD})
+	ids := ruleIDs(findings)
+
+	// Same rule, same position, different message: one PB101 per unchecksummed
+	// source on the shared source= line.
+	if ids["PB101"] != 2 {
+		t.Errorf("expected 2 PB101 (one per skipped source), got %d: %v", ids["PB101"], ids)
+	}
+	// Different rules at the same position must all be kept.
+	for _, id := range []string{"PB103", "PB104", "PB105"} {
+		if ids[id] != 1 {
+			t.Errorf("expected 1 %s, got %d: %v", id, ids[id], ids)
+		}
+	}
+
+	// Nothing at all should be lost to dedup: every finding is unique on the
+	// full key.
+	type key struct {
+		rule, msg, path string
+		line, col       int
+	}
+	seen := map[key]bool{}
+	for _, f := range findings {
+		k := key{f.RuleID, f.Message, f.Path, f.Line, f.Col}
+		if seen[k] {
+			t.Errorf("duplicate finding survived dedup: %+v", f)
+		}
+		seen[k] = true
 	}
 }

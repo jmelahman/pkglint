@@ -4,8 +4,8 @@ malicious: grade F, 15 finding(s)
   PKGBUILD:11:1: info [PB105] source host "cdn.not-github.example" differs from project url host "github.com"
   PKGBUILD:16:3: warn [PB201] curl downloads during build(); network access belongs in prepare() with pinned hashes
   PKGBUILD:16:3: critical [PB304] a network download is piped straight into bash and executed
-  PKGBUILD:17:11: warn [PB201] wget downloads during build(); network access belongs in prepare() with pinned hashes
   PKGBUILD:17:3: critical [PB302] eval executes the output of a network download
+  PKGBUILD:17:11: warn [PB201] wget downloads during build(); network access belongs in prepare() with pinned hashes
   PKGBUILD:18:17: error [PB401] redirection to "$HOME/.bashrc" writes into the user's home directory
   PKGBUILD:24:3: error [PB401] install writes to an absolute system path ("/usr/bin/badpkg")
   PKGBUILD:24:3: error [PB402] sudo escalates privileges during a build; anything needing root belongs to pacman's install step

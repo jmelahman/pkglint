@@ -277,7 +277,9 @@ func Registry() []Rule {
 }
 
 // Run executes every rule not in ignore and returns findings, dropping ones
-// suppressed by inline directives, sorted by file position.
+// suppressed by inline directives. The result is totally ordered by
+// (Path, Line, Col, RuleID, Message) and free of exact duplicates, so the same
+// package always lints to the same list.
 func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 	ctx := NewContext(pkg)
 	var out []Finding
@@ -300,8 +302,29 @@ func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 		if a.Line != b.Line {
 			return a.Line < b.Line
 		}
-		return a.RuleID < b.RuleID
+		if a.Col != b.Col {
+			return a.Col < b.Col
+		}
+		if a.RuleID != b.RuleID {
+			return a.RuleID < b.RuleID
+		}
+		return a.Message < b.Message
 	})
+	// Drop exact duplicates (same rule + location + message). After a total
+	// sort, duplicates are adjacent. This de-noises rules that can emit the
+	// same finding twice (e.g. overlapping persistence-path hints).
+	if len(out) > 1 {
+		deduped := out[:1]
+		for _, f := range out[1:] {
+			last := deduped[len(deduped)-1]
+			if f.RuleID == last.RuleID && f.Path == last.Path && f.Line == last.Line &&
+				f.Col == last.Col && f.Message == last.Message {
+				continue
+			}
+			deduped = append(deduped, f)
+		}
+		out = deduped
+	}
 	return out
 }
 

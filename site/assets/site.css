@@ -547,13 +547,6 @@ td.rfix { width: 1%; }
 .rung > span.grade { color: var(--on-g); font-size: 0.8125rem; }
 .rung span b { color: var(--chalk); font-weight: 600; }
 
-/* ── footer ───────────────────────────────────────────────────────────── */
-footer {
-  border-top: 1px solid var(--rule); margin-top: 2rem;
-  padding: 1.5rem 1.25rem 3rem; max-width: 78rem; margin-left: auto; margin-right: auto;
-}
-footer p { color: var(--dim); font-size: 0.8125rem; max-width: 46rem; margin: 0; }
-
 /* ── motion ───────────────────────────────────────────────────────────── */
 @keyframes draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes rise { from { opacity: 0; transform: translateY(0.4rem); } to { opacity: 1; transform: none; } }

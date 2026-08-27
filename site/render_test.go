@@ -91,3 +91,93 @@ func TestRenderFixableBadges(t *testing.T) {
 		t.Errorf("rule reference missing Fix column:\n%s", idx)
 	}
 }
+
+// TestRenderLinkPreview covers the head metadata a link preview reads. The
+// failure this guards against is silent: a relative og:image or a page-relative
+// og:url renders identically in a browser and produces no card at all when the
+// page is posted, and nobody notices until someone shares a link.
+func TestRenderLinkPreview(t *testing.T) {
+	results := []siteResult{{
+		Name: "demo", Base: "demo", Version: "1.0-1", Grade: "A",
+		Findings: []rules.Finding{},
+	}}
+
+	out := t.TempDir()
+	for _, sub := range []string{"rules", "package", "badge"} {
+		if err := os.MkdirAll(filepath.Join(out, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := renderSite(out, results); err != nil {
+		t.Fatalf("renderSite: %v", err)
+	}
+
+	// Every page carries the card image and the card type; the canonical URL is
+	// the page's own, which is what pins a preview to one address when the same
+	// page is reachable as both /rules/ and /rules/index.html.
+	for rel, wantURL := range map[string]string{
+		"index.html":                          baseURL,
+		filepath.Join("rules", "index.html"):  baseURL + "rules/",
+		filepath.Join("rules", "PB101.html"):  baseURL + "rules/PB101.html",
+		filepath.Join("package", "demo.html"): baseURL + "package/demo.html",
+	} {
+		b, err := os.ReadFile(filepath.Join(out, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		page := string(b)
+		for _, want := range []string{
+			`<meta name="twitter:card" content="summary_large_image">`,
+			`<meta property="og:image" content="` + baseURL + `assets/og.png">`,
+			`<meta property="og:url" content="` + wantURL + `">`,
+			`<link rel="canonical" href="` + wantURL + `">`,
+		} {
+			if !strings.Contains(page, want) {
+				t.Errorf("%s missing %s", rel, want)
+			}
+		}
+		// A card with no title or description is a bare link, so the tags have
+		// to be filled in rather than merely present.
+		for _, empty := range []string{
+			`<meta property="og:title" content="">`,
+			`<meta property="og:description" content="">`,
+			"<title></title>",
+		} {
+			if strings.Contains(page, empty) {
+				t.Errorf("%s has an empty head tag: %s", rel, empty)
+			}
+		}
+	}
+
+	// The image the tags point at has to be published alongside them.
+	if _, err := os.Stat(filepath.Join(out, "assets", "og.png")); err != nil {
+		t.Errorf("card image not copied to the site: %v", err)
+	}
+}
+
+// TestClip covers the description shortener: previews cut a long description
+// wherever they run out of room, so it is cut here on a word instead.
+func TestClip(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"short", "PB101: pin it.", 200, "PB101: pin it."},
+		{"exact", "abcde", 5, "abcde"},
+		{"word boundary", "one two three four", 12, "one two…"},
+		{"trailing comma", "one two, three", 9, "one two…"},
+		// A dash left stranded by the cut goes with it.
+		{"dangling dash", "a — bcdefg", 5, "a…"},
+		// Cutting by bytes would end this one mid-rune.
+		{"multibyte", "ünïcödé wörd", 7, "ünïcödé…"},
+		{"unbroken", "aaaaaaaa", 4, "aaaa…"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := clip(tc.in, tc.n); got != tc.want {
+				t.Errorf("clip(%q, %d) = %q, want %q", tc.in, tc.n, got, tc.want)
+			}
+		})
+	}
+}

@@ -1,8 +1,6 @@
 {{define "rule.html"}}<!doctype html>
 <html lang="en">
 <head>
-<title>{{.Rule.ID}}: {{.Rule.Name}} — AUR Report Card</title>
-<meta name="description" content="{{.Rule.ID}} ({{.Rule.Name}}): {{.Rule.Doc}}">
 {{template "head" .}}
 </head>
 <body>
@@ -60,7 +58,6 @@
 </section>
 
 </main>
-{{template "footer" .}}
 </body>
 </html>
 {{end}}

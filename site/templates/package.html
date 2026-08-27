@@ -1,8 +1,6 @@
 {{define "package.html"}}<!doctype html>
 <html lang="en">
 <head>
-<title>{{.R.Name}} — AUR Report Card</title>
-<meta name="description" content="pkglint grade {{.R.Grade}} for the AUR package {{.R.Name}}: {{len .R.Findings}} finding(s) from static analysis.">
 {{template "head" .}}
 </head>
 <body>
@@ -79,7 +77,6 @@
 </section>
 
 </main>
-{{template "footer" .}}
 </body>
 </html>
 {{end}}

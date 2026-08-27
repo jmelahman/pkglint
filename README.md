@@ -114,6 +114,13 @@ The generated site is checked into [`docs/`](docs/) and served at
 <https://jamison.lahman.dev/pkglint/>. The [`Report card site`](.github/workflows/site.yml)
 workflow regenerates it nightly and commits any changes.
 
+Every page carries its own Open Graph and `twitter:card` metadata, so a shared link
+previews as a card rather than a bare URL. The card image is `site/assets/og.png`,
+rendered from [`site/og-card.html`](site/og-card.html) — it is a committed PNG because
+the preview readers will not take the SVG the rest of the site is drawn in. Because
+Open Graph is read without a document to resolve against, those URLs are absolute and
+the published origin is the `baseURL` constant in `site/render.go`.
+
 ## Roadmap
 
 - A `makepkg` shim so AUR helpers lint before building (`yay --makepkg pkglint-makepkg`,

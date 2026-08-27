@@ -88,47 +88,7 @@ and reproducible a PKGBUILD is. A low grade means "worth reviewing", never "mali
 and a high grade is not an endorsement. Static analysis cannot catch a malicious upstream
 release pinned with a perfectly valid checksum.
 
-## Report card site
-
-`site/` generates a static "AUR Report Card" — grades, per-package finding pages,
-a [rule reference](https://jamison.lahman.dev/pkglint/rules/) with a flagged/preferred
-example for every check, `results.json`, and embeddable SVG badges. Findings whose rule
-has an auto-fix are tagged with a `--fix`/`--unsafe-fix` badge so it's clear at a glance
-what pkglint can rewrite for you:
-
-```shell
-go run ./site -maintainer Jamison -top 500 -out docs
-```
-
-It downloads the AUR metadata dump once a day, fetches package snapshots politely
-(throttled, cached by `LastModified`), and scans everything in-process.
-
-Between runs it also remembers each package's source fingerprints (checksums per URL,
-VCS commit pins, pkgver) in `.cache/state.json` and flags **drift**: a checksum changing
-under an unchanged URL, or a commit pin moving without a version bump — the shape a
-hijacked upstream release takes. Drifted packages get a warning box on their page, a ⚠
-marker on the index, and a `drift` array in `results.json`. This is a stateful,
-cross-scan signal, so it lives in the site generator rather than the per-file linter.
-
-The generated site is checked into [`docs/`](docs/) and served at
-<https://jamison.lahman.dev/pkglint/>. The [`Report card site`](.github/workflows/site.yml)
-workflow regenerates it nightly and commits any changes.
-
-Every page carries its own Open Graph and `twitter:card` metadata, so a shared link
-previews as a card rather than a bare URL. The card image is `site/assets/og.png`,
-rendered from [`site/og-card.html`](site/og-card.html) — it is a committed PNG because
-the preview readers will not take the SVG the rest of the site is drawn in. Because
-Open Graph is read without a document to resolve against, those URLs are absolute and
-the published origin is the `baseURL` constant in `site/render.go`.
-
-## Roadmap
-
-- A `makepkg` shim so AUR helpers lint before building (`yay --makepkg pkglint-makepkg`,
-  paru `[bin] Makepkg`)
-- Sandboxed builds: containerized `makepkg` with the package artifact installed on the
-  host via `pacman -U`
-- Hermetic builds: two-phase `makepkg -o` (network) / `makepkg -e` (`--network=none`),
-  with these lint rules enforcing the conventions that make that split work
+A full reference including examples of each rule is available in the [documentation](https://jamison.lahman.dev/pkglint/rules/).
 
 ## License
 

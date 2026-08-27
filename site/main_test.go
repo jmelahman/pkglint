@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -72,6 +73,29 @@ func TestSelectSeedDropsUnsafeBases(t *testing.T) {
 	}
 	if len(seed) != 2 || !got["good-pkg"] || !got["mine"] {
 		t.Errorf("selectSeed = %v, want exactly [good-pkg mine]", got)
+	}
+}
+
+// TestSelectSeedIsDeterministic pins the tie-break at the top-N cutoff. The
+// bases come out of a map and sort.Slice is not stable, so without one the
+// cutoff falls differently on every run and packages appear on the site, 404,
+// and come back over input that never changed.
+func TestSelectSeedIsDeterministic(t *testing.T) {
+	// Every base carries the same vote count, so the cutoff is decided purely
+	// by the tie-break, and the input order is not the answer.
+	var meta []metaPackage
+	for _, n := range []string{"delta", "alpha", "echo", "charlie", "bravo"} {
+		meta = append(meta, metaPackage{PackageBase: n, NumVotes: 42})
+	}
+	want := []string{"alpha", "bravo", "charlie"}
+	for i := 0; i < 32; i++ {
+		var got []string
+		for _, m := range selectSeed(meta, "", 3) {
+			got = append(got, m.PackageBase)
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("run %d: selectSeed = %v, want %v", i, got, want)
+		}
 	}
 }
 

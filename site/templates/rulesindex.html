@@ -2,42 +2,69 @@
 <html lang="en">
 <head>
 <title>Rule reference — AUR Report Card</title>
+<meta name="description" content="Every check pkglint runs on a PKGBUILD, grouped by concern, with a flagged and preferred example for each.">
 {{template "head" .}}
 </head>
 <body>
-<main>
-<h1><a href="../index.html">AUR Report Card</a> / rules</h1>
-<p class="sub">Every check pkglint runs, grouped by concern. Each links to a page with an
-explanation and a flagged/preferred example.</p>
+{{template "topbar" .}}
+<main id="main">
 
-<div class="notice">Grading: any <span class="sev sev-critical">critical</span> &rarr; F,
-any <span class="sev sev-error">error</span> &rarr; D, three or more
-<span class="sev sev-warn">warn</span> &rarr; C, one or two &rarr; B, otherwise A.
-Suppress a reviewed case inline with <code># pkglint: ignore=PB123</code>. Rules marked
-<span class="fix fix-safe">--fix</span> pkglint rewrites automatically;
-<span class="fix fix-unsafe">--unsafe-fix</span> ones are mechanical but change behavior, so review them.</div>
+<section class="row hero-row">
+  <div class="tag"></div>
+  <div>
+    <p class="eyebrow"><a href="{{.Root}}index.html">AUR report card</a></p>
+    <h1>Rule<br>Reference</h1>
+    <p class="lede">Every check pkglint runs, grouped by what it protects. Each rule has a
+    page with a flagged and a preferred example.</p>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Grading</div>
+  <div>
+    <p>A package is graded by its worst finding, so one critical outweighs any number of
+    smaller notes.</p>
+    <div class="ladder">
+      <div class="rung"><span class="grade grade-F">F</span><span>any <b>critical</b> finding</span></div>
+      <div class="rung"><span class="grade grade-D">D</span><span>any <b>error</b></span></div>
+      <div class="rung"><span class="grade grade-C">C</span><span><b>3 or more warnings</b></span></div>
+      <div class="rung"><span class="grade grade-B">B</span><span><b>1 or 2 warnings</b></span></div>
+      <div class="rung"><span class="grade grade-A">A</span><span><b>no warnings</b>, only info</span></div>
+    </div>
+    <p>Rules tagged {{template "fixpill" .FixSafe}} are rewritten in place by
+    <code>pkglint --fix</code>, which never changes what the build does. Rules tagged
+    {{template "fixpill" .FixUnsafe}} are mechanical too, but they do change it, so read the
+    diff. Adding <code># pkglint: ignore=PB123</code> above a line suppresses a case you have
+    already reviewed.</p>
+  </div>
+</section>
 
 {{range .Groups}}
-<h2 class="rulegroup">{{.Title}}</h2>
-<div class="overflow">
-<table>
-  <thead><tr><th>Rule</th><th>Name</th><th>Fix</th><th>Description</th></tr></thead>
-  <tbody>
-  {{range .Rules}}
-  <tr>
-    <td class="rid"><a href="{{.ID}}.html">{{.ID}}</a></td>
-    <td><code>{{.Name}}</code></td>
-    <td>{{template "fixpill" .FixLevel}}</td>
-    <td>{{.Doc}}</td>
-  </tr>
-  {{end}}
-  </tbody>
-</table>
-</div>
+<section class="row">
+  <div class="tag">{{.Code}}<small>n = {{len .Rules}}</small></div>
+  <div>
+    <h2>{{.Title}}</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      <thead><tr><th>Rule</th><th class="rname-h">Name</th><th>Fix</th><th>Description</th></tr></thead>
+      <tbody>
+      {{range .Rules}}
+      <tr>
+        <td class="rid"><a href="{{.ID}}.html">{{.ID}}</a></td>
+        <td class="rname">{{.Name}}</td>
+        <td class="rfix">{{template "fixpill" .FixLevel}}</td>
+        <td class="rdoc">{{doc .Doc}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
 {{end}}
 
-{{template "footer" .}}
 </main>
+{{template "footer" .}}
 </body>
 </html>
 {{end}}

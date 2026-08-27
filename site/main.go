@@ -150,7 +150,50 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 			return err
 		}
 	}
+	keep := make(map[string]bool, len(results))
+	for _, r := range results {
+		keep[r.Name] = true
+	}
+	ruleIDs := map[string]bool{"index": true}
+	for _, r := range rules.Registry() {
+		ruleIDs[r.ID] = true
+	}
+	for _, p := range []struct {
+		dir, ext string
+		keep     map[string]bool
+	}{
+		{filepath.Join(out, "package"), ".html", keep},
+		{filepath.Join(out, "badge"), ".svg", keep},
+		{filepath.Join(out, "rules"), ".html", ruleIDs},
+	} {
+		if err := prune(p.dir, p.ext, p.keep); err != nil {
+			return err
+		}
+	}
+
 	log.Printf("site written to %s", out)
+	return nil
+}
+
+// prune deletes generated pages that this run did not write. Without it a
+// package that drops out of the seed keeps its page on the site for ever,
+// served against whatever the current stylesheet happens to be — a stale grade
+// for a package no longer being scanned is worse than no page at all.
+func prune(dir, ext string, keep map[string]bool) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ext) || keep[strings.TrimSuffix(name, ext)] {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			return err
+		}
+		log.Printf("removed stale %s", filepath.Join(dir, name))
+	}
 	return nil
 }
 
@@ -220,7 +263,17 @@ func selectSeed(meta []metaPackage, maintainer string, top int) []metaPackage {
 	for _, m := range byBase {
 		bases = append(bases, m)
 	}
-	sort.Slice(bases, func(i, j int) bool { return bases[i].NumVotes > bases[j].NumVotes })
+	// Votes alone do not order this set: they come out of a map, sort.Slice is
+	// not stable, and the AUR has long runs of bases on identical counts. Ties
+	// at the top-N cutoff then fall differently on every run, so a package
+	// drifts in and out of the site — its page and badge appearing, 404ing, and
+	// reappearing — over input that never changed. Break on the name.
+	sort.Slice(bases, func(i, j int) bool {
+		if bases[i].NumVotes != bases[j].NumVotes {
+			return bases[i].NumVotes > bases[j].NumVotes
+		}
+		return bases[i].PackageBase < bases[j].PackageBase
+	})
 
 	var seed []metaPackage
 	seen := map[string]bool{}
@@ -455,23 +508,31 @@ func writeJSON(path string, v any) error {
 	return enc.Encode(v)
 }
 
-// badgeSVG renders a shields.io-style flat badge for a grade.
+// badgeSVG renders a flat badge for a grade, in the site's grade ramp so a
+// letter means the same colour in a README as it does on the report card. The
+// ramp is the report-card one, green through red, with "?" off it in grey.
+//
+// The badge keeps the familiar shields.io silhouette because that is what a
+// README expects, but drops the gloss gradient and puts dark text on the
+// coloured half — the ramp's middle is far too light to carry white. The
+// charcoal label half is chosen to stay legible against both a white and a dark
+// README background, since the badge has no control over where it lands.
 func badgeSVG(grade string) string {
+	const charcoal, ink, chalk = "#2b2b32", "#0a0a0c", "#f4f4f5"
 	colors := map[string]string{
-		"A": "#4c1", "B": "#97ca00", "C": "#dfb317", "D": "#fe7d37", "F": "#e05d44", "?": "#9f9f9f",
+		"A": "#57b87e", "B": "#a3c265", "C": "#d8b04a", "D": "#e08a48", "F": "#e05a55", "?": "#898994",
 	}
 	color, ok := colors[grade]
 	if !ok {
-		color = "#9f9f9f"
+		color = colors["?"]
 	}
 	const label, labelW, gradeW = "pkglint", 50, 24
 	total := labelW + gradeW
 	return fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="20" role="img" aria-label="%s: %s">
-<linearGradient id="s" x2="0" y2="100%%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
 <clipPath id="r"><rect width="%d" height="20" rx="3" fill="#fff"/></clipPath>
-<g clip-path="url(#r)"><rect width="%d" height="20" fill="#555"/><rect x="%d" width="%d" height="20" fill="%s"/><rect width="%d" height="20" fill="url(#s)"/></g>
-<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
-<text x="%d" y="14">%s</text><text x="%d" y="14" font-weight="bold">%s</text></g></svg>`,
-		total, label, grade, total, labelW, labelW, gradeW, color, total,
-		labelW/2, label, labelW+gradeW/2, grade)
+<g clip-path="url(#r)"><rect width="%d" height="20" fill="%s"/><rect x="%d" width="%d" height="20" fill="%s"/></g>
+<g text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
+<text x="%d" y="14" fill="%s">%s</text><text x="%d" y="14" fill="%s" font-weight="bold">%s</text></g></svg>`,
+		total, label, grade, total, labelW, charcoal, labelW, gradeW, color,
+		labelW/2, chalk, label, labelW+gradeW/2, ink, grade)
 }

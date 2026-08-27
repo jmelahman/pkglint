@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,8 +19,86 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
+//go:embed assets
+var assetFS embed.FS
+
 var funcs = template.FuncMap{
-	"sev": func(s rules.Severity) string { return s.String() },
+	"sev":     func(s rules.Severity) string { return s.String() },
+	"doc":     renderDoc,
+	"scanErr": scanError,
+}
+
+// scanError strips pkglint's internal snapshot path out of a parse failure,
+// leaving the file, line, column, and reason — the part a reader can act on.
+// Errors arrive as "parse <snapshot>/PKGBUILD: <snapshot>/PKGBUILD:12:3: why".
+func scanError(s string) string {
+	if rest, ok := strings.CutPrefix(s, "parse "); ok {
+		if i := strings.Index(rest, ": "); i >= 0 {
+			s = rest[i+2:]
+		}
+	}
+	head := s
+	if i := strings.Index(head, ":"); i >= 0 {
+		head = head[:i]
+	}
+	if i := strings.LastIndex(head, "/"); i >= 0 {
+		s = s[i+1:]
+	}
+	return s
+}
+
+// renderDoc escapes a rule's documentation and turns its `backtick` spans into
+// code, which is how the rule docs are written for the terminal.
+func renderDoc(s string) template.HTML {
+	parts := strings.Split(s, "`")
+	var b strings.Builder
+	for i, p := range parts {
+		esc := template.HTMLEscapeString(p)
+		if i%2 == 1 && i != len(parts)-1 {
+			b.WriteString("<code>" + esc + "</code>")
+			continue
+		}
+		// An unmatched trailing backtick closes nothing, so it is prose rather
+		// than the start of a span. Split has already eaten it — put it back,
+		// or the sentence quietly loses a character.
+		if i%2 == 1 {
+			b.WriteByte('`')
+		}
+		b.WriteString(esc)
+	}
+	return template.HTML(b.String())
+}
+
+// rubric states, per grade, the condition that produces it. It is shown beside
+// the grade counts so the distribution explains its own axis.
+var rubric = map[string]string{
+	"A": "no warnings",
+	"B": "1–2 warnings",
+	"C": "3+ warnings",
+	"D": "any error",
+	"F": "any critical",
+	"?": "not scanned",
+}
+
+// band is one grade's segment of the distribution bar, sized by package count.
+type band struct {
+	Grade  string
+	Count  int
+	Rubric string
+	Style  template.CSS
+}
+
+// tick is one labelled mark on the scale drawn under the distribution bar.
+type tick struct {
+	Label string
+	Style template.CSS
+}
+
+// fileGroup collects a package's findings under the file they were found in,
+// in first-seen order, so a page reads file by file rather than as one list.
+type fileGroup struct {
+	Path     string
+	Findings []rules.Finding
 }
 
 func renderSite(out string, results []siteResult) error {
@@ -25,9 +106,14 @@ func renderSite(out string, results []siteResult) error {
 	if err != nil {
 		return err
 	}
+	ver, err := copyAssets(out)
+	if err != nil {
+		return err
+	}
 
+	registry := rules.Registry() // sorted by ID
 	ruleIndex := map[string]rules.Rule{}
-	for _, r := range rules.Registry() {
+	for _, r := range registry {
 		ruleIndex[r.ID] = r
 	}
 
@@ -47,28 +133,48 @@ func renderSite(out string, results []siteResult) error {
 			}
 		}
 	}
-	indexData := map[string]any{
+
+	// page wraps per-page data with what every template needs: the relative
+	// path back to the site root (pages live at two depths) and an asset
+	// version, so a stylesheet change can't be served from a stale cache.
+	page := func(depth int, data map[string]any) map[string]any {
+		data["Root"] = strings.Repeat("../", depth)
+		data["Ver"] = ver
+		return data
+	}
+
+	indexData := page(0, map[string]any{
 		"Results":   results,
-		"Counts":    counts,
-		"Grades":    []string{"A", "B", "C", "D", "F", "?"},
+		"Bands":     bands(counts, len(results)),
+		"Ticks":     ticks(len(results)),
 		"Total":     len(results),
 		"Findings":  findingsTotal,
 		"Fixable":   fixableTotal,
 		"Drifted":   driftedTotal,
 		"Generated": time.Now().UTC().Format("2006-01-02 15:04 UTC"),
-	}
+	})
 	if err := renderTo(tmpl, "index.html", filepath.Join(out, "index.html"), indexData); err != nil {
 		return err
 	}
 
-	for _, r := range ruleIndex {
-		data := map[string]any{"Rule": r}
+	for i, r := range registry {
+		data := page(1, map[string]any{"Rule": r})
+		if i > 0 {
+			data["Prev"] = registry[i-1]
+		}
+		if i < len(registry)-1 {
+			data["Next"] = registry[i+1]
+		}
 		if err := renderTo(tmpl, "rule.html", filepath.Join(out, "rules", r.ID+".html"), data); err != nil {
 			return err
 		}
 	}
 
-	rulesData := map[string]any{"Groups": groupRules(rules.Registry())}
+	rulesData := page(1, map[string]any{
+		"Groups":    groupRules(registry),
+		"FixSafe":   rules.FixSafe,
+		"FixUnsafe": rules.FixUnsafe,
+	})
 	if err := renderTo(tmpl, "rulesindex.html", filepath.Join(out, "rules", "index.html"), rulesData); err != nil {
 		return err
 	}
@@ -80,7 +186,7 @@ func renderSite(out string, results []siteResult) error {
 			log.Printf("skipping page for unsafe name %q", r.Name)
 			continue
 		}
-		data := map[string]any{"R": r, "Rules": ruleIndex}
+		data := page(1, map[string]any{"R": r, "Rules": ruleIndex, "Files": groupFindings(r.Findings)})
 		if err := renderTo(tmpl, "package.html", filepath.Join(out, "package", r.Name+".html"), data); err != nil {
 			return err
 		}
@@ -88,8 +194,104 @@ func renderSite(out string, results []siteResult) error {
 	return nil
 }
 
-// ruleGroup is a titled section of the rule reference.
+// copyAssets writes the embedded stylesheet, script, and fonts under out and
+// returns a short content hash of the two text assets, used to bust caches.
+func copyAssets(out string) (string, error) {
+	sum := sha256.New()
+	err := fs.WalkDir(assetFS, "assets", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(out, filepath.FromSlash(p))
+		if d.IsDir() {
+			return os.MkdirAll(dst, 0o755)
+		}
+		b, err := assetFS.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(p, ".css") || strings.HasSuffix(p, ".js") {
+			sum.Write(b)
+		}
+		return os.WriteFile(dst, b, 0o644)
+	})
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(sum.Sum(nil))[:8], nil
+}
+
+// bands turns the grade counts into the segments of the distribution bar, in
+// grade order and skipping grades nothing landed on.
+func bands(counts map[string]int, total int) []band {
+	var out []band
+	for i, g := range []string{"A", "B", "C", "D", "F", "?"} {
+		n := counts[g]
+		if n == 0 {
+			continue
+		}
+		out = append(out, band{
+			Grade:  g,
+			Count:  n,
+			Rubric: rubric[g],
+			Style:  template.CSS(fmt.Sprintf("flex-grow:%d;animation-delay:%dms", n, i*70)),
+		})
+	}
+	return out
+}
+
+// ticks lays out a drafting scale under the distribution bar: round marks at a
+// readable interval, plus the total at the right edge.
+func ticks(total int) []tick {
+	if total == 0 {
+		return nil
+	}
+	step := 1
+	for _, s := range []int{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000} {
+		step = s
+		if total/s <= 6 {
+			break
+		}
+	}
+	var out []tick
+	mark := func(n int) {
+		out = append(out, tick{
+			Label: fmt.Sprint(n),
+			Style: template.CSS(fmt.Sprintf("left:%.4f%%", float64(n)/float64(total)*100)),
+		})
+	}
+	for n := 0; n < total; n += step {
+		// Drop a mark that would collide with the total at the right edge.
+		if total-n < step/2 {
+			break
+		}
+		mark(n)
+	}
+	mark(total)
+	return out
+}
+
+// groupFindings buckets a package's findings by file, preserving the order
+// each file and finding first appeared in.
+func groupFindings(findings []rules.Finding) []fileGroup {
+	var out []fileGroup
+	at := map[string]int{}
+	for _, f := range findings {
+		i, ok := at[f.Path]
+		if !ok {
+			i = len(out)
+			at[f.Path] = i
+			out = append(out, fileGroup{Path: f.Path})
+		}
+		out[i].Findings = append(out[i].Findings, f)
+	}
+	return out
+}
+
+// ruleGroup is a titled section of the rule reference. Code is the PB-hundreds
+// prefix, shown in the page margin; Title names what the group protects.
 type ruleGroup struct {
+	Code  string
 	Title string
 	Rules []rules.Rule
 }
@@ -101,17 +303,17 @@ func groupRules(all []rules.Rule) []ruleGroup {
 		prefix string
 		title  string
 	}{
-		{"PB1", "PB1xx — Integrity & provenance"},
-		{"PB2", "PB2xx — Hermeticity"},
-		{"PB3", "PB3xx — Execution & obfuscation"},
-		{"PB4", "PB4xx — Filesystem & privilege"},
-		{"PB5", "PB5xx — Install scriptlets"},
-		{"PB6", "PB6xx — Metadata consistency"},
-		{"PB7", "PB7xx — Correctness & metadata"},
+		{"PB1", "Integrity & provenance"},
+		{"PB2", "Hermeticity"},
+		{"PB3", "Execution & obfuscation"},
+		{"PB4", "Filesystem & privilege"},
+		{"PB5", "Install scriptlets"},
+		{"PB6", "Metadata consistency"},
+		{"PB7", "Correctness & metadata"},
 	}
 	var groups []ruleGroup
 	for _, t := range titles {
-		g := ruleGroup{Title: t.title}
+		g := ruleGroup{Code: t.prefix + "xx", Title: t.title}
 		for _, r := range all {
 			if strings.HasPrefix(r.ID, t.prefix) {
 				g.Rules = append(g.Rules, r)

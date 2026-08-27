@@ -208,6 +208,9 @@ func fixVCSPins(ctx *Context, env *FixEnv) []Edit {
 			}
 			fragKey, refVal = "tag", tag
 		} else if br, ok := e.Fragment["branch"]; ok {
+			if ctx.tracksTip(e.VCS) {
+				continue // checkVCSPins does not flag it; pinning would freeze a -git package
+			}
 			fragKey, refVal = "branch", br
 		} else {
 			continue // no named ref to resolve into a commit deterministically

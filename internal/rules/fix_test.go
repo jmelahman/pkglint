@@ -106,6 +106,27 @@ sha256sums=('SKIP')
 			t.Errorf("expected no edit without ResolveRef, got:\n%s", got["PKGBUILD"])
 		}
 	})
+	t.Run("a -git package's branch is not pinned", func(t *testing.T) {
+		// Pinning here would freeze a package whose contract is "build the tip",
+		// so the fix has to stay out of it exactly as checkVCSPins does.
+		vcs := `pkgname=demo-git
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+url='https://example.com'
+source=("git+https://example.com/demo.git#branch=main")
+sha256sums=('SKIP')
+`
+		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("a -git package's branch should not be pinned, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("a -git package's mutable tag is still rewritten", func(t *testing.T) {
+		vcs := strings.Replace(body, "pkgname=demo", "pkgname=demo-git", 1)
+		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "#commit=0123456789abcdef0123456789abcdef01234567")
+	})
 	t.Run("signed tag is not rewritten", func(t *testing.T) {
 		signed := strings.Replace(body,
 			`source=("git+https://example.com/demo.git#tag=v1")`,

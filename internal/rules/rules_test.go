@@ -152,6 +152,47 @@ url='https://example.com'
 source=("git+https://example.com/demo.git#tag=v1")
 sha256sums=('SKIP')`, "")})
 	})
+	t.Run("PB103 not for a -git package following a branch", func(t *testing.T) {
+		expectNoRule(t, "PB103", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo-git
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')`, "")})
+		expectNoRule(t, "PB103", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo-git
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/demo.git#branch=main")
+sha256sums=('SKIP')`, "")})
+	})
+	t.Run("PB103 -git exemption reads through pkgbase and variables", func(t *testing.T) {
+		expectNoRule(t, "PB103", map[string]string{"PKGBUILD": pkgbuildWith(`_pkgname=demo
+pkgbase=$_pkgname-git
+pkgname=($_pkgname-git $_pkgname-docs)
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')`, "")})
+	})
+	t.Run("PB103 -git package pinned to a mutable tag is still flagged", func(t *testing.T) {
+		// The suffix licenses following upstream's tip, not a re-pointable tag.
+		expectRule(t, "PB103", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo-git
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/demo.git#tag=v1")
+sha256sums=('SKIP')`, "")})
+	})
+	t.Run("PB103 -git does not exempt a source from another VCS", func(t *testing.T) {
+		expectRule(t, "PB103", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo-git
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("svn+https://example.com/demo/trunk")
+sha256sums=('SKIP')`, "")})
+	})
 	t.Run("PB103 commit pin is fine", func(t *testing.T) {
 		expectNoRule(t, "PB103", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
 pkgver=1

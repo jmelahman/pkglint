@@ -33,7 +33,11 @@ var integrityRules = []Rule{
 		Name: "unpinned-vcs-source",
 		Doc: "A VCS source without `#commit=` pins to a mutable reference: branches move and tags " +
 			"can be re-pointed by anyone with push access (or a compromised forge account). Pinning " +
-			"the exact commit hash makes the fetched tree tamper-evident.",
+			"the exact commit hash makes the fetched tree tamper-evident. Packages named for the VCS " +
+			"they track (`foo-git`, `foo-hg`, …) are exempt while they follow a branch: building " +
+			"whatever upstream's tip points at today is what such a package is for, and pinning it " +
+			"would make it a different package. A mutable `#tag=` is still reported there — a tag is " +
+			"not the tip, and it can be re-pointed.",
 		Check:    checkVCSPins,
 		FixLevel: FixSafe,
 		Fix:      fixVCSPins,
@@ -429,6 +433,34 @@ func (ctx *Context) archesWithSums() []string {
 
 var sumAlgoNames = []string{"ck", "md5", "sha1", "sha224", "sha256", "sha384", "sha512", "b2"}
 
+// vcsPackageSuffix maps a source VCS to the AUR name suffix that marks a
+// package built from that VCS's moving ref: pacman-git tracks a git repository,
+// pacman-svn an svn one. The suffix has to match the source's VCS — a -git
+// package's svn source is outside the convention, so it stays pinnable.
+var vcsPackageSuffix = map[string]string{
+	"git": "-git", "hg": "-hg", "svn": "-svn", "bzr": "-bzr", "fossil": "-fossil",
+}
+
+// tracksTip reports whether the package's own name declares it a VCS package
+// for vcs, i.e. one whose job is to build whatever upstream's moving ref points
+// at today. Only the literal suffix matters, so a name assembled from variables
+// ("${_pkgname}-git") counts too, and any pkgname of a split package marks the
+// whole PKGBUILD — its sources are shared.
+func (ctx *Context) tracksTip(vcs string) bool {
+	suffix, ok := vcsPackageSuffix[vcs]
+	if !ok {
+		return false
+	}
+	for _, field := range []string{"pkgbase", "pkgname"} {
+		for _, e := range varElems(ctx.Pkg.Vars[field]) {
+			if strings.HasSuffix(ctx.Pkg.Expand(e.Value), suffix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func checkVCSPins(ctx *Context) []Finding {
 	var out []Finding
 	for _, e := range ctx.Pkg.Sources() {
@@ -449,6 +481,9 @@ func checkVCSPins(ctx *Context) []Finding {
 			out = append(out, findingAt("PB103", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
 				"VCS source pinned to mutable tag %q; tags can be re-pointed — pin with #commit=", tag))
 			continue
+		}
+		if ctx.tracksTip(e.VCS) {
+			continue // a -git package following a branch is its purpose, not a lapse
 		}
 		ref := "default branch"
 		if b, ok := e.Fragment["branch"]; ok {

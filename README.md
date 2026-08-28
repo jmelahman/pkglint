@@ -20,6 +20,19 @@ somepkg: grade F, 3 finding(s)
 
 ## Install
 
+**AUR**
+
+```
+yay -S pkglint
+```
+
+**PyPi**
+
+```
+uv tool install pkglint
+```
+
+**Go**
 ```shell
 go install github.com/jmelahman/pkglint@latest
 ```

@@ -3,6 +3,8 @@ package rules
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -141,6 +143,15 @@ var integrityRules = []Rule{
 			"keys. Either dead configuration or a signature source was dropped — confusing at review " +
 			"time either way.",
 		Check: checkUnusedPGPKeys,
+	},
+	{
+		ID:       "PB114",
+		Name:     "malformed-checksum",
+		Severity: Error,
+		Doc: "A checksum with the wrong length for its algorithm or with non-hex characters can " +
+			"never match any download, so verification is guaranteed to fail — usually a truncated " +
+			"paste or a digest computed with a different algorithm than the array names.",
+		Check: checkMalformedChecksums,
 	},
 }
 
@@ -645,5 +656,46 @@ func checkMissingInstall(ctx *Context) []Finding {
 				"install scriptlet %q referenced but not found next to the PKGBUILD", name))
 		}
 	}
+	return out
+}
+
+// --- PB114: malformed checksum values ---------------------------------------
+
+// sumHexLengths is the exact digest length, in hex characters, per algorithm.
+// cksums (a decimal CRC) is absent: its values aren't fixed-width hex.
+var sumHexLengths = map[string]int{
+	"md5": 32, "sha1": 40, "sha224": 56, "sha256": 64, "sha384": 96, "sha512": 128, "b2": 128,
+}
+
+var hexRe = regexp.MustCompile(`^[0-9a-fA-F]+$`)
+
+func checkMalformedChecksums(ctx *Context) []Finding {
+	var out []Finding
+	for algo, want := range sumHexLengths {
+		names := []string{algo + "sums"}
+		for _, a := range ctx.archesWithSums() {
+			if a != "" {
+				names = append(names, algo+"sums_"+a)
+			}
+		}
+		for _, name := range names {
+			for _, e := range varElems(ctx.Pkg.Vars[name]) {
+				val, ok := staticVal(ctx.Pkg, e.Value)
+				if !ok || val == "" || isSkip(val) {
+					continue
+				}
+				switch {
+				case len(val) != want:
+					out = append(out, findingAt("PB114", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+						"%s entry %q is %d characters, but a %s digest is %d hex characters; this can never verify",
+						name, val, len(val), algo, want))
+				case !hexRe.MatchString(val):
+					out = append(out, findingAt("PB114", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
+						"%s entry %q contains non-hex characters; this can never verify", name, val))
+				}
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Line < out[j].Line })
 	return out
 }

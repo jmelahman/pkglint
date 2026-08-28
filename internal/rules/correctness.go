@@ -151,6 +151,15 @@ var correctnessRules = []Rule{
 			"a PKGBUILD that violates any of these.",
 		Check: checkArch,
 	},
+	{
+		ID:       "PB711",
+		Name:     "missing-vcs-makedepends",
+		Severity: Warn,
+		Doc: "A VCS source (git+…, hg+…) is fetched by the corresponding client, which makepkg " +
+			"does not install for you: without the tool in makedepends the build fails on any " +
+			"machine that doesn't happen to have it — which is every clean chroot.",
+		Check: checkVCSMakedepends,
+	},
 }
 
 // --- shared helpers --------------------------------------------------------
@@ -579,6 +588,34 @@ func checkArch(ctx *Context) []Finding {
 	if anyCount > 0 && len(elems) > 1 {
 		out = append(out, findingAt("PB710", Error, path, v.Pos,
 			"the 'any' architecture cannot be combined with other architectures"))
+	}
+	return out
+}
+
+// --- PB711: VCS sources need their client in makedepends --------------------
+
+// vcsClientPackages maps a VCS proto to the Arch package shipping its client.
+var vcsClientPackages = map[string]string{
+	"git": "git", "hg": "mercurial", "svn": "subversion", "bzr": "breezy", "fossil": "fossil",
+}
+
+func checkVCSMakedepends(ctx *Context) []Finding {
+	have := map[string]bool{}
+	for _, field := range []string{"depends", "makedepends"} {
+		for name := range depsFor(ctx, field) {
+			have[name] = true
+		}
+	}
+	var out []Finding
+	reported := map[string]bool{}
+	for _, e := range ctx.Pkg.Sources() {
+		tool, ok := vcsClientPackages[e.VCS]
+		if !ok || have[tool] || reported[tool] {
+			continue
+		}
+		reported[tool] = true
+		out = append(out, findingAt("PB711", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
+			"%s source needs %q in makedepends; a clean build environment does not have it", e.VCS, tool))
 	}
 	return out
 }

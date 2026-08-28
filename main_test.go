@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jmelahman/pkglint/internal/pkgfile/pkgtest"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -59,6 +61,36 @@ func TestExitCodes(t *testing.T) {
 	buf.Reset()
 	if code := run([]string{"testdata/clean"}, &buf); code != 0 {
 		t.Errorf("clean fixture: got exit %d, want 0", code)
+	}
+}
+
+// TestPackageArchive runs the CLI end-to-end over a synthetic built package:
+// a world-writable file is a deterministic, database-independent error.
+func TestPackageArchive(t *testing.T) {
+	archive := pkgtest.Tar(pkgtest.Info("demo", "any"),
+		pkgtest.Member{Name: "usr/bin/demo", Data: []byte("#!/bin/sh\necho demo\n"), Mode: 0o777})
+	path := filepath.Join(t.TempDir(), "demo-1.0-1-any.pkg.tar")
+	if err := os.WriteFile(path, archive, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if code := run([]string{path}, &buf); code != 1 {
+		t.Errorf("package with a world-writable file: got exit %d, want 1\n%s", code, buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "PB821") || !strings.Contains(out, "world-writable") {
+		t.Errorf("expected a PB821 world-writable finding, got:\n%s", out)
+	}
+	if !strings.Contains(out, "grade") {
+		t.Errorf("expected a letter grade in the report, got:\n%s", out)
+	}
+	// Fix mode declines package archives instead of erroring.
+	buf.Reset()
+	if code := run([]string{"--fix", path}, &buf); code != 0 {
+		t.Errorf("--fix on an archive: got exit %d, want 0\n%s", code, buf.String())
+	}
+	if !strings.Contains(buf.String(), "rebuild") {
+		t.Errorf("--fix on an archive should explain itself, got:\n%s", buf.String())
 	}
 }
 

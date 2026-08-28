@@ -3,6 +3,7 @@ package rules
 import (
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -48,6 +49,21 @@ func findingsAt(fs []Finding) []Finding {
 		f.Col = 0
 		out = append(out, f)
 	}
+	// Run's total order includes the column we just dropped, so two spellings
+	// can interleave same-line findings differently; re-sort on what remains.
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Path != b.Path {
+			return a.Path < b.Path
+		}
+		if a.Line != b.Line {
+			return a.Line < b.Line
+		}
+		if a.RuleID != b.RuleID {
+			return a.RuleID < b.RuleID
+		}
+		return a.Message < b.Message
+	})
 	return out
 }
 

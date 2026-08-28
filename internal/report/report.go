@@ -123,6 +123,12 @@ func RenderText(w io.Writer, reports []PackageReport) {
 		}
 		fmt.Fprintf(w, ", %d finding(s)\n", len(r.Findings))
 		for _, f := range r.Findings {
+			if f.Line == 0 {
+				// Package-archive findings locate a member, not a line.
+				fmt.Fprintf(w, "  %s: %s [%s] %s\n",
+					sanitize(f.Path), f.Severity, f.RuleID, sanitize(f.Message))
+				continue
+			}
 			fmt.Fprintf(w, "  %s:%d:%d: %s [%s] %s\n",
 				sanitize(f.Path), f.Line, f.Col, f.Severity, f.RuleID, sanitize(f.Message))
 		}

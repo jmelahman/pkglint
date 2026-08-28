@@ -134,6 +134,13 @@ func Load(path string) (*Package, error) {
 	return pkg, nil
 }
 
+// ParseScriptlet parses raw as an install scriptlet unit. It exists for
+// callers that get scriptlet bytes from somewhere other than the package
+// directory — notably the .INSTALL member of a built package archive.
+func ParseScriptlet(path string, raw []byte) (Unit, error) {
+	return parseUnit(path, raw, true)
+}
+
 func parseUnit(path string, raw []byte, scriptlet bool) (Unit, error) {
 	f, err := newParser().Parse(bytes.NewReader(raw), path)
 	if err != nil {

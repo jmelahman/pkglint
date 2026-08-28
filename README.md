@@ -1,6 +1,6 @@
 # pkglint
 
-A security-focused linter for Arch Linux PKGBUILDs.
+A security-focused linter for Arch Linux packages.
 
 pkglint statically analyzes PKGBUILDs and their install scriptlets — **without ever
 sourcing them** — and reports findings about source integrity, build hermeticity, code
@@ -9,6 +9,14 @@ reproduces makepkg's own build-breaking metadata checks, so a PKGBUILD that woul
 build is caught (and, where the fix is mechanical, rewritten) before you run makepkg. It is
 built on a real bash AST ([mvdan.cc/sh](https://github.com/mvdan/sh)), so the
 quoting/line-continuation tricks that evade regex-based scanners don't work here.
+
+Built packages (`*.pkg.tar.zst` and friends) are first-class inputs too: pkglint inspects
+the archive the way namcap does — ELF hardening (PIE, RELRO, executable stacks, text
+relocations, RPATH), stripping and placement, dependencies inferred from linked shared
+libraries and script shebangs (via pacman's local database), packaged `.INSTALL`
+scriptlets, and filesystem hygiene from FHS layout to stale python bytecode — while
+**never executing anything from the package** (no `ldd`, no interpreter launches; ELF
+files are parsed, not loaded).
 
 ```
 $ pkglint ~/pkgbuilds/somepkg
@@ -33,6 +41,7 @@ uv tool install pkglint
 ```
 
 **Go**
+
 ```shell
 go install github.com/jmelahman/pkglint@latest
 ```
@@ -40,7 +49,8 @@ go install github.com/jmelahman/pkglint@latest
 ## Usage
 
 ```shell
-pkglint [flags] [path ...]     # paths are package dirs or PKGBUILD files (default: .)
+pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
+                               # or built packages (*.pkg.tar.*) (default: .)
 
   --format text|json|sarif     # output format (sarif = SARIF 2.1.0, for code scanning)
   --fail-on SEVERITY           # exit 1 at or above: info, warn, error (default), critical, never
@@ -68,10 +78,10 @@ or vice versa.
 `--fix` rewrites what it can and prints every change; `--diff` previews without
 writing. Fixes come in two tiers:
 
-| Tier | Flag | Rules | What it does |
-|------|------|-------|--------------|
-| Safe | `--fix` | PB103, PB203, PB205, PB705, PB708 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`) |
-| Unsafe | `--unsafe-fix` | PB204, PB206–PB209, PB403 | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits |
+| Tier   | Flag           | Rules                             | What it does                                                                                                                                                                                                                                                               |
+| ------ | -------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Safe   | `--fix`        | PB103, PB203, PB205, PB705, PB708 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`) |
+| Unsafe | `--unsafe-fix` | PB204, PB206–PB209, PB403         | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits          |
 
 Safe fixes preserve behavior or restore a security default; unsafe fixes are
 mechanical but change what the build does, so review them. An inline
@@ -81,17 +91,32 @@ suggestion (`updpkgsums`, `makepkg --printsrcinfo`) instead.
 
 ## Rules
 
-| Group | Rules | What they catch |
-|-------|-------|-----------------|
-| Integrity | PB101–PB113 | SKIP/weak checksums, unpinned VCS sources, unencrypted transports, source/url domain and forge-owner mismatches, DLAGENTS and other makepkg.conf overrides, checksum-count mismatches, missing install scripts, PGP signatures without pinned keys, insecure signature transport, unused validpgpkeys |
-| Hermeticity | PB201–PB209 | network access outside `prepare()`, `pip`/`uv pip` without `--require-hashes`, unlocked `cargo`/npm/yarn/pnpm/bun/composer/bundler/uv/poetry installs, implicit Go module downloads and mutable `@latest` refs, disabled checksum databases |
-| Execution | PB301–PB309 | top-level code, `eval`, decode-and-execute, download-and-execute (including `eval "$(curl ...)"` and `source <(wget ...)"` variants), `/dev/tcp`, unresolvable command names, embedded payloads, makepkg-internal function overrides, hidden bidi/zero-width characters |
-| Filesystem | PB401–PB405 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files and setcap capability grants, install steps that skip `$pkgdir`, writes to pacman/dynamic-linker/sudoers config |
-| Scriptlets | PB501–PB502 | network access and persistence (crontabs, systemd units, shell profiles, login-capable users) in `.install` files running as root |
-| Consistency | PB601–PB603 | PKGBUILD / .SRCINFO drift, network access in `pkgver()`, provides/replaces/conflicts claims on core system packages |
-| Correctness | PB701–PB710 | makepkg build-breakers: invalid pkgname/pkgver/pkgrel/epoch, backup leading slash, unknown `options`, `provides` comparison operators, scalar-vs-array field types, schema variables set inside `package()`, missing/duplicate/mixed `arch` |
+| Group         | Rules       | What they catch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integrity     | PB101–PB114 | SKIP/weak/malformed checksums, unpinned VCS sources, unencrypted transports, source/url domain and forge-owner mismatches, DLAGENTS and other makepkg.conf overrides, checksum-count mismatches, missing install scripts, PGP signatures without pinned keys, insecure signature transport, unused validpgpkeys                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Hermeticity   | PB201–PB209 | network access outside `prepare()`, `pip`/`uv pip` without `--require-hashes`, unlocked `cargo`/npm/yarn/pnpm/bun/composer/bundler/uv/poetry installs, implicit Go module downloads and mutable `@latest` refs, disabled checksum databases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Execution     | PB301–PB309 | top-level code, `eval`, decode-and-execute, download-and-execute (including `eval "$(curl ...)"` and `source <(wget ...)"` variants), `/dev/tcp`, unresolvable command names, embedded payloads, makepkg-internal function overrides, hidden bidi/zero-width characters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Filesystem    | PB401–PB405 | writes outside `$srcdir`/`$pkgdir`, privilege escalation, setuid files and setcap capability grants, install steps that skip `$pkgdir`, writes to pacman/dynamic-linker/sudoers config                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Scriptlets    | PB501–PB504 | network access and persistence (crontabs, systemd units, shell profiles, login-capable users) in `.install` files running as root, unparseable scriptlets, commands pacman hooks already run                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Consistency   | PB601–PB603 | PKGBUILD / .SRCINFO drift, network access in `pkgver()`, provides/replaces/conflicts claims on core system packages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Correctness   | PB701–PB711 | makepkg build-breakers: invalid pkgname/pkgver/pkgrel/epoch, backup leading slash, unknown `options`, `provides` comparison operators, scalar-vs-array field types, schema variables set inside `package()`, missing/duplicate/mixed `arch`, VCS sources without their client in makedepends                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Built package | PB801–PB839 | everything namcap checks in a `.pkg.tar.*`: ELF in `any` packages and nonstandard paths, executable stacks, text relocations, missing RELRO, non-PIE executables, unstripped binaries, insecure RPATH/RUNPATH, missing/unused library and interpreter dependencies (resolved through pacman's database, statically — no `ldd`), stale soname declarations, pkg-config requirements, FHS layout, permissions and ownership, empty directories, invalid filenames, cross-directory hardlinks, dangling symlinks, `.la`/`perllocal.pod`/info `dir`/MIME-cache landmines, stale python bytecode, `site-packages/tests`, systemd/D-Bus units under `/etc`, missing license and backup files, doc-heavy packages, sphinx caches — plus the full scriptlet analysis over the packaged `.INSTALL` |
+| Style         | PB901–PB912 | namcap's PKGBUILD conventions: hardcoded architectures instead of `$CARCH`, custom variables without `_` prefix, `$startdir`, redundant makedepends, pinned SourceForge mirrors, pkgname repeated in pkgdesc, makepkg-internal output helpers, missing Maintainer tag, uppercase package names, missing pkgdesc/url/license, version-only download names, depends duplicated in optdepends                                                                                                                                                                                                                                                                                                                                                                                                |
 
 `pkglint --rules` prints the full documentation for each.
+A full reference including examples of each rule is available in the [documentation](https://jamison.lahman.dev/pkglint/rules/).
+
+### Relationship to namcap
+
+pkglint covers namcap's rule set — both the PKGBUILD checks and the built-package
+checks — with a few deliberate differences: nothing from the analyzed package is ever
+executed (namcap runs `ldd -r -u` on packaged binaries; pkglint compares dynamic symbol
+tables instead), findings the lint host cannot actually verify (a library owned by a
+package that isn't installed here, a declared dependency that isn't installed) are
+reported informationally instead of as hard errors, and everything is folded into the
+same graded, suppressible, JSON/SARIF-capable reporting the PKGBUILD rules use.
+Dependency inference reads pacman's local database directly (`/var/lib/pacman/local`)
+and degrades gracefully on non-Arch hosts by skipping just those rules.
 
 Grading: any critical → **F**, any error → **D**, 3+ warns → **C**, 1–2 warns → **B**,
 otherwise **A**.
@@ -100,8 +125,6 @@ A grade is a **static hygiene score, not a malware verdict** — it measures how
 and reproducible a PKGBUILD is. A low grade means "worth reviewing", never "malicious",
 and a high grade is not an endorsement. Static analysis cannot catch a malicious upstream
 release pinned with a perfectly valid checksum.
-
-A full reference including examples of each rule is available in the [documentation](https://jamison.lahman.dev/pkglint/rules/).
 
 ## License
 

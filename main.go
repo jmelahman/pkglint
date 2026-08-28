@@ -17,7 +17,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/jmelahman/pkglint/internal/alpmdb"
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
+	"github.com/jmelahman/pkglint/internal/pkgfile"
 	"github.com/jmelahman/pkglint/internal/report"
 	"github.com/jmelahman/pkglint/internal/rules"
 )
@@ -43,12 +45,16 @@ func run(args []string, stdout io.Writer) int {
 	code := 0
 	cmd := &cobra.Command{
 		Use:   "pkglint [flags] [path ...]",
-		Short: "security-focused linter for Arch Linux PKGBUILDs",
+		Short: "security-focused linter for Arch Linux packages",
 		Long: `pkglint statically analyzes PKGBUILDs and install scriptlets — never
 sourcing them — and reports integrity, hermeticity, and code-execution
-findings with an overall letter grade per package.
+findings with an overall letter grade per package. Built packages
+(*.pkg.tar.*) are analyzed too: ELF hardening and placement, dependencies
+inferred from linked libraries and script interpreters, and filesystem
+hygiene — never executing anything from the package.
 
-paths are package directories or PKGBUILD files (default: .)`,
+paths are package directories, PKGBUILD files, or built package
+archives (default: .)`,
 		Version:       version,
 		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
@@ -105,7 +111,8 @@ func ignoreSet(csv string) map[string]bool {
 }
 
 // lint runs the rules over each path and renders the reports, returning the
-// process exit code.
+// process exit code. A path may be a package directory / PKGBUILD (static
+// PKGBUILD analysis) or a built .pkg.tar.* archive (package analysis).
 func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
 	ignored := ignoreSet(ignore)
 
@@ -113,8 +120,30 @@ func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
 		paths = []string{"."}
 	}
 
+	// The pacman local database backs the dependency-inference rules; loaded
+	// once, and only if a package archive is actually being linted. A missing
+	// database (non-Arch host) yields nil, which disables just those rules.
+	var db *alpmdb.DB
+	dbLoaded := false
+	localDB := func() *alpmdb.DB {
+		if !dbLoaded {
+			dbLoaded = true
+			db, _ = alpmdb.Load(alpmdb.DefaultRoot)
+		}
+		return db
+	}
+
 	var reports []report.PackageReport
 	for _, path := range paths {
+		if pkgfile.IsPackagePath(path) {
+			pkg, err := pkgfile.Load(path)
+			if err != nil {
+				reports = append(reports, report.NewError(path, err))
+				continue
+			}
+			reports = append(reports, report.New(path, rules.RunPackage(pkg, localDB(), ignored)))
+			continue
+		}
 		pkg, err := pkgbuild.Load(path)
 		if err != nil {
 			reports = append(reports, report.NewError(path, err))
@@ -169,6 +198,10 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 	}
 	rc := 0
 	for _, path := range paths {
+		if pkgfile.IsPackagePath(path) {
+			fmt.Fprintf(stdout, "%s: built packages have no auto-fixable findings; fix the PKGBUILD and rebuild\n", rel(path))
+			continue
+		}
 		pkg, err := pkgbuild.Load(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "pkglint: %s: %v\n", path, err)

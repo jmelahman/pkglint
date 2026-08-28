@@ -42,6 +42,39 @@ var scriptletRules = []Rule{
 			"or deliberately obfuscated to defeat static analysis; either way it must be reviewed by hand.",
 		Check: checkScriptletParseError,
 	},
+	{
+		ID:       "PB504",
+		Name:     "hook-covered-command",
+		Severity: Info,
+		Doc: "pacman has run update-desktop-database, gtk-update-icon-cache, fc-cache and friends " +
+			"automatically via alpm hooks since version 5.0. Calling them from a scriptlet is dead " +
+			"code at best and shadows the hook's transaction-wide batching at worst; usually the " +
+			"whole scriptlet can be deleted.",
+		Check: checkHookCoveredCommands,
+	},
+}
+
+// hookCoveredCommands are commands pacman's stock alpm hooks (or hooks shipped
+// by the owning package) run automatically at the end of every transaction, so
+// a scriptlet calling them by hand is redundant. Mirrors namcap's
+// externalhooks list.
+var hookCoveredCommands = map[string]bool{
+	"update-desktop-database": true, "update-mime-database": true, "install-info": true,
+	"glib-compile-schemas": true, "gtk-update-icon-cache": true, "xdg-icon-resource": true,
+	"gconfpkg": true, "gio-querymodules": true, "fc-cache": true, "mkfontscale": true,
+	"mkfontdir": true, "systemd-sysusers": true, "systemd-tmpfiles": true, "vlc-cache-gen": true,
+}
+
+func checkHookCoveredCommands(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range ctx.Commands() {
+		if !c.Unit.Scriptlet || !hookCoveredCommands[c.Name] {
+			continue
+		}
+		out = append(out, c.finding("PB504", Info,
+			"%s is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant", c.Name))
+	}
+	return out
 }
 
 func checkScriptletParseError(ctx *Context) []Finding {

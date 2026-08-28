@@ -381,4 +381,393 @@ package() {
 		Bad:  `arch=('any' 'x86_64')   # 'any' cannot be combined with concrete architectures`,
 		Good: `arch=('x86_64')`,
 	},
+	"PB711": {
+		Bad: `source=("git+https://github.com/example/demo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")
+# nothing installs git, so a clean chroot build fails at the fetch step`,
+		Good: `makedepends=('git')
+source=("git+https://github.com/example/demo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")`,
+	},
+	"PB114": {
+		Bad: `source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('deadbeef')   # 8 characters can never be a sha256 digest`,
+		Good: `source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+	},
+	"PB504": {
+		Bad: `post_install() {
+  gtk-update-icon-cache -q /usr/share/icons/hicolor
+}`,
+		Good: `post_install() {
+  echo "run 'demo --setup' once to finish configuration"
+}`,
+	},
+	"PB901": {
+		Bad:  `source=("https://example.com/demo-$pkgver-x86_64.tar.gz")`,
+		Good: `source=("https://example.com/demo-$pkgver-$CARCH.tar.gz")`,
+	},
+	"PB902": {
+		Bad:  `gitcommit='3f2b1a0'   # could collide with a future makepkg field`,
+		Good: `_gitcommit='3f2b1a0'`,
+	},
+	"PB903": {
+		Bad: `package() {
+  install -Dm755 demo "$startdir/pkg/usr/bin/demo"
+}`,
+		Good: `package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"
+}`,
+	},
+	"PB904": {
+		Bad: `depends=('libfoo')
+makedepends=('libfoo' 'cmake')   # libfoo is installed at build time already`,
+		Good: `depends=('libfoo')
+makedepends=('cmake')`,
+	},
+	"PB905": {
+		Bad:  `source=("https://heanet.dl.sourceforge.net/project/demo/demo-$pkgver.tar.gz")`,
+		Good: `source=("https://downloads.sourceforge.net/project/demo/demo-$pkgver.tar.gz")`,
+	},
+	"PB906": {
+		Bad:  `pkgdesc='The demo package'`,
+		Good: `pkgdesc='Fast demonstration tool for benchmarks'`,
+	},
+	"PB907": {
+		Bad: `build() {
+  msg "building demo"
+  make
+}`,
+		Good: `build() {
+  echo "building demo"
+  make
+}`,
+	},
+	"PB908": {
+		Bad: `# Contributor: Somebody Else <somebody@example.com>
+# ...but no '# Maintainer:' line anywhere in the file`,
+		Good: `# Maintainer: Sam Coder <sam@example.com>`,
+	},
+	"PB909": {
+		Bad:  `pkgname=Demo-Tool`,
+		Good: `pkgname=demo-tool`,
+	},
+	"PB910": {
+		Bad:  `pkgdesc=''   # empty — and url= is never set at all`,
+		Good: `url='https://github.com/example/demo'`,
+	},
+	"PB911": {
+		Bad:  `source=("https://github.com/example/demo/archive/v$pkgver.tar.gz")   # saves as v1.0.0.tar.gz`,
+		Good: `source=("$pkgname-$pkgver.tar.gz::https://github.com/example/demo/archive/v$pkgver.tar.gz")`,
+	},
+	"PB912": {
+		Bad: `depends=('ffmpeg')
+optdepends=('ffmpeg: video export')   # already a hard dependency`,
+		Good: `optdepends=('ffmpeg: video export')`,
+	},
+
+	// PB8xx examples illustrate what in the PKGBUILD produced the offending
+	// package contents; the rules themselves run on built .pkg.tar.* archives,
+	// so these snippets are documentation, verified by the package-rule tests
+	// rather than the example round-trip suite.
+	"PB801": {
+		Bad: `arch=('any')
+package() {
+  install -Dm755 prebuilt/tool "$pkgdir/usr/bin/tool"   # a compiled ELF binary
+}`,
+		Good: `arch=('x86_64')
+package() {
+  install -Dm755 prebuilt/tool "$pkgdir/usr/bin/tool"
+}`,
+	},
+	"PB802": {
+		Bad: `package() {
+  install -Dm755 helper "$pkgdir/usr/share/demo/helper"   # ELF outside usr/bin, usr/lib
+}`,
+		Good: `package() {
+  install -Dm755 helper "$pkgdir/usr/lib/demo/helper"
+}`,
+	},
+	"PB803": {
+		Bad: `# hand-written assembly without a .note.GNU-stack section makes the
+# linker request an executable stack for the whole binary
+build() {
+  make
+}`,
+		Good: `build() {
+  export LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"
+  make
+}`,
+	},
+	"PB804": {
+		Bad: `build() {
+  gcc -shared -o libdemo.so demo.c   # non-PIC objects force text relocations
+}`,
+		Good: `build() {
+  gcc -shared -fPIC -o libdemo.so demo.c
+}`,
+	},
+	"PB805": {
+		Bad: `options=(!buildflags)   # drops Arch's default -Wl,-z,relro,-z,now hardening`,
+		Good: `# keep the default buildflags; Arch's LDFLAGS already enable full RELRO
+build() {
+  make
+}`,
+	},
+	"PB806": {
+		Bad: `build() {
+  export LDFLAGS="-no-pie"
+  make
+}`,
+		Good: `# keep the default toolchain flags; Arch builds executables as PIE
+build() {
+  make
+}`,
+	},
+	"PB807": {
+		Bad:  `options=(!strip)   # ships every binary with its full symbol table`,
+		Good: `options=(strip debug)   # symbols go to the -debug split package`,
+	},
+	"PB808": {
+		Bad: `build() {
+  export LDFLAGS="-Wl,-rpath,/home/builder/demo/lib"
+  make
+}`,
+		Good: `build() {
+  export LDFLAGS="-Wl,-rpath,\$ORIGIN/../lib/demo"
+  make
+}`,
+	},
+	"PB809": {
+		Bad:  `depends=()   # but usr/bin/demo links libpng16.so.16`,
+		Good: `depends=('libpng')`,
+	},
+	"PB810": {
+		Bad: `# the build links every library pkg-config mentions, used or not:
+# usr/bin/demo lists libxml2.so.2 in DT_NEEDED but imports nothing from it
+build() {
+  make
+}`,
+		Good: `build() {
+  export LDFLAGS="$LDFLAGS -Wl,--as-needed"
+  make
+}`,
+	},
+	"PB811": {
+		Bad:  `depends=('libfoo.so')   # unversioned: matches every future ABI`,
+		Good: `depends=('libfoo.so=2-64')`,
+	},
+	"PB812": {
+		Bad:  `depends=()   # but the package installs scripts beginning #!/usr/bin/python`,
+		Good: `depends=('python')`,
+	},
+	"PB813": {
+		Bad: `depends=('qt5-base' 'libpng')   # the qt frontend was dropped a year ago;
+                                # nothing links or runs qt5-base anymore`,
+		Good: `depends=('libpng')`,
+	},
+	"PB814": {
+		Bad: `package() {
+  install -Dm644 demo.gschema.xml "$pkgdir/usr/share/glib-2.0/schemas/demo.gschema.xml"
+}   # ...but depends does not include dconf`,
+		Good: `depends=('dconf')
+package() {
+  install -Dm644 demo.gschema.xml "$pkgdir/usr/share/glib-2.0/schemas/demo.gschema.xml"
+}`,
+	},
+	"PB815": {
+		Bad: `depends=('desktop-file-utils')   # only there for update-desktop-database,
+                                 # which pacman's hook runs anyway`,
+		Good: `# ship the .desktop file; pacman's hook updates the database
+package() {
+  install -Dm644 demo.desktop "$pkgdir/usr/share/applications/demo.desktop"
+}`,
+	},
+	"PB816": {
+		Bad: `# usr/lib/pkgconfig/demo.pc says "Requires: libcrypto"
+depends=()   # ...but nothing in depends provides openssl's .pc files`,
+		Good: `depends=('openssl')`,
+	},
+	"PB817": {
+		Bad: `# built with a PKGBUILD that never set url= or pkgdesc=,
+# so .PKGINFO ships blanks and pacman -Qi shows empty fields`,
+		Good: `pkgdesc='Fast demonstration tool'
+url='https://github.com/example/demo'`,
+	},
+	"PB820": {
+		Bad: `package() {
+  install -d "$pkgdir/run/demo"   # tmpfs: gone at first boot
+}`,
+		Good: `package() {
+  install -Dm644 demo.tmpfiles "$pkgdir/usr/lib/tmpfiles.d/demo.conf"
+}`,
+	},
+	"PB821": {
+		Bad: `package() {
+  chmod 777 "$pkgdir/var/lib/demo"   # world-writable
+}`,
+		Good: `package() {
+  chmod 755 "$pkgdir/var/lib/demo"
+}`,
+	},
+	"PB822": {
+		Bad: `package() {
+  cp -a ~/demo-data "$pkgdir/usr/share/demo"   # preserves the build user's ownership
+}`,
+		Good: `package() {
+  cp -a --no-preserve=ownership demo-data "$pkgdir/usr/share/demo"
+}`,
+	},
+	"PB823": {
+		Bad: `package() {
+  install -d "$pkgdir/var/log/demo"   # ships as an empty directory
+}`,
+		Good: `# create runtime directories at boot instead of shipping them empty
+package() {
+  install -Dm644 demo.tmpfiles "$pkgdir/usr/lib/tmpfiles.d/demo.conf"
+}`,
+	},
+	"PB824": {
+		Bad: `package() {
+  # upstream tarball contains "README (kopie).txt" with a non-ASCII name
+  cp -r docs "$pkgdir/usr/share/doc/$pkgname"
+}`,
+		Good: `package() {
+  install -Dm644 docs/README.txt "$pkgdir/usr/share/doc/$pkgname/README.txt"
+}`,
+	},
+	"PB825": {
+		Bad: `package() {
+  ln "$pkgdir/usr/bin/demo" "$pkgdir/usr/lib/demo/demo"   # hard link across directories
+}`,
+		Good: `package() {
+  ln -s /usr/bin/demo "$pkgdir/usr/lib/demo/demo"
+}`,
+	},
+	"PB826": {
+		Bad: `package() {
+  ln -s /usr/share/demo/old-name "$pkgdir/usr/bin/demo"   # target was renamed upstream
+}`,
+		Good: `package() {
+  ln -s /usr/share/demo/demo.sh "$pkgdir/usr/bin/demo"   # target ships in this package
+}`,
+	},
+	"PB827": {
+		Bad: `package() {
+  make DESTDIR="$pkgdir" install   # leaves libtool .la files in usr/lib
+}`,
+		Good: `package() {
+  make DESTDIR="$pkgdir" install
+  find "$pkgdir" -name '*.la' -delete
+}`,
+	},
+	"PB828": {
+		Bad: `package() {
+  make DESTDIR="$pkgdir" install   # perl's install step wrote perllocal.pod
+}`,
+		Good: `package() {
+  make DESTDIR="$pkgdir" install
+  find "$pkgdir" -name perllocal.pod -delete
+}`,
+	},
+	"PB829": {
+		Bad: `package() {
+  make DESTDIR="$pkgdir" install-info   # writes usr/share/info/dir
+}`,
+		Good: `package() {
+  make DESTDIR="$pkgdir" install-info
+  rm -f "$pkgdir/usr/share/info/dir"
+}`,
+	},
+	"PB830": {
+		Bad: `package() {
+  python -m compileall "$pkgdir"
+  sed -i "s/@VERSION@/$pkgver/" "$pkgdir"/usr/lib/python*/site-packages/demo/version.py
+}   # the .py is now newer than its .pyc`,
+		Good: `package() {
+  sed -i "s/@VERSION@/$pkgver/" "$pkgdir"/usr/lib/python*/site-packages/demo/version.py
+  python -m compileall "$pkgdir"
+}`,
+	},
+	"PB831": {
+		Bad: `package() {
+  python -m installer --destdir="$pkgdir" dist/*.whl   # the wheel ships a top-level tests/
+}`,
+		Good: `package() {
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  rm -r "$pkgdir"/usr/lib/python*/site-packages/tests
+}`,
+	},
+	"PB832": {
+		Bad: `package() {
+  install -Dm644 demo.service "$pkgdir/etc/systemd/system/demo.service"
+}`,
+		Good: `package() {
+  install -Dm644 demo.service "$pkgdir/usr/lib/systemd/system/demo.service"
+}`,
+	},
+	"PB833": {
+		Bad: `package() {
+  install -Dm644 demo.conf "$pkgdir/etc/dbus-1/system.d/demo.conf"
+}`,
+		Good: `package() {
+  install -Dm644 demo.conf "$pkgdir/usr/share/dbus-1/system.d/demo.conf"
+}`,
+	},
+	"PB834": {
+		Bad: `license=('LicenseRef-demo-eula')
+package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"   # the EULA text is never installed
+}`,
+		Good: `license=('LicenseRef-demo-eula')
+package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"
+  install -Dm644 EULA "$pkgdir/usr/share/licenses/$pkgname/EULA"
+}`,
+	},
+	"PB835": {
+		Bad: `backup=('etc/demo.conf')
+package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"   # etc/demo.conf is never installed
+}`,
+		Good: `backup=('etc/demo.conf')
+package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"
+  install -Dm644 demo.conf "$pkgdir/etc/demo.conf"
+}`,
+	},
+	"PB836": {
+		Bad: `package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"
+  cp -r manual/ "$pkgdir/usr/share/doc/$pkgname"   # 300 MB of HTML for a 2 MB tool
+}`,
+		Good: `# move the manual to a demo-docs split package
+package_demo-docs() {
+  cp -r manual/ "$pkgdir/usr/share/doc/demo"
+}`,
+	},
+	"PB837": {
+		Bad: `package() {
+  cp -r docs/_build "$pkgdir/usr/share/doc/$pkgname"   # includes .doctrees/environment.pickle
+}`,
+		Good: `package() {
+  cp -r docs/_build/html "$pkgdir/usr/share/doc/$pkgname"
+}`,
+	},
+	"PB838": {
+		Bad: `package() {
+  update-mime-database "$pkgdir/usr/share/mime"   # bakes generated caches into the package
+}`,
+		Good: `package() {
+  install -Dm644 demo-mime.xml "$pkgdir/usr/share/mime/packages/demo.xml"
+}   # pacman's hook regenerates the database on the user's system`,
+	},
+	"PB839": {
+		Bad: `build() {
+  ./configure --prefix=/usr   # an ancient scrollkeeper hook creates var/lib/scrollkeeper
+  make
+}`,
+		Good: `build() {
+  ./configure --prefix=/usr --disable-scrollkeeper
+  make
+}`,
+	},
 }

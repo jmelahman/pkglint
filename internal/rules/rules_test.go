@@ -35,10 +35,11 @@ func ruleIDs(fs []Finding) map[string]int {
 	return out
 }
 
-const cleanPKGBUILD = `pkgname=demo
+const cleanPKGBUILD = `# Maintainer: Sam Coder <sam@example.com>
+pkgname=demo
 pkgver=1.0.0
 pkgrel=1
-pkgdesc='A demo'
+pkgdesc='A demonstration tool'
 arch=('x86_64')
 url='https://github.com/example/demo'
 license=('MIT')
@@ -199,7 +200,10 @@ func TestEscalatingRulesReachBothEnds(t *testing.T) {
 
 	for _, r := range Registry() {
 		s := r.Severities()
-		_, pinned := cases[r.ID]
+		_, pinnedHere := cases[r.ID]
+		// Package-scope rules are driven through archive fixtures in
+		// TestPackageEscalatingRulesReachBothEnds instead.
+		pinned := pinnedHere || packageEscalationCases[r.ID]
 		if s.Varies() != pinned {
 			t.Errorf("%s declares %s..%s but %s in TestEscalatingRulesReachBothEnds",
 				r.ID, s.Low, s.High, map[bool]string{true: "is pinned", false: "is not pinned"}[pinned])

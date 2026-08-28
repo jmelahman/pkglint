@@ -1,4 +1,5 @@
-malicious: grade F, 15 finding(s)
+malicious: grade F, 16 finding(s)
+  PKGBUILD:1:1: info [PB908] no '# Maintainer:' comment; AUR convention names the responsible maintainer at the top of the PKGBUILD
   PKGBUILD:11:9: error [PB101] remote source "http://cdn.not-github.example/badpkg.tar.gz" has no checksum (SKIP): the download is never verified
   PKGBUILD:11:9: error [PB104] source "http://cdn.not-github.example/badpkg.tar.gz" is fetched over unencrypted http://
   PKGBUILD:11:9: info [PB105] source host "cdn.not-github.example" differs from project url host "github.com"

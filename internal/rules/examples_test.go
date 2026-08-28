@@ -81,6 +81,12 @@ var knownGaps = map[string]string{
 func TestExamplesTripTheirRule(t *testing.T) {
 	for _, r := range Registry() {
 		r := r
+		if r.Scope == ScopePackage {
+			// Package-rule examples show the PKGBUILD mistake behind bad
+			// archive contents; the rules run on built packages, and the
+			// package-rule test suite verifies each with archive fixtures.
+			continue
+		}
 		if reason, skip := knownGaps[r.ID]; skip {
 			t.Logf("SKIP %s (known gap): %s", r.ID, reason)
 			continue

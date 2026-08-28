@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/jmelahman/pkglint/internal/alpmdb"
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
+	"github.com/jmelahman/pkglint/internal/pkgfile"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -87,10 +89,22 @@ type Finding struct {
 	Col      int      `json:"col"`
 }
 
+// Scope says which kind of input a rule analyzes.
+type Scope int
+
+const (
+	// ScopePKGBUILD rules run over a package directory: the PKGBUILD and the
+	// install scriptlets committed next to it.
+	ScopePKGBUILD Scope = iota
+	// ScopePackage rules run over a built package archive (.pkg.tar.*).
+	ScopePackage
+)
+
 // Rule is a single check.
 type Rule struct {
-	ID   string
-	Name string // short slug, e.g. "unpinned-vcs-source"
+	ID    string
+	Name  string // short slug, e.g. "unpinned-vcs-source"
+	Scope Scope
 
 	// Severity is what the rule reports. A handful of rules escalate on what
 	// they find — an eval of a downloaded script is worse than a plain eval —
@@ -119,11 +133,16 @@ type Rule struct {
 }
 
 // Context carries the package under analysis plus precomputed command
-// information shared by rules.
+// information shared by rules. Exactly one of Pkg (a PKGBUILD package
+// directory) and File (a built package archive) drives a given run.
 type Context struct {
 	Pkg  *pkgbuild.Package
+	File *pkgfile.Package // built package under analysis, for ScopePackage rules
+	DB   *alpmdb.DB       // pacman local database; nil when unavailable
 	cmds []Command
 	vars map[string]string
+
+	pkgFacts *packageFacts // lazily computed facts shared by package rules
 }
 
 // Command is one resolved command invocation anywhere in a unit (including
@@ -310,7 +329,7 @@ func findingAt(id string, sev Severity, path string, pos syntax.Pos, format stri
 
 // Registry is every rule, in ID order.
 func Registry() []Rule {
-	all := [][]Rule{integrityRules, hermeticRules, execRules, fsRules, scriptletRules, consistencyRules, correctnessRules}
+	all := [][]Rule{integrityRules, hermeticRules, execRules, fsRules, scriptletRules, consistencyRules, correctnessRules, packageRules, styleRules}
 	var out []Rule
 	for _, group := range all {
 		out = append(out, group...)
@@ -325,15 +344,15 @@ func Registry() []Rule {
 	return out
 }
 
-// Run executes every rule not in ignore and returns findings, dropping ones
-// suppressed by inline directives. The result is totally ordered by
-// (Path, Line, Col, RuleID, Message) and free of exact duplicates, so the same
-// package always lints to the same list.
+// Run executes every PKGBUILD-scope rule not in ignore and returns findings,
+// dropping ones suppressed by inline directives. The result is totally ordered
+// by (Path, Line, Col, RuleID, Message) and free of exact duplicates, so the
+// same package always lints to the same list.
 func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 	ctx := NewContext(pkg)
 	var out []Finding
 	for _, rule := range Registry() {
-		if ignore[rule.ID] {
+		if rule.Scope != ScopePKGBUILD || ignore[rule.ID] {
 			continue
 		}
 		for _, f := range rule.Check(ctx) {
@@ -343,6 +362,68 @@ func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 			out = append(out, f)
 		}
 	}
+	return sortDedupe(out)
+}
+
+// RunPackage executes every package-scope rule over a built package archive,
+// plus the scriptlet rules over the archive's .INSTALL if it has one. db may
+// be nil, in which case the rules that need dependency resolution do not run.
+func RunPackage(pf *pkgfile.Package, db *alpmdb.DB, ignore map[string]bool) []Finding {
+	ctx := &Context{File: pf, DB: db, vars: map[string]string{}}
+	var out []Finding
+	for _, rule := range Registry() {
+		if rule.Scope != ScopePackage || ignore[rule.ID] {
+			continue
+		}
+		out = append(out, rule.Check(ctx)...)
+	}
+	out = append(out, runPackageScriptlet(pf, ignore)...)
+	return sortDedupe(out)
+}
+
+// runPackageScriptlet runs the PKGBUILD-scope rules over the archive's
+// .INSTALL scriptlet, keeping only the findings anchored in the scriptlet
+// itself. This gives built packages the same install-time analysis (network,
+// persistence, obfuscation, hook redundancy) a package directory gets.
+func runPackageScriptlet(pf *pkgfile.Package, ignore map[string]bool) []Finding {
+	install := pf.Entry(".INSTALL")
+	if install == nil || len(install.Data) == 0 {
+		return nil
+	}
+	const path = ".INSTALL"
+	pseudo := &pkgbuild.Package{
+		Vars:         map[string]*pkgbuild.Var{},
+		Suppressions: map[string]map[int]map[string]bool{},
+	}
+	// Rules walk every unit including the PKGBUILD; give the pseudo-package an
+	// empty-but-parsed one so nothing trips over a nil AST.
+	if empty, err := pkgbuild.ParseScriptlet("", nil); err == nil {
+		empty.Scriptlet = false
+		pseudo.PKGBUILD = empty
+	}
+	if unit, err := pkgbuild.ParseScriptlet(path, install.Data); err != nil {
+		pseudo.ScriptletErrors = []pkgbuild.ScriptletError{{Path: path, Err: err.Error()}}
+	} else {
+		pseudo.Scriptlets = []pkgbuild.Unit{unit}
+	}
+	ctx := NewContext(pseudo)
+	var out []Finding
+	for _, rule := range Registry() {
+		if rule.Scope != ScopePKGBUILD || ignore[rule.ID] {
+			continue
+		}
+		for _, f := range rule.Check(ctx) {
+			// Rules that judge the (empty) pseudo-PKGBUILD report at other
+			// paths; only the scriptlet's own findings are real here.
+			if f.Path == path {
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
+func sortDedupe(out []Finding) []Finding {
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Path != b.Path {

@@ -537,7 +537,13 @@ pre {
 
 td.rid { white-space: nowrap; font: 600 0.875rem/1.5 var(--mono); }
 td.rname { font: 400 0.875rem/1.5 var(--mono); color: var(--dim); white-space: nowrap; }
-td.rdoc { font-size: 0.875rem; }
+/* anywhere, not break-word: a slash-joined run like
+   GOFLAGS/GONOSUMCHECK/GOSUMDB/GOINSECURE carries no break opportunity of its
+   own, and break-word still counts the whole run toward the column's minimum.
+   That was enough to push one category's table past its container and give it a
+   horizontal scrollbar the other six didn't have. The description is the only
+   column that flexes, so letting it break the run keeps every table flush. */
+td.rdoc { font-size: 0.875rem; overflow-wrap: anywhere; }
 td.rfix { width: 1%; }
 /* Severity rides in badges, so the cell only has to refuse to wrap: a range
    broken across two lines would read as two separate rules. */

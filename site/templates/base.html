@@ -47,6 +47,53 @@
 </header>
 {{end}}
 
+{{/* rostertable renders a slice of results as the roster. Three things show
+     these rows — the index's head, each alphabetical shard, and site.js
+     rebuilding them from roster.json — so the row shape is defined once here.
+     .Sort names the column the rows are already in, which is the only part
+     that differs: the index arrives votes-first, a shard alphabetically. */}}
+{{define "rostertable"}}
+{{/* Root and Total ride on the table because the script renders rows the
+     server never sent, and has to spell their links relative to whichever
+     page it is running on. Total is the corpus behind the table, not the rows
+     in it, so the count can say "1000 of 47429" before roster.json lands. */}}
+<table id="roster" data-root="{{.Root}}" data-total="{{.Total}}">
+  <thead>
+    <tr>
+      <th class="grade-h" data-sort="grade">Grade</th>
+      <th class="pkg-h" data-sort="name"{{if eq .Sort "name"}} aria-sort="ascending"{{end}}>Package</th>
+      <th class="num" data-sort="findings">Findings</th>
+      <th class="num votes-h" data-sort="votes"{{if eq .Sort "votes"}} aria-sort="descending"{{end}}>Votes</th>
+      <th class="desc-h">Description</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Results}}
+    {{/* The maintainer has no column of its own, so it rides in a data
+         attribute for the filter to match, and in the name cell's tooltip
+         so a row that matched on it can still say why. */}}
+    <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-maintainer="{{.Maintainer}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
+      <td class="gcell"><span class="grade grade-{{.Grade}}">{{.Grade}}</span></td>
+      <td class="pkg"{{with .Maintainer}} title="maintained by {{.}}"{{end}}><a href="{{$.Root}}package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}}
+        <span class="drift" title="source drift since the previous scan">&#9888;</span>{{end}}</td>
+      <td class="num">{{len .Findings}}</td>
+      <td class="num votes">{{.Votes}}</td>
+      <td class="desc" title="{{.Description}}">{{.Description}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+
+{{/* shardnav links the alphabetical roster pages. Every package page on the
+     site is reachable through these, which is what keeps the corpus outside
+     the index's head crawlable and browsable without JavaScript. */}}
+{{define "shardnav"}}
+<nav class="shardnav" aria-label="Packages by first letter">
+  {{range .Keys}}<a href="{{$.Root}}roster/{{.}}.html"{{if eq . $.Key}} aria-current="page"{{end}}>{{.}}</a>{{end}}
+</nav>
+{{end}}
+
 {{/* fixpill renders an auto-fix badge for a rules.FixLevel; nothing when the
      rule has no fix. */}}
 {{define "fixpill"}}{{if .Fixable}}<span class="fix fix-{{if .Safe}}safe{{else}}unsafe{{end}}" title="pkglint rewrites this for you with {{.Flag}}">{{.Flag}}</span>{{end}}{{end}}

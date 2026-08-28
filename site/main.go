@@ -1,10 +1,15 @@
 // Command site generates the static AUR report-card website.
 //
-// It downloads the AUR metadata dump, selects a seed set of packages
-// (a maintainer's packages plus the top-N by votes), fetches each package
-// base's snapshot tarball (cached by LastModified), runs pkglint in-process,
-// and renders a static site: an index, a page per package, a page per rule,
-// per-package SVG badges, and results.json.
+// It downloads the AUR metadata dump, selects a seed set of packages (every
+// base modified recently, plus a maintainer's packages and the top-N by
+// votes), fetches each package base's snapshot tarball (cached by
+// LastModified), runs pkglint in-process, and renders a static site: an index,
+// a page per package, a page per rule, alphabetical roster pages, per-package
+// SVG badges, a sitemap, and results.json.
+//
+// The seed runs to tens of thousands of bases, which is more than one run can
+// fetch: see state.go for the checked-in scan state that makes that tractable,
+// and -budget for the cap on what a single run downloads.
 package main
 
 import (
@@ -86,19 +91,22 @@ type siteResult struct {
 func main() {
 	out := flag.String("out", "public", "output directory for the generated site")
 	cache := flag.String("cache", ".cache", "cache directory for downloads")
+	state := flag.String("state", "data/state.jsonl", "checked-in scan state; bases unchanged since it was written are not refetched")
 	maintainer := flag.String("maintainer", "", "always include this maintainer's packages")
-	top := flag.Int("top", 500, "also include the top-N packages by votes")
+	top := flag.Int("top", 0, "also include the top-N packages by votes (0 = none)")
+	since := flag.Int("since-days", 90, "include every package base modified within the last N days (0 = none)")
+	budget := flag.Int("budget", 0, "max snapshot fetches this run (0 = no cap); bases past it keep their last known result")
 	jobs := flag.Int("jobs", 2, "concurrent snapshot fetches")
 	limit := flag.Int("limit", 0, "hard cap on packages scanned (0 = no cap), for smoke tests")
 	flag.Parse()
 
-	if err := run(*out, *cache, *maintainer, *top, *jobs, *limit); err != nil {
+	if err := run(*out, *cache, *state, *maintainer, *top, *since, *budget, *jobs, *limit); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(out, cache, maintainer string, top, jobs, limit int) error {
-	for _, dir := range []string{out, cache, filepath.Join(out, "package"), filepath.Join(out, "rules"), filepath.Join(out, "badge")} {
+func run(out, cache, statePath, maintainer string, top, since, budget, jobs, limit int) error {
+	for _, dir := range []string{out, cache, filepath.Join(out, "package"), filepath.Join(out, "rules"), filepath.Join(out, "badge"), filepath.Join(out, "roster")} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
@@ -115,20 +123,30 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 	}
 	log.Printf("metadata: %d packages", len(meta))
 
-	seed := selectSeed(meta, maintainer, top)
+	seed := selectSeed(meta, maintainer, top, since, time.Now())
 	if limit > 0 && len(seed) > limit {
 		seed = seed[:limit]
 	}
-	log.Printf("scanning %d package bases (maintainer=%q top=%d)", len(seed), maintainer, top)
+	log.Printf("seed: %d package bases (maintainer=%q top=%d since=%dd)", len(seed), maintainer, top, since)
 
-	results, state := scanAll(seed, cache, jobs, loadState(cache))
-	if err := saveState(cache, state); err != nil {
+	prev, err := loadState(statePath)
+	if err != nil {
+		return fmt.Errorf("load scan state: %w", err)
+	}
+	results, state := scanAll(seed, cache, jobs, budget, prev)
+	if err := saveState(statePath, state); err != nil {
 		return err
 	}
 
+	// Votes order, not worst-grade-first: the roster's server-rendered slice is
+	// its head, so this decides which packages a visitor sees before any
+	// filtering. The most-installed packages are the ones worth showing there —
+	// sorted by grade the head would be an unbroken run of Fs from packages
+	// nobody has heard of. Votes also move far more slowly than grades do,
+	// which keeps the committed output's nightly diff small.
 	sort.Slice(results, func(i, j int) bool {
-		if results[i].Grade != results[j].Grade {
-			return results[i].Grade > results[j].Grade // worst first
+		if results[i].Votes != results[j].Votes {
+			return results[i].Votes > results[j].Votes
 		}
 		return results[i].Name < results[j].Name
 	})
@@ -158,6 +176,12 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 	for _, r := range rules.Registry() {
 		ruleIDs[r.ID] = true
 	}
+	// A letter empties out when its last package leaves the corpus, so the
+	// shards are pruned on the same rule as everything else.
+	shardKeys := map[string]bool{"index": true}
+	for _, s := range groupShards(results) {
+		shardKeys[s.Key] = true
+	}
 	for _, p := range []struct {
 		dir, ext string
 		keep     map[string]bool
@@ -165,6 +189,7 @@ func run(out, cache, maintainer string, top, jobs, limit int) error {
 		{filepath.Join(out, "package"), ".html", keep},
 		{filepath.Join(out, "badge"), ".svg", keep},
 		{filepath.Join(out, "rules"), ".html", ruleIDs},
+		{filepath.Join(out, "roster"), ".html", shardKeys},
 	} {
 		if err := prune(p.dir, p.ext, p.keep); err != nil {
 			return err
@@ -244,10 +269,15 @@ func safeBase(name string) bool {
 }
 
 // selectSeed picks one representative per package base: everything by
-// maintainer, plus the top-N bases by votes. Bases with unsafe names are
-// dropped here, the single choke point, so no unsafe name reaches scanAll,
-// results.json, the rendered links, or any output filename.
-func selectSeed(meta []metaPackage, maintainer string, top int) []metaPackage {
+// maintainer, everything modified within the last sinceDays, plus the top-N
+// bases by votes. Bases with unsafe names are dropped here, the single choke
+// point, so no unsafe name reaches scanAll, results.json, the rendered links,
+// or any output filename.
+//
+// The result is ordered by votes, which is what makes a partial run coherent:
+// -budget spends on the front of this slice, so an incomplete corpus is the
+// most-installed packages rather than an arbitrary sample.
+func selectSeed(meta []metaPackage, maintainer string, top, sinceDays int, now time.Time) []metaPackage {
 	byBase := map[string]metaPackage{}
 	for _, m := range meta {
 		if !safeBase(m.PackageBase) {
@@ -290,42 +320,123 @@ func selectSeed(meta []metaPackage, maintainer string, top int) []metaPackage {
 			}
 		}
 	}
-	// The top-N most voted bases; overlap with the maintainer set is a no-op.
+	// Everything touched inside the window. A base the AUR has not seen an
+	// update to in a year is not what the report card is for: its PKGBUILD is
+	// as likely to be abandoned as clean, and scanning it costs the same as
+	// scanning one somebody still installs.
+	if sinceDays > 0 {
+		cutoff := now.AddDate(0, 0, -sinceDays).Unix()
+		for _, m := range bases {
+			if m.LastModified >= cutoff {
+				add(m)
+			}
+		}
+	}
+	// The top-N most voted bases; overlap with the sets above is a no-op. This
+	// is what keeps a heavily-installed but long-stable package on the site
+	// even though nothing about it has changed inside the window.
 	for i := 0; i < len(bases) && i < top; i++ {
 		add(bases[i])
 	}
 	return seed
 }
 
-// scanAll lints every seed package and returns the results plus the updated
-// drift state: prev's fingerprints with every successfully scanned base
-// overwritten, so packages that drop out of the seed keep their history.
-func scanAll(seed []metaPackage, cache string, jobs int, prev map[string]sourceState) ([]siteResult, map[string]sourceState) {
+// scanAll produces a result for every seed package and returns the updated
+// scan state: prev with every freshly scanned base overwritten, so bases that
+// drop out of the seed keep their history rather than being forgotten.
+//
+// Most of the corpus is not scanned on any given run. A base whose
+// LastModified matches its state record cannot have changed, so its grade,
+// findings and fingerprint are reused untouched — no snapshot fetch, no lint.
+// What remains is split against budget up front, in seed order, rather than by
+// letting goroutines race for it: the seed is votes-ordered, so deciding here
+// means a bounded run spends on the most-installed packages and does so
+// reproducibly.
+func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string]stateRecord) ([]siteResult, map[string]stateRecord) {
 	results := make([]siteResult, len(seed))
-	states := make([]*sourceState, len(seed))
+	keep := make([]bool, len(seed))
+	var todo []int
+	var reused, stale, omitted int
+
+	for i, m := range seed {
+		rec, ok := prev[m.PackageBase]
+		switch {
+		// A record carrying an error is not fresh: the failure may have been a
+		// transient fetch, and a base that is genuinely gone leaves the
+		// metadata dump and so never reaches this loop again.
+		case ok && rec.Err == "" && rec.LastModified == m.LastModified:
+			results[i], keep[i] = resultFrom(m, rec), true
+			reused++
+		case budget > 0 && len(todo) >= budget:
+			// Out of budget. A base seen before still has a real grade from a
+			// real snapshot, so show it and leave its record's LastModified
+			// where it was — that is what makes the next run pick it up. A base
+			// never scanned has nothing to show, so it stays off the site until
+			// a later run reaches it.
+			if ok {
+				results[i], keep[i] = resultFrom(m, rec), true
+				stale++
+			} else {
+				omitted++
+			}
+		default:
+			todo = append(todo, i)
+			keep[i] = true
+		}
+	}
+
+	states := make([]*stateRecord, len(seed))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, jobs)
-	for i, m := range seed {
+	for _, i := range todo {
 		wg.Add(1)
-		go func(i int, m metaPackage) {
+		go func(i int) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[i], states[i] = scanOne(m, cache, prev)
-		}(i, m)
+			results[i], states[i] = scanOne(seed[i], cache, prev)
+		}(i)
 	}
 	wg.Wait()
-	next := make(map[string]sourceState, len(prev)+len(seed))
+
+	next := make(map[string]stateRecord, len(prev)+len(seed))
 	maps.Copy(next, prev)
 	for i, st := range states {
 		if st != nil {
 			next[seed[i].PackageBase] = *st
 		}
 	}
-	return results, next
+
+	kept := make([]siteResult, 0, len(seed))
+	for i, ok := range keep {
+		if ok {
+			kept = append(kept, results[i])
+		}
+	}
+	log.Printf("scanned %d, reused %d, stale %d, awaiting a later run %d (%d rendered)",
+		len(todo), reused, stale, omitted, len(kept))
+	return kept, next
 }
 
-func scanOne(m metaPackage, cache string, prev map[string]sourceState) (siteResult, *sourceState) {
+// resultFrom rebuilds a result from a state record, refreshing everything the
+// metadata dump carries. Votes and description are free on every run, so a
+// package whose PKGBUILD has not changed still shows a current vote count.
+func resultFrom(m metaPackage, rec stateRecord) siteResult {
+	res := siteResult{
+		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
+		Description: m.Description, Votes: m.NumVotes, LastModified: m.LastModified,
+		Grade: rec.Grade, Findings: rec.Findings, Drift: rec.Drift, Err: rec.Err,
+	}
+	if m.Maintainer != nil {
+		res.Maintainer = *m.Maintainer
+	}
+	if res.Findings == nil {
+		res.Findings = []rules.Finding{}
+	}
+	return res
+}
+
+func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResult, *stateRecord) {
 	res := siteResult{
 		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
 		Description: m.Description, Votes: m.NumVotes, LastModified: m.LastModified,
@@ -334,6 +445,8 @@ func scanOne(m metaPackage, cache string, prev map[string]sourceState) (siteResu
 	if m.Maintainer != nil {
 		res.Maintainer = *m.Maintainer
 	}
+	// A failed scan is recorded but not persisted: writing it would pin the
+	// record to this LastModified and stop the next run from retrying.
 	dir, err := fetchSnapshot(m, cache)
 	if err != nil {
 		res.Grade, res.Err = "?", err.Error()
@@ -345,7 +458,7 @@ func scanOne(m metaPackage, cache string, prev map[string]sourceState) (siteResu
 		return res, nil
 	}
 	cur := extractState(pkg, m.LastModified)
-	res.Drift = driftNotes(prev[m.PackageBase], cur)
+	res.Drift = driftNotes(prev[m.PackageBase].Fingerprint, cur)
 	res.Findings = rules.Run(pkg, nil)
 	if res.Findings == nil {
 		res.Findings = []rules.Finding{}
@@ -355,7 +468,14 @@ func scanOne(m metaPackage, cache string, prev map[string]sourceState) (siteResu
 		res.Findings[i].Path = strings.TrimPrefix(res.Findings[i].Path, dir+string(filepath.Separator))
 	}
 	res.Grade = report.Grade(res.Findings)
-	return res, &cur
+	return res, &stateRecord{
+		Base:         m.PackageBase,
+		LastModified: m.LastModified,
+		Grade:        res.Grade,
+		Findings:     res.Findings,
+		Drift:        res.Drift,
+		Fingerprint:  cur,
+	}
 }
 
 // fetchSnapshot downloads and extracts a package base's snapshot, cached by

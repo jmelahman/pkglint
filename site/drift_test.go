@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
+	"github.com/jmelahman/pkglint/internal/rules"
 )
 
 // stateFor loads a PKGBUILD from a string and fingerprints it.
@@ -103,17 +104,64 @@ sha256sums=('SKIP')
 }
 
 func TestStateRoundTrip(t *testing.T) {
-	cache := t.TempDir()
-	st := map[string]sourceState{"demo": stateFor(t, driftBase, 123)}
-	if err := saveState(cache, st); err != nil {
+	path := filepath.Join(t.TempDir(), "state.jsonl")
+	st := map[string]stateRecord{"demo": {
+		Base: "demo", LastModified: 123, Grade: "B",
+		Findings:    []rules.Finding{{RuleID: "PB101", Path: "PKGBUILD", Line: 3}},
+		Drift:       []string{"a note"},
+		Fingerprint: stateFor(t, driftBase, 123),
+	}}
+	if err := saveState(path, st); err != nil {
 		t.Fatal(err)
 	}
-	got := loadState(cache)
-	if got["demo"].LastModified != 123 || got["demo"].Pkgver != "1.0.0" {
-		t.Errorf("state round trip lost data: %+v", got)
+	got, err := loadState(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(got["demo"].Sums) != 1 {
-		t.Errorf("expected one fingerprinted source, got %+v", got["demo"].Sums)
+	rec := got["demo"]
+	if rec.LastModified != 123 || rec.Grade != "B" || rec.Fingerprint.Pkgver != "1.0.0" {
+		t.Errorf("state round trip lost data: %+v", rec)
+	}
+	if len(rec.Findings) != 1 || rec.Findings[0].RuleID != "PB101" {
+		t.Errorf("state round trip lost findings: %+v", rec.Findings)
+	}
+	if len(rec.Drift) != 1 {
+		t.Errorf("state round trip lost drift: %+v", rec.Drift)
+	}
+	if len(rec.Fingerprint.Sums) != 1 {
+		t.Errorf("expected one fingerprinted source, got %+v", rec.Fingerprint.Sums)
+	}
+}
+
+// TestLoadStateMissingIsEmpty pins the first-run case: no state file is the
+// ordinary way this starts, not a failure.
+func TestLoadStateMissingIsEmpty(t *testing.T) {
+	got, err := loadState(filepath.Join(t.TempDir(), "absent.jsonl"))
+	if err != nil {
+		t.Fatalf("loadState on a missing file: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected an empty state, got %v", got)
+	}
+}
+
+// TestLoadStateRejectsMalformed keeps a damaged state file from being read as
+// an empty one. Treating it as empty would rescan the whole corpus and then
+// overwrite the file that was merely unparseable.
+func TestLoadStateRejectsMalformed(t *testing.T) {
+	for name, line := range map[string]string{
+		"truncated JSON": `{"base":"demo","last_`,
+		"unsafe base":    `{"base":"../../evil","last_modified":1}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "state.jsonl")
+			if err := os.WriteFile(path, []byte(line+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := loadState(path); err == nil {
+				t.Error("expected an error, got nil")
+			}
+		})
 	}
 }
 

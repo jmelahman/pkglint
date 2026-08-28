@@ -2,12 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
 )
@@ -23,26 +19,6 @@ type sourceState struct {
 	Pkgver       string                       `json:"pkgver,omitempty"`
 	Sums         map[string]map[string]string `json:"sums,omitempty"` // source URL -> algo -> digest
 	Pins         map[string]string            `json:"pins,omitempty"` // VCS URL -> commit
-}
-
-const stateFile = "state.json"
-
-// loadState reads the previous run's fingerprints; a missing or unreadable
-// file just means every package is a first sighting.
-func loadState(cache string) map[string]sourceState {
-	data, err := os.ReadFile(filepath.Join(cache, stateFile))
-	if err != nil {
-		return map[string]sourceState{}
-	}
-	var st map[string]sourceState
-	if err := json.Unmarshal(data, &st); err != nil || st == nil {
-		return map[string]sourceState{}
-	}
-	return st
-}
-
-func saveState(cache string, st map[string]sourceState) error {
-	return writeJSON(filepath.Join(cache, stateFile), st)
 }
 
 // extractState fingerprints a loaded package: its pkgver, every remote

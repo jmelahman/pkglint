@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -118,6 +119,38 @@ func TestRuleSeveritiesAreDeclared(t *testing.T) {
 			within(t, lint(t, packageFor(r.ID, "good", r.Good)))
 		})
 	}
+}
+
+// TestFindingJSONRoundTrip pins that a Finding survives being written and read
+// back. Severity encodes as a name rather than the int it is, so the two halves
+// have to agree; when only the marshaler existed, anything that persisted
+// findings as JSON wrote a file it could not load.
+func TestFindingJSONRoundTrip(t *testing.T) {
+	for _, sev := range []Severity{Info, Warn, Error, Critical} {
+		t.Run(sev.String(), func(t *testing.T) {
+			want := Finding{
+				RuleID: "PB101", Severity: sev, Message: "a message",
+				Path: "PKGBUILD", Line: 3, Col: 7,
+			}
+			b, err := json.Marshal(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got Finding
+			if err := json.Unmarshal(b, &got); err != nil {
+				t.Fatalf("unmarshal %s: %v", b, err)
+			}
+			if got != want {
+				t.Errorf("round trip changed the finding:\n got %+v\nwant %+v", got, want)
+			}
+		})
+	}
+	t.Run("unknown name", func(t *testing.T) {
+		var f Finding
+		if err := json.Unmarshal([]byte(`{"severity":"catastrophic"}`), &f); err == nil {
+			t.Error("expected an error for an unknown severity, got nil")
+		}
+	})
 }
 
 // TestEscalatingRulesReachBothEnds pins the rules that report more than one

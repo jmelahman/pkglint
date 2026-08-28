@@ -29,11 +29,36 @@ jobs:
           path: .cache
           key: aur-snapshots-${{ github.run_id }}
           restore-keys: aur-snapshots-
-      - run: go run ./site -maintainer Jamison -top 500 -out docs
+      # The corpus is every base the AUR has seen a change to in the last 90
+      # days: ~23,600, still far more than one run can download. Widening the
+      # window is a one-line change and the state carries over, so this can
+      # grow later — 180d is ~35,000 bases and a year is ~47,600.
+      #
+      # data/state.jsonl carries the previous scan, so a base whose
+      # LastModified has not moved is served from it without a fetch, and
+      # -budget caps the rest. 8000 comes from the request throttle rather than
+      # the runner: fetches are spaced 500ms apart globally, so the ceiling is
+      # 2/s no matter what -jobs says, and measured throughput is nearer 1/s.
+      # That puts a full budget at roughly two hours, well inside the 6h job
+      # limit. From an empty state the corpus fills in about three nights;
+      # after that a run fetches only the bases that actually changed and
+      # finishes in minutes, with the budget never binding.
+      - run: >
+          go run ./site
+          -maintainer Jamison
+          -since-days 90
+          -top 500
+          -budget 8000
+          -state data/state.jsonl
+          -out docs
       - uses: actions/upload-artifact@v6
         with:
+          # Both paths, so their least common ancestor is the workspace root and
+          # the publish job can restore them where they belong.
+          path: |
+            docs
+            data/state.jsonl
           name: report-card-docs
-          path: docs
           retention-days: 1
           if-no-files-found: error
           include-hidden-files: true # docs/.nojekyll must ride along
@@ -49,12 +74,14 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: report-card-docs
-          path: docs
+          path: . # the artifact holds docs/ and data/ already
       - name: Commit refreshed site
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs
+          # The state must be committed alongside the pages it produced, or the
+          # next run rescans everything this one just did.
+          git add docs data
           if git diff --cached --quiet; then
             echo "No changes to the report card."
           else

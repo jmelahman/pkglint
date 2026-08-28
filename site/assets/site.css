@@ -426,6 +426,58 @@ td.gcell { padding-left: 0; }
 .empty { color: var(--dim); padding: 2rem 0.7rem; text-align: center; }
 .empty[hidden] { display: none; }
 
+/* ── reaching the rest of the corpus ──────────────────────────────────── */
+/* The index server-renders its most-voted head only, so this line says what
+   the table actually holds and points at the pages that hold the rest. It is
+   not a .js affordance: with scripting off it is the only thing on the page
+   that admits the roster is a slice, so it must render either way. */
+.rest {
+  margin: 1rem 0 0; padding-top: 0.9rem; border-top: 1px solid var(--rule);
+  color: var(--dim); font-size: 0.875rem;
+}
+
+/* The letter strip. Monospace and fixed-width cells so the row reads as an
+   index rather than a sentence — "i" and "w" get the same target. */
+.shardnav { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 1.25rem; }
+.shardnav a {
+  min-width: 2rem; padding: 0.35rem 0.4rem; text-align: center;
+  border: 1px solid var(--rule); border-radius: 3px;
+  color: var(--dim); text-decoration: none;
+  font: 600 0.8125rem/1 var(--mono);
+}
+.shardnav a:hover { color: var(--chalk); border-color: var(--dim); }
+.shardnav a[aria-current="page"] {
+  color: var(--chalk); border-color: var(--accent); background: var(--accent-soft);
+}
+
+.pager {
+  display: flex; justify-content: space-between; gap: 1rem;
+  margin-top: 1.25rem; padding-top: 0.9rem; border-top: 1px solid var(--rule);
+  font: 600 0.8125rem/1 var(--mono);
+}
+/* The next link sits at the right edge even when there is no previous one —
+   without this an only child would be pushed left by justify-content. */
+.pager .next:only-child { margin-left: auto; }
+.pager a { color: var(--dim); text-decoration: none; }
+.pager a:hover { color: var(--accent); }
+
+/* One tile per letter, each carrying its count, so the index doubles as a
+   histogram of where the corpus actually sits. */
+.shardlist {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); gap: 0.5rem;
+}
+.shardlist a {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem;
+  padding: 0.6rem 0.7rem; border: 1px solid var(--rule); border-radius: 3px;
+  text-decoration: none;
+}
+.shardlist a:hover { border-color: var(--dim); background: var(--ink-2); }
+.shardlist b { color: var(--chalk); font: 600 1rem/1 var(--mono); }
+.shardlist span {
+  color: var(--dim); font: 400 0.8125rem/1 var(--mono); font-variant-numeric: tabular-nums;
+}
+
 /* ── notes ────────────────────────────────────────────────────────────── */
 .note {
   border: 1px solid var(--rule); border-left: 3px solid var(--dim);

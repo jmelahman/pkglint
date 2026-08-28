@@ -3,6 +3,7 @@
 package rules
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -37,6 +38,22 @@ func ParseSeverity(name string) (Severity, error) {
 // MarshalJSON renders severities as their names.
 func (s Severity) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + s.String() + `"`), nil
+}
+
+// UnmarshalJSON reads back what MarshalJSON wrote. Without it a Finding is
+// write-only over JSON: it encodes to a name and then refuses to decode,
+// because the underlying int has no idea what "warn" means.
+func (s *Severity) UnmarshalJSON(b []byte) error {
+	var name string
+	if err := json.Unmarshal(b, &name); err != nil {
+		return err
+	}
+	sev, err := ParseSeverity(name)
+	if err != nil {
+		return err
+	}
+	*s = sev
+	return nil
 }
 
 // SeverityRange is the span of severities one rule can report: Low is what it

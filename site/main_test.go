@@ -10,6 +10,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jmelahman/pkglint/internal/rules"
 )
 
 // TestSafeBase pins the filter that keeps untrusted AUR package bases from
@@ -63,7 +66,7 @@ func TestSelectSeedDropsUnsafeBases(t *testing.T) {
 		{PackageBase: ".hidden", NumVotes: 1, Maintainer: &who},
 		{PackageBase: "mine", NumVotes: 1, Maintainer: &who},
 	}
-	seed := selectSeed(meta, who, 100)
+	seed := selectSeed(meta, who, 100, 0, time.Now())
 	got := map[string]bool{}
 	for _, m := range seed {
 		got[m.PackageBase] = true
@@ -90,12 +93,145 @@ func TestSelectSeedIsDeterministic(t *testing.T) {
 	want := []string{"alpha", "bravo", "charlie"}
 	for i := 0; i < 32; i++ {
 		var got []string
-		for _, m := range selectSeed(meta, "", 3) {
+		for _, m := range selectSeed(meta, "", 3, 0, time.Now()) {
 			got = append(got, m.PackageBase)
 		}
 		if !slices.Equal(got, want) {
 			t.Fatalf("run %d: selectSeed = %v, want %v", i, got, want)
 		}
+	}
+}
+
+// TestSelectSeedWindow pins the recency window: the corpus is what the AUR has
+// seen an update to lately, and -top is what keeps a heavily-installed but
+// long-stable package on the site anyway.
+func TestSelectSeedWindow(t *testing.T) {
+	now := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
+	ago := func(days int) int64 { return now.AddDate(0, 0, -days).Unix() }
+	meta := []metaPackage{
+		{PackageBase: "fresh", NumVotes: 1, LastModified: ago(30)},
+		{PackageBase: "edge", NumVotes: 2, LastModified: ago(365) + 60},
+		{PackageBase: "stale", NumVotes: 3, LastModified: ago(400)},
+		{PackageBase: "ancient-but-loved", NumVotes: 9999, LastModified: ago(2000)},
+	}
+
+	got := map[string]bool{}
+	for _, m := range selectSeed(meta, "", 0, 365, now) {
+		got[m.PackageBase] = true
+	}
+	if !got["fresh"] || !got["edge"] {
+		t.Errorf("window dropped a package inside it: %v", got)
+	}
+	if got["stale"] || got["ancient-but-loved"] {
+		t.Errorf("window kept a package outside it: %v", got)
+	}
+
+	// -top is additive: the popular package returns even though nothing about
+	// it has changed inside the window.
+	got = map[string]bool{}
+	for _, m := range selectSeed(meta, "", 1, 365, now) {
+		got[m.PackageBase] = true
+	}
+	if !got["ancient-but-loved"] {
+		t.Errorf("-top did not re-add the most-voted base: %v", got)
+	}
+}
+
+// TestSelectSeedWindowIsVotesOrdered pins the ordering the fetch budget relies
+// on. -budget spends on the front of the seed, so if this is not votes-first a
+// bounded run scans an arbitrary sample instead of the packages people install.
+func TestSelectSeedWindowIsVotesOrdered(t *testing.T) {
+	now := time.Now()
+	var meta []metaPackage
+	for i, n := range []string{"few", "many", "some"} {
+		meta = append(meta, metaPackage{
+			PackageBase: n, NumVotes: []int{1, 100, 10}[i], LastModified: now.Unix(),
+		})
+	}
+	var got []string
+	for _, m := range selectSeed(meta, "", 0, 365, now) {
+		got = append(got, m.PackageBase)
+	}
+	if want := []string{"many", "some", "few"}; !slices.Equal(got, want) {
+		t.Errorf("selectSeed = %v, want %v", got, want)
+	}
+}
+
+// TestScanAllReusesUnchanged is the property the whole corpus rests on: a base
+// whose LastModified has not moved is served from state, without a fetch. If
+// this regresses the nightly run tries to download 47,000 snapshots.
+func TestScanAllReusesUnchanged(t *testing.T) {
+	seed := []metaPackage{{
+		PackageBase: "demo", Version: "2.0-1", Description: "now with more votes",
+		NumVotes: 99, LastModified: 1000,
+	}}
+	prev := map[string]stateRecord{"demo": {
+		Base: "demo", LastModified: 1000, Grade: "B",
+		Findings: []rules.Finding{{RuleID: "PB101"}},
+		Drift:    []string{"a note from the run that saw it change"},
+	}}
+
+	// cache points nowhere: a fetch would fail, so a passing test is proof
+	// none was attempted.
+	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 0, prev)
+	if len(results) != 1 {
+		t.Fatalf("expected one result, got %d", len(results))
+	}
+	r := results[0]
+	if r.Grade != "B" || len(r.Findings) != 1 {
+		t.Errorf("reused result lost its lint output: %+v", r)
+	}
+	if len(r.Drift) != 1 {
+		t.Errorf("reused result lost its drift note: %+v", r.Drift)
+	}
+	// Metadata is free every run, so it refreshes even when the lint does not.
+	if r.Votes != 99 || r.Version != "2.0-1" || r.Description != "now with more votes" {
+		t.Errorf("reused result kept stale metadata: %+v", r)
+	}
+	if next["demo"].LastModified != 1000 || next["demo"].Grade != "B" {
+		t.Errorf("state lost the reused record: %+v", next["demo"])
+	}
+}
+
+// TestScanAllBudget pins how a bounded run divides the corpus. Bases past the
+// budget must not be fetched, must keep their last known grade if they have
+// one, and must keep their old LastModified so a later run picks them up.
+func TestScanAllBudget(t *testing.T) {
+	seed := []metaPackage{
+		{PackageBase: "unchanged", NumVotes: 30, LastModified: 1000},
+		{PackageBase: "known", NumVotes: 20, LastModified: 2000},
+		{PackageBase: "new", NumVotes: 10, LastModified: 3000},
+	}
+	prev := map[string]stateRecord{
+		"unchanged": {Base: "unchanged", LastModified: 1000, Grade: "A"},
+		// Changed since it was last scanned, so it is work — but the budget is
+		// zero, so it renders at its old grade instead.
+		"known": {Base: "known", LastModified: 1, Grade: "D"},
+	}
+
+	// One fetch allowed against two candidates. "unchanged" is not a candidate
+	// at all — it is reused — so the slot goes to "known", the more-voted of
+	// the two, and "new" waits for a later run.
+	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 1, prev)
+	got := map[string]string{}
+	for _, r := range results {
+		got[r.Name] = r.Grade
+	}
+	if got["unchanged"] != "A" {
+		t.Errorf("unchanged base was not reused: %v", got)
+	}
+	// "known" was the one scan the budget allowed; the fetch fails against an
+	// absent cache, which is the recorded outcome.
+	if _, ok := got["known"]; !ok {
+		t.Errorf("budgeted base was dropped: %v", got)
+	}
+	if _, ok := got["new"]; ok {
+		t.Errorf("never-scanned base past the budget should not render: %v", got)
+	}
+	// A failed scan must not be persisted, or the next run would treat the
+	// failure as this snapshot's answer and never retry it.
+	if next["known"].LastModified != 1 {
+		t.Errorf("failed scan overwrote the record: %+v", next["known"])
 	}
 }
 

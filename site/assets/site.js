@@ -23,7 +23,14 @@
   var grades = Object.create(null); // selected grades; empty means "all"
 
   rows.forEach(function (tr) {
-    tr.dataset.text = tr.textContent.toLowerCase();
+    // The maintainer has no column, so it is not in the row's text — fold it in
+    // by hand, or the one thing people most often look a package up by is the
+    // one thing the filter cannot find. Both haystacks are cached case-folded,
+    // under their own keys: data-maintainer keeps the handle's real casing,
+    // which is what the page renders and what a reader of the DOM expects.
+    var maintainer = (tr.dataset.maintainer || "").toLowerCase();
+    tr.dataset.maintainerText = maintainer;
+    tr.dataset.text = (tr.textContent + " " + maintainer).toLowerCase();
   });
 
   function selected() {
@@ -31,11 +38,20 @@
   }
 
   function apply() {
-    var q = search ? search.value.trim().toLowerCase() : "";
+    // A leading "@" narrows the query to the maintainer. Handles and package
+    // names share one namespace on the AUR, and plenty of packages are named
+    // after the person who maintains them, so a plain query cannot separate
+    // "packages called foo" from "packages by foo". What follows the "@" is
+    // still a substring, so "@dberm" finds dbermond; a bare "@" narrows to
+    // nothing in particular and shows everything, same as an empty box.
+    var raw = search ? search.value.trim() : "";
+    var byMaintainer = raw.charAt(0) === "@";
+    var q = (byMaintainer ? raw.slice(1) : raw).toLowerCase();
     var picked = selected();
     var shown = 0;
     rows.forEach(function (tr) {
-      var ok = (!q || tr.dataset.text.indexOf(q) !== -1) &&
+      var hay = byMaintainer ? tr.dataset.maintainerText : tr.dataset.text;
+      var ok = (!q || hay.indexOf(q) !== -1) &&
         (!picked.length || grades[tr.dataset.grade]);
       tr.hidden = !ok;
       if (ok) shown++;
@@ -46,7 +62,9 @@
         : shown + " of " + rows.length + " packages";
     }
     if (empty) empty.hidden = shown !== 0;
-    if (clear) clear.hidden = !q && !picked.length;
+    // raw, not q: a box holding just "@" filters nothing but is still not
+    // empty, and Reset is what empties it.
+    if (clear) clear.hidden = !raw && !picked.length;
     if (bar) bar.classList.toggle("filtered", picked.length > 0);
     keys.forEach(function (el) {
       el.setAttribute("aria-pressed", grades[el.dataset.grade] ? "true" : "false");

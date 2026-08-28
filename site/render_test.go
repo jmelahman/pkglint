@@ -213,6 +213,72 @@ func TestRenderLinkPreview(t *testing.T) {
 	}
 }
 
+// TestRenderMaintainerFilter covers the roster's maintainer search. The roster
+// has no maintainer column, so a data attribute is the only thing carrying the
+// value into the page — and the script that reads it lives in a separate file,
+// where renaming either half leaves a page that builds, ships, and quietly
+// matches nothing.
+func TestRenderMaintainerFilter(t *testing.T) {
+	results := []siteResult{
+		{Name: "demo", Base: "demo", Version: "1.0-1", Grade: "A", Maintainer: "dbermond", Findings: []rules.Finding{}},
+		// Orphaned packages have no maintainer; the AUR drops the field entirely.
+		{Name: "orphaned", Base: "orphaned", Version: "2.0-1", Grade: "A", Findings: []rules.Finding{}},
+	}
+
+	out := t.TempDir()
+	for _, sub := range []string{"rules", "package", "badge"} {
+		if err := os.MkdirAll(filepath.Join(out, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := renderSite(out, results); err != nil {
+		t.Fatalf("renderSite: %v", err)
+	}
+
+	read := func(rel string) string {
+		b, err := os.ReadFile(filepath.Join(out, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		return string(b)
+	}
+
+	index := read("index.html")
+	for _, want := range []string{
+		// What the filter matches on, and the tooltip that lets a row matched on
+		// a maintainer say why, given no column shows it.
+		`data-maintainer="dbermond"`,
+		`title="maintained by dbermond"`,
+		// An orphan still carries the attribute, empty, so the script reads a
+		// string on every row rather than an undefined on some of them.
+		`data-maintainer=""`,
+		// Nobody searches a field the box does not admit to having.
+		`placeholder="Filter by name, maintainer, or description"`,
+	} {
+		if !strings.Contains(index, want) {
+			t.Errorf("index.html missing %s", want)
+		}
+	}
+	// An orphan has no maintainer to name, so it gets no tooltip either.
+	if strings.Contains(index, `title="maintained by "`) {
+		t.Error("index.html gives an unmaintained package an empty maintainer tooltip")
+	}
+	// The @ prefix has no other affordance, so the label is the whole of its
+	// discoverability.
+	if !strings.Contains(index, "Prefix the query with @") {
+		t.Error("index.html does not document the @maintainer prefix")
+	}
+
+	// The other half of the contract: the script has to read the attribute the
+	// template writes.
+	js := read(filepath.Join("assets", "site.js"))
+	for _, want := range []string{"tr.dataset.maintainer", `charAt(0) === "@"`} {
+		if !strings.Contains(js, want) {
+			t.Errorf("site.js missing %s: the roster's maintainer filter is not wired up", want)
+		}
+	}
+}
+
 // TestClip covers the description shortener: previews cut a long description
 // wherever they run out of room, so it is cut here on a word instead.
 func TestClip(t *testing.T) {

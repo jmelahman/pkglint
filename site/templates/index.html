@@ -72,8 +72,13 @@
   <div class="tag">Roster<small>n = {{.Total}}</small></div>
   <div>
     <div class="toolbar">
-      <input type="search" id="q" placeholder="Filter by name or description" autocomplete="off"
-        aria-label="Filter packages by name or description">
+      {{/* The roster has no maintainer column, so the box is where it says so.
+           The "@" prefix is spelled out in the title and the label rather than
+           the placeholder: the placeholder has to describe what typing does by
+           default, and it is already as long as the field can hold. */}}
+      <input type="search" id="q" placeholder="Filter by name, maintainer, or description" autocomplete="off"
+        title="Prefix the query with @ to match the maintainer only, e.g. @dbermond"
+        aria-label="Filter packages by name, maintainer, or description. Prefix the query with @ to match the maintainer only.">
       <button type="button" class="clear" id="clear" hidden>Reset</button>
       <span class="count" id="count" role="status">{{.Total}} packages</span>
     </div>
@@ -89,9 +94,12 @@
       </thead>
       <tbody>
       {{range .Results}}
-        <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
+        {{/* The maintainer has no column of its own, so it rides in a data
+             attribute for the filter to match, and in the name cell's tooltip
+             so a row that matched on it can still say why. */}}
+        <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-maintainer="{{.Maintainer}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
           <td class="gcell"><span class="grade grade-{{.Grade}}">{{.Grade}}</span></td>
-          <td class="pkg"><a href="package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}}
+          <td class="pkg"{{with .Maintainer}} title="maintained by {{.}}"{{end}}><a href="package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}}
             <span class="drift" title="source drift since the previous scan">&#9888;</span>{{end}}</td>
           <td class="num">{{len .Findings}}</td>
           <td class="num votes">{{.Votes}}</td>

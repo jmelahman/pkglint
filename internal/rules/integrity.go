@@ -11,8 +11,9 @@ import (
 // PB1xx: source integrity.
 var integrityRules = []Rule{
 	{
-		ID:   "PB101",
-		Name: "skipped-checksum",
+		ID:       "PB101",
+		Name:     "skipped-checksum",
+		Severity: Error,
 		Doc: "Every remote, non-VCS source should carry a real checksum. `SKIP` means makepkg " +
 			"performs no integrity verification at all: if the upstream file or the connection is " +
 			"tampered with, nothing notices. Pin the artifact with a sha256 or stronger digest. " +
@@ -21,16 +22,18 @@ var integrityRules = []Rule{
 		Check: checkSkippedChecksums,
 	},
 	{
-		ID:   "PB102",
-		Name: "weak-checksum",
+		ID:       "PB102",
+		Name:     "weak-checksum",
+		Severity: Warn,
 		Doc: "md5 and sha1 are broken for collision resistance. When they are the only digests " +
 			"present, an attacker able to produce collisions can substitute the source artifact. " +
 			"Add sha256sums, sha512sums or b2sums.",
 		Check: checkWeakChecksums,
 	},
 	{
-		ID:   "PB103",
-		Name: "unpinned-vcs-source",
+		ID:       "PB103",
+		Name:     "unpinned-vcs-source",
+		Severity: Warn,
 		Doc: "A VCS source without `#commit=` pins to a mutable reference: branches move and tags " +
 			"can be re-pointed by anyone with push access (or a compromised forge account). Pinning " +
 			"the exact commit hash makes the fetched tree tamper-evident. Packages named for the VCS " +
@@ -43,8 +46,9 @@ var integrityRules = []Rule{
 		Fix:      fixVCSPins,
 	},
 	{
-		ID:   "PB104",
-		Name: "insecure-transport",
+		ID:       "PB104",
+		Name:     "insecure-transport",
+		Severity: Error,
 		Doc: "Sources fetched over http://, git:// or ftp:// can be modified in transit. With a " +
 			"strong checksum this downgrades availability rather than integrity, but combined with " +
 			"SKIP or weak sums it is a working man-in-the-middle vector. Use https:// (or git+https://). " +
@@ -52,31 +56,35 @@ var integrityRules = []Rule{
 		Check: checkInsecureTransport,
 	},
 	{
-		ID:   "PB105",
-		Name: "source-url-mismatch",
+		ID:       "PB105",
+		Name:     "source-url-mismatch",
+		Severity: Info,
 		Doc: "A source hosted on a different domain than the project's `url` is worth a second " +
 			"look: repackaged or 'mirrored' artifacts are a common way to slip in modified binaries. " +
 			"Often legitimate (CDNs, release mirrors) — hence only informational.",
 		Check: checkSourceDomains,
 	},
 	{
-		ID:   "PB106",
-		Name: "dlagents-override",
+		ID:       "PB106",
+		Name:     "dlagents-override",
+		Severity: Warn,
 		Doc: "Overriding DLAGENTS replaces makepkg's download logic with arbitrary commands, which " +
 			"run before any checksum is verified. Legitimate uses exist but are rare enough that " +
 			"every override deserves review.",
 		Check: checkDLAgents,
 	},
 	{
-		ID:   "PB107",
-		Name: "missing-install-script",
+		ID:       "PB107",
+		Name:     "missing-install-script",
+		Severity: Warn,
 		Doc: "The PKGBUILD references an install scriptlet that is not present next to it, so its " +
 			"contents cannot be reviewed or linted.",
 		Check: checkMissingInstall,
 	},
 	{
-		ID:   "PB108",
-		Name: "makepkg-config-override",
+		ID:       "PB108",
+		Name:     "makepkg-config-override",
+		Severity: Warn, MaxSeverity: Critical, // critical for the variables makepkg executes
 		Doc: "Assigning a makepkg.conf variable at the top level reconfigures makepkg itself. " +
 			"VCSCLIENTS and the COMPRESS* arrays are executed as commands, so overriding them injects " +
 			"code into the fetch and packaging steps; PACKAGER/GPGKEY spoof package identity and " +
@@ -85,8 +93,9 @@ var integrityRules = []Rule{
 		Check: checkMakepkgConfOverride,
 	},
 	{
-		ID:   "PB109",
-		Name: "forge-owner-mismatch",
+		ID:       "PB109",
+		Name:     "forge-owner-mismatch",
+		Severity: Warn,
 		Doc: "A source hosted on the same forge as the project url but under a different owner is a " +
 			"common repackaging vector: recent AUR compromises kept github.com and changed only the " +
 			"account in the path, which a host-only comparison (PB105) misses. Often a legitimate fork " +
@@ -94,16 +103,18 @@ var integrityRules = []Rule{
 		Check: checkForgeOwner,
 	},
 	{
-		ID:   "PB110",
-		Name: "checksum-count-mismatch",
+		ID:       "PB110",
+		Name:     "checksum-count-mismatch",
+		Severity: Error,
 		Doc: "makepkg pairs each source with the checksum at the same index, so a sums array of the " +
 			"wrong length means some sources are unverified (or verified against the wrong digest). " +
 			"makepkg errors on this; regenerate with updpkgsums.",
 		Check: checkChecksumCounts,
 	},
 	{
-		ID:   "PB111",
-		Name: "signature-without-key",
+		ID:       "PB111",
+		Name:     "signature-without-key",
+		Severity: Error,
 		Doc: "A detached signature (.sig/.asc) or a ?signed VCS source is only as strong as the key " +
 			"it is checked against. With validpgpkeys empty, makepkg accepts any key already present " +
 			"in the builder's keyring — whatever the user was last told to import — instead of a " +
@@ -112,8 +123,9 @@ var integrityRules = []Rule{
 		Check: checkSignatureKeys,
 	},
 	{
-		ID:   "PB112",
-		Name: "insecure-signature-transport",
+		ID:       "PB112",
+		Name:     "insecure-signature-transport",
+		Severity: Warn,
 		Doc: "This signature file is fetched over an unencrypted transport. With validpgpkeys pinned " +
 			"the signature still verifies cryptographically — hence a warning where PB104 errors for " +
 			"ordinary sources — but a man-in-the-middle can strip or swap the file to break builds, " +
@@ -121,8 +133,9 @@ var integrityRules = []Rule{
 		Check: checkSignatureTransport,
 	},
 	{
-		ID:   "PB113",
-		Name: "unused-validpgpkeys",
+		ID:       "PB113",
+		Name:     "unused-validpgpkeys",
+		Severity: Info,
 		Doc: "validpgpkeys pins signing keys, but no source carries a detached signature (.sig/.asc) " +
 			"and no VCS source requests ?signed verification, so nothing is ever checked against the " +
 			"keys. Either dead configuration or a signature source was dropped — confusing at review " +

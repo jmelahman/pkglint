@@ -15,16 +15,18 @@ import (
 // scriptlet-specific.
 var scriptletRules = []Rule{
 	{
-		ID:   "PB501",
-		Name: "network-in-scriptlet",
+		ID:       "PB501",
+		Name:     "network-in-scriptlet",
+		Severity: Critical,
 		Doc: "Install scriptlets run as root during pacman transactions. A scriptlet that talks " +
 			"to the network executes unreviewable remote input at the worst possible moment — " +
 			"this is how the 2018 acroread AUR compromise delivered its payload.",
 		Check: checkScriptletNetwork,
 	},
 	{
-		ID:   "PB502",
-		Name: "scriptlet-persistence",
+		ID:       "PB502",
+		Name:     "scriptlet-persistence",
+		Severity: Warn, MaxSeverity: Critical, // critical for crontabs and other persistence writes
 		Doc: "Files a package ships belong in package(), tracked and removed by pacman. A " +
 			"scriptlet that edits crontabs, systemd units, shell profiles or autostart entries, or " +
 			"creates login-capable users, is installing untracked persistence — a classic backdoor " +
@@ -32,8 +34,9 @@ var scriptletRules = []Rule{
 		Check: checkScriptletPersistence,
 	},
 	{
-		ID:   "PB503",
-		Name: "unparseable-scriptlet",
+		ID:       "PB503",
+		Name:     "unparseable-scriptlet",
+		Severity: Error,
 		Doc: "An install scriptlet pkglint cannot parse is analyzed by no rule, yet its code " +
 			"still runs as root at install time. A parse failure usually means the file is malformed " +
 			"or deliberately obfuscated to defeat static analysis; either way it must be reviewed by hand.",

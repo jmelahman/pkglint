@@ -50,3 +50,8 @@
 {{/* fixpill renders an auto-fix badge for a rules.FixLevel; nothing when the
      rule has no fix. */}}
 {{define "fixpill"}}{{if .Fixable}}<span class="fix fix-{{if .Safe}}safe{{else}}unsafe{{end}}" title="pkglint rewrites this for you with {{.Flag}}">{{.Flag}}</span>{{end}}{{end}}
+
+{{/* sevpills renders a rules.SeverityRange: one badge for a rule that always
+     reports the same severity, two spanned by an en dash for one that
+     escalates on what it finds. */}}
+{{define "sevpills"}}<span class="sev {{sev .Low}}">{{sev .Low}}</span>{{if .Varies}}<span class="sevto">–</span><span class="sev {{sev .High}}">{{sev .High}}</span>{{end}}{{end}}

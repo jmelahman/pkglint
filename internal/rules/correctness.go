@@ -63,16 +63,18 @@ var validOptions = map[string]bool{
 
 var correctnessRules = []Rule{
 	{
-		ID:   "PB701",
-		Name: "invalid-pkgname",
+		ID:       "PB701",
+		Name:     "invalid-pkgname",
+		Severity: Error,
 		Doc: "pkgname and pkgbase may only contain the characters makepkg allows " +
 			"([A-Za-z0-9@._+-]), must be ASCII, and must not start with a hyphen or dot. makepkg " +
 			"refuses to build a package whose name breaks these rules.",
 		Check: checkPkgName,
 	},
 	{
-		ID:   "PB702",
-		Name: "invalid-pkgver",
+		ID:       "PB702",
+		Name:     "invalid-pkgver",
+		Severity: Error,
 		Doc: "pkgver must not be empty and may not contain colons, forward slashes, hyphens or " +
 			"whitespace — those characters have meaning in pacman's version syntax (epoch:, -pkgrel), " +
 			"so makepkg rejects them. makepkg lints the literal value before any pkgver() function " +
@@ -80,20 +82,23 @@ var correctnessRules = []Rule{
 		Check: checkPkgVer,
 	},
 	{
-		ID:    "PB703",
-		Name:  "invalid-pkgrel",
-		Doc:   "pkgrel must be of the form 'integer[.integer]' (e.g. 1 or 1.5). makepkg errors otherwise.",
-		Check: checkPkgRel,
+		ID:       "PB703",
+		Name:     "invalid-pkgrel",
+		Severity: Error,
+		Doc:      "pkgrel must be of the form 'integer[.integer]' (e.g. 1 or 1.5). makepkg errors otherwise.",
+		Check:    checkPkgRel,
 	},
 	{
-		ID:    "PB704",
-		Name:  "invalid-epoch",
-		Doc:   "epoch, when set, must be a non-negative integer; makepkg refuses any other value.",
-		Check: checkEpoch,
+		ID:       "PB704",
+		Name:     "invalid-epoch",
+		Severity: Error,
+		Doc:      "epoch, when set, must be a non-negative integer; makepkg refuses any other value.",
+		Check:    checkEpoch,
 	},
 	{
-		ID:   "PB705",
-		Name: "backup-leading-slash",
+		ID:       "PB705",
+		Name:     "backup-leading-slash",
+		Severity: Error,
 		Doc: "backup entries are paths relative to the filesystem root, so a leading slash is an " +
 			"error makepkg rejects. Drop it: `etc/foo.conf`, not `/etc/foo.conf`.",
 		Check:    checkBackupSlash,
@@ -101,23 +106,26 @@ var correctnessRules = []Rule{
 		Fix:      fixBackupSlash,
 	},
 	{
-		ID:   "PB706",
-		Name: "unknown-option",
+		ID:       "PB706",
+		Name:     "unknown-option",
+		Severity: Error,
 		Doc: "The options array only accepts makepkg's known toggles (strip, debug, lto, " +
 			"staticlibs, emptydirs, …), each optionally prefixed with '!'. An unrecognized entry is " +
 			"usually a typo that silently does nothing; makepkg flags it as an error.",
 		Check: checkUnknownOptions,
 	},
 	{
-		ID:   "PB707",
-		Name: "provides-comparison",
+		ID:       "PB707",
+		Name:     "provides-comparison",
+		Severity: Error,
 		Doc: "provides entries may pin an exact version with '=' but must not use '<' or '>' " +
 			"comparisons — a provide is a concrete capability, not a range. makepkg errors on comparison operators.",
 		Check: checkProvidesComparison,
 	},
 	{
-		ID:   "PB708",
-		Name: "variable-type",
+		ID:       "PB708",
+		Name:     "variable-type",
+		Severity: Error,
 		Doc: "makepkg requires list fields (depends, source, sums, license, options, …) to be " +
 			"arrays and scalar fields (pkgver, url, pkgdesc, …) to be plain strings. A bare " +
 			"`depends=foo` builds by luck at best and errors under makepkg; wrap it: `depends=(foo)`.",
@@ -126,16 +134,18 @@ var correctnessRules = []Rule{
 		Fix:      fixVariableTypes,
 	},
 	{
-		ID:   "PB709",
-		Name: "package-function-variable",
+		ID:       "PB709",
+		Name:     "package-function-variable",
+		Severity: Error,
 		Doc: "A package_*() function may only override packaging metadata (pkgdesc, depends, " +
 			"optdepends, provides, backup, install, …). Setting pkgver, source, makedepends, or the " +
 			"checksums there is an error: those are resolved before packaging runs.",
 		Check: checkPackageFunctionVars,
 	},
 	{
-		ID:   "PB710",
-		Name: "invalid-arch",
+		ID:       "PB710",
+		Name:     "invalid-arch",
+		Severity: Error,
 		Doc: "arch must be set and non-empty, must not combine 'any' with concrete architectures, " +
 			"must not repeat a value, and each entry may only contain [A-Za-z0-9_]. makepkg rejects " +
 			"a PKGBUILD that violates any of these.",

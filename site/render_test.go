@@ -95,6 +95,61 @@ func TestRenderFixableBadges(t *testing.T) {
 	}
 }
 
+// TestRenderRuleSeverities covers the Severity column on the rule reference:
+// a fixed-severity rule gets one badge, an escalating one gets the range, and
+// the header carries the sizer that holds the column at a single width across
+// the seven category tables.
+func TestRenderRuleSeverities(t *testing.T) {
+	// Pin the fixtures' declared severities, so a change to a rule fails here
+	// rather than quietly turning the assertions below into no-ops.
+	for id, want := range map[string]rules.SeverityRange{
+		"PB101": {Low: rules.Error, High: rules.Error},
+		"PB302": {Low: rules.Error, High: rules.Critical},
+	} {
+		r, ok := rules.RuleByID(id)
+		if !ok {
+			t.Fatalf("rule %s missing from registry", id)
+		}
+		if got := r.Severities(); got != want {
+			t.Fatalf("%s severities = %v, want %v", id, got, want)
+		}
+	}
+
+	out := t.TempDir()
+	for _, sub := range []string{"rules", "package", "badge"} {
+		if err := os.MkdirAll(filepath.Join(out, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := renderSite(out, nil); err != nil {
+		t.Fatalf("renderSite: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(out, "rules", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := string(b)
+
+	if !strings.Contains(idx, `<th>Severity<span class="colsizer">`) {
+		t.Errorf("rule reference missing Severity column sizer:\n%s", idx)
+	}
+	// PB101 always reports error: one badge, no range.
+	const fixed = `<td class="rsev"><span class="sev error">error</span></td>`
+	if !strings.Contains(idx, fixed) {
+		t.Errorf("PB101 row should carry a single error badge (%s)", fixed)
+	}
+	// PB302 escalates to critical when the evaluated string is downloaded.
+	const ranged = `<td class="rsev"><span class="sev error">error</span>` +
+		`<span class="sevto">–</span><span class="sev critical">critical</span></td>`
+	if !strings.Contains(idx, ranged) {
+		t.Errorf("PB302 row should carry an error–critical range (%s)", ranged)
+	}
+	// Every rule reports one, so every row has a badge — none may be skipped.
+	if got, want := strings.Count(idx, `<td class="rsev">`), len(rules.Registry()); got != want {
+		t.Errorf("rule reference has %d severity cells, want %d", got, want)
+	}
+}
+
 // TestRenderLinkPreview covers the head metadata a link preview reads. The
 // failure this guards against is silent: a relative og:image or a page-relative
 // og:url renders identically in a browser and produces no card at all when the

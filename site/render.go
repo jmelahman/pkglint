@@ -209,10 +209,11 @@ func renderSite(out string, results []siteResult) error {
 	rulesData := page("rules/", "Rule reference — AUR Report Card",
 		"Every check pkglint runs on a PKGBUILD, grouped by concern, with a flagged and preferred example for each.",
 		map[string]any{
-			"Groups":     groupRules(registry),
-			"FixSafe":    rules.FixSafe,
-			"FixUnsafe":  rules.FixUnsafe,
-			"WidestName": widestName(registry),
+			"Groups":         groupRules(registry),
+			"FixSafe":        rules.FixSafe,
+			"FixUnsafe":      rules.FixUnsafe,
+			"WidestName":     widestName(registry),
+			"WidestSeverity": widestSeverity(registry),
 		})
 	if err := renderTo(tmpl, "rulesindex.html", filepath.Join(out, "rules", "index.html"), rulesData); err != nil {
 		return err
@@ -376,6 +377,30 @@ func widestName(all []rules.Rule) string {
 	for _, r := range all {
 		if len(r.Name) > len(w) {
 			w = r.Name
+		}
+	}
+	return w
+}
+
+// widestSeverity returns the registry's widest severity range, measured in
+// label characters. It plays the same trick as widestName: the rule reference
+// renders it invisibly in every table's Severity header so the column holds one
+// width across all seven categories, including the ones where no rule
+// escalates and the cells are a single badge. A range always renders two badges
+// and so always beats a fixed severity, which makes the character count a fair
+// proxy for the rendered width within each group.
+func widestSeverity(all []rules.Rule) rules.SeverityRange {
+	width := func(s rules.SeverityRange) int {
+		n := len(s.Low.String())
+		if s.Varies() {
+			n += len("–") + len(s.High.String())
+		}
+		return n
+	}
+	var w rules.SeverityRange
+	for _, r := range all {
+		if s := r.Severities(); width(s) > width(w) {
+			w = s
 		}
 	}
 	return w

@@ -13,8 +13,9 @@ import (
 // with networking disabled.
 var hermeticRules = []Rule{
 	{
-		ID:   "PB201",
-		Name: "network-in-build",
+		ID:       "PB201",
+		Name:     "network-in-build",
+		Severity: Warn,
 		Doc: "Downloads during build(), check() or package() bypass makepkg's checksum " +
 			"verification and make the build non-hermetic: what gets compiled depends on network " +
 			"state at build time. Move fetching to prepare() (or better, the source array) where " +
@@ -22,16 +23,18 @@ var hermeticRules = []Rule{
 		Check: checkNetworkInBuild,
 	},
 	{
-		ID:   "PB202",
-		Name: "pip-without-hashes",
+		ID:       "PB202",
+		Name:     "pip-without-hashes",
+		Severity: Warn,
 		Doc: "`pip install` without --require-hashes will happily fetch whatever the index serves. " +
 			"With hash-pinned requirements, pip verifies every downloaded artifact against a digest " +
 			"recorded in the requirements file.",
 		Check: checkPipHashes,
 	},
 	{
-		ID:   "PB203",
-		Name: "cargo-unlocked",
+		ID:       "PB203",
+		Name:     "cargo-unlocked",
+		Severity: Warn,
 		Doc: "cargo without --locked (or --frozen/--offline) may resolve and fetch dependency " +
 			"versions that differ from the committed Cargo.lock, so the built artifact is not " +
 			"reproducible and unreviewed code can enter the build.",
@@ -40,8 +43,9 @@ var hermeticRules = []Rule{
 		Fix:      fixCargoLocked,
 	},
 	{
-		ID:   "PB204",
-		Name: "go-implicit-downloads",
+		ID:       "PB204",
+		Name:     "go-implicit-downloads",
+		Severity: Warn,
 		Doc: "`go build` fetches modules on demand unless they were vendored or pre-downloaded. " +
 			"That download happens inside build() with no makepkg-level verification (go.sum " +
 			"verifies content, but resolution still depends on network state). Vendor the modules, " +
@@ -52,8 +56,9 @@ var hermeticRules = []Rule{
 		Fix:      fixGoDownloads,
 	},
 	{
-		ID:   "PB205",
-		Name: "go-verification-disabled",
+		ID:       "PB205",
+		Name:     "go-verification-disabled",
+		Severity: Warn,
 		Doc: "GOFLAGS/GONOSUMCHECK/GOSUMDB/GOINSECURE settings that disable Go's module checksum " +
 			"database or allow insecure transports remove the only integrity verification Go " +
 			"downloads get inside a build.",
@@ -62,8 +67,9 @@ var hermeticRules = []Rule{
 		Fix:      fixGoEnvWeakening,
 	},
 	{
-		ID:   "PB206",
-		Name: "npm-install-unlocked",
+		ID:       "PB206",
+		Name:     "npm-install-unlocked",
+		Severity: Info,
 		Doc: "`npm install` may rewrite the dependency tree; `npm ci` (and yarn --immutable, " +
 			"pnpm/bun --frozen-lockfile) installs exactly what the committed lockfile specifies " +
 			"and fails otherwise.",
@@ -72,8 +78,9 @@ var hermeticRules = []Rule{
 		Fix:      fixNpmCI,
 	},
 	{
-		ID:   "PB207",
-		Name: "composer-unlocked",
+		ID:       "PB207",
+		Name:     "composer-unlocked",
+		Severity: Warn,
 		Doc: "`composer update` re-resolves and fetches dependency versions, abandoning the " +
 			"committed composer.lock — use `composer install`, which installs exactly what the lock " +
 			"pins. And either way, composer runs hook scripts and plugins from composer.json and the " +
@@ -84,8 +91,9 @@ var hermeticRules = []Rule{
 		Fix:      fixComposer,
 	},
 	{
-		ID:   "PB208",
-		Name: "bundler-unlocked",
+		ID:       "PB208",
+		Name:     "bundler-unlocked",
+		Severity: Info, MaxSeverity: Warn, // warn once a fetch is unpinned rather than merely unfrozen
 		Doc: "`bundle install` without --frozen (or deployment mode) silently rewrites Gemfile.lock " +
 			"when it drifts from the Gemfile, fetching versions nobody reviewed; --frozen makes the " +
 			"committed lock authoritative and fails otherwise. Plain `gem install` has no lockfile " +
@@ -95,8 +103,9 @@ var hermeticRules = []Rule{
 		Fix:      fixBundler,
 	},
 	{
-		ID:   "PB209",
-		Name: "uv-poetry-unlocked",
+		ID:       "PB209",
+		Name:     "uv-poetry-unlocked",
+		Severity: Warn,
 		Doc: "uv and poetry re-resolve dependencies unless told the committed lockfile is " +
 			"authoritative: `uv sync`/`uv run` without --frozen or --locked may rewrite uv.lock, and " +
 			"`poetry update`/`poetry add` abandon poetry.lock outright. Pass --frozen, and prefer " +

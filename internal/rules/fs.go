@@ -12,24 +12,27 @@ import (
 // PB4xx: filesystem and privilege hygiene.
 var fsRules = []Rule{
 	{
-		ID:   "PB401",
-		Name: "write-outside-builddir",
+		ID:       "PB401",
+		Name:     "write-outside-builddir",
+		Severity: Error,
 		Doc: "A build must only write beneath $srcdir and $pkgdir. Writes to $HOME or absolute " +
 			"system paths either corrupt the builder's machine or hint at persistence being " +
 			"installed outside the package manager's tracking.",
 		Check: checkWritesOutside,
 	},
 	{
-		ID:   "PB402",
-		Name: "privilege-escalation",
+		ID:       "PB402",
+		Name:     "privilege-escalation",
+		Severity: Error,
 		Doc: "makepkg builds must never escalate: sudo/su/doas/pkexec in a PKGBUILD runs arbitrary " +
 			"commands as root on the build machine. Anything needing privileges belongs in the " +
 			"package's install step, executed and tracked by pacman.",
 		Check: checkPrivilegeEscalation,
 	},
 	{
-		ID:   "PB403",
-		Name: "setuid-file",
+		ID:       "PB403",
+		Name:     "setuid-file",
+		Severity: Warn,
 		Doc: "chmod u+s/g+s (or 4xxx/2xxx modes), and `install -m` with such a mode, create " +
 			"setuid/setgid binaries, and `setcap` grants file capabilities (cap_setuid, cap_net_raw, " +
 			"…) — the capability-based equivalent of setuid. Each is a privilege boundary that " +
@@ -40,8 +43,9 @@ var fsRules = []Rule{
 		Fix:      fixSetuid,
 	},
 	{
-		ID:   "PB404",
-		Name: "install-without-destdir",
+		ID:       "PB404",
+		Name:     "install-without-destdir",
+		Severity: Error,
 		Doc: "A build system's install step in package() must be redirected into $pkgdir (via " +
 			"DESTDIR, --root, --prefix, or --destdir). Without it, `make install` and friends write " +
 			"into the builder's live filesystem instead of the staging directory — untracked by pacman " +
@@ -49,8 +53,9 @@ var fsRules = []Rule{
 		Check: checkInstallDestdir,
 	},
 	{
-		ID:   "PB405",
-		Name: "sensitive-file-write",
+		ID:       "PB405",
+		Name:     "sensitive-file-write",
+		Severity: Critical,
 		Doc: "Writing to pacman's configuration (SigLevel/repos control package trust), the dynamic " +
 			"linker's preload/search config, or sudoers — or running pacman-key — reconfigures the " +
 			"system's trust and privilege boundaries. In a PKGBUILD or scriptlet this is a persistence " +

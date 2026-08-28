@@ -39,6 +39,27 @@ func (s Severity) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + s.String() + `"`), nil
 }
 
+// SeverityRange is the span of severities one rule can report: Low is what it
+// reports by default, High the worst it escalates to. The two are equal for
+// the rules whose severity does not depend on what they find.
+type SeverityRange struct {
+	Low, High Severity
+}
+
+// Varies reports whether the rule's severity depends on what it found, i.e.
+// whether the range covers more than one severity.
+func (r SeverityRange) Varies() bool { return r.High > r.Low }
+
+// Severities returns the range of severities the rule can report. It resolves
+// an unset MaxSeverity, which is indistinguishable from Info (the zero value),
+// to a fixed range at Severity.
+func (r Rule) Severities() SeverityRange {
+	if r.MaxSeverity > r.Severity {
+		return SeverityRange{Low: r.Severity, High: r.MaxSeverity}
+	}
+	return SeverityRange{Low: r.Severity, High: r.Severity}
+}
+
 // Finding is a single reported issue.
 type Finding struct {
 	RuleID   string   `json:"rule"`
@@ -51,8 +72,19 @@ type Finding struct {
 
 // Rule is a single check.
 type Rule struct {
-	ID    string
-	Name  string // short slug, e.g. "unpinned-vcs-source"
+	ID   string
+	Name string // short slug, e.g. "unpinned-vcs-source"
+
+	// Severity is what the rule reports. A handful of rules escalate on what
+	// they find — an eval of a downloaded script is worse than a plain eval —
+	// and set MaxSeverity to the worst they can reach; it is left unset when
+	// the severity is fixed. Read the pair through Severities, which resolves
+	// that zero value. Both are declarations *about* Check, not inputs to it:
+	// the findings carry their own severity, and TestRuleSeveritiesAreDeclared
+	// holds the two in agreement.
+	Severity    Severity
+	MaxSeverity Severity
+
 	Doc   string // one-paragraph explanation, rendered on the report card site
 	Check func(*Context) []Finding
 

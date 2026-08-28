@@ -12,24 +12,27 @@ import (
 // also claim identities (provides/replaces) it has no business claiming.
 var consistencyRules = []Rule{
 	{
-		ID:   "PB601",
-		Name: "srcinfo-mismatch",
+		ID:       "PB601",
+		Name:     "srcinfo-mismatch",
+		Severity: Warn,
 		Doc: ".SRCINFO is what the AUR web interface and helpers display; the PKGBUILD is what " +
 			"executes. A mismatch means reviewers saw different metadata than the build uses — " +
 			"sometimes a stale regeneration, sometimes deliberate misdirection.",
 		Check: checkSrcInfoMatch,
 	},
 	{
-		ID:   "PB602",
-		Name: "network-in-pkgver",
+		ID:       "PB602",
+		Name:     "network-in-pkgver",
+		Severity: Warn,
 		Doc: "pkgver() should derive a version from the already-fetched sources (git describe, " +
 			"cat VERSION). Downloading inside pkgver() executes network-dependent code on every " +
 			"makepkg invocation, including ones the user thought were offline.",
 		Check: checkPkgverNetwork,
 	},
 	{
-		ID:   "PB603",
-		Name: "core-package-claim",
+		ID:       "PB603",
+		Name:     "core-package-claim",
+		Severity: Warn,
 		Doc: "A provides, replaces or conflicts entry naming a core system package hijacks the " +
 			"dependency graph: installing the package silently satisfies dependencies meant for the " +
 			"real pacman/glibc/systemd, or removes the real one outright. Variant packages (foo-git, " +

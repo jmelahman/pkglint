@@ -10,61 +10,69 @@ import (
 // PB3xx: code execution and obfuscation.
 var execRules = []Rule{
 	{
-		ID:   "PB301",
-		Name: "top-level-execution",
+		ID:       "PB301",
+		Name:     "top-level-execution",
+		Severity: Critical,
 		Doc: "Commands outside any function run the moment the PKGBUILD is sourced — including by " +
 			"tools that only wanted metadata (`makepkg --printsrcinfo`, AUR helpers rendering a " +
 			"preview). Top-level code should be limited to variable assignments.",
 		Check: checkTopLevelExec,
 	},
 	{
-		ID:   "PB302",
-		Name: "eval",
+		ID:       "PB302",
+		Name:     "eval",
+		Severity: Error, MaxSeverity: Critical, // critical when the evaluated string is downloaded
 		Doc: "eval executes a string as code, defeating static review: what actually runs is " +
 			"assembled at build time. Almost every legitimate use has a plain-bash equivalent.",
 		Check: checkEval,
 	},
 	{
-		ID:   "PB303",
-		Name: "decode-and-execute",
+		ID:       "PB303",
+		Name:     "decode-and-execute",
+		Severity: Critical,
 		Doc: "Decoding embedded data (base64, xxd, openssl enc) and piping it into an interpreter " +
 			"is the canonical way to smuggle a payload past human review. There is no legitimate " +
 			"reason for a PKGBUILD to execute decoded blobs.",
 		Check: checkDecodeExec,
 	},
 	{
-		ID:   "PB304",
-		Name: "download-and-execute",
+		ID:       "PB304",
+		Name:     "download-and-execute",
+		Severity: Critical,
 		Doc: "Piping a download straight into an interpreter executes whatever the server chooses " +
 			"to send, with no checksum, no review, and no record. This includes `eval \"$(curl ...)\"`, " +
 			"`sh -c \"$(wget ...)\"` and `source <(curl ...)` variants.",
 		Check: checkDownloadExec,
 	},
 	{
-		ID:   "PB305",
-		Name: "dev-tcp",
+		ID:       "PB305",
+		Name:     "dev-tcp",
+		Severity: Critical,
 		Doc: "/dev/tcp and /dev/udp redirections are bash's built-in network sockets — in a " +
 			"PKGBUILD they are typically reverse shells or exfiltration, never packaging.",
 		Check: checkDevTCP,
 	},
 	{
-		ID:   "PB306",
-		Name: "unresolvable-command",
+		ID:       "PB306",
+		Name:     "unresolvable-command",
+		Severity: Warn, MaxSeverity: Error, // error for ${!indirection}, which hides the name outright
 		Doc: "A command whose name comes from indirection (${!var}) or command substitution cannot " +
 			"be statically reviewed. In a PKGBUILD, hiding *which program runs* is itself a signal: " +
 			"obfuscation is what this rule flags.",
 		Check: checkDynamicCommands,
 	},
 	{
-		ID:   "PB307",
-		Name: "obfuscated-payload",
+		ID:       "PB307",
+		Name:     "obfuscated-payload",
+		Severity: Warn,
 		Doc: "Long hex-escape sequences or large base64-looking literals embedded in a build " +
 			"script are how encoded payloads look at rest. Flagged for human review.",
 		Check: checkObfuscatedLiterals,
 	},
 	{
-		ID:   "PB308",
-		Name: "makepkg-function-override",
+		ID:       "PB308",
+		Name:     "makepkg-function-override",
+		Severity: Critical,
 		Doc: "makepkg sources the PKGBUILD after defining its own internal functions, so a top-level " +
 			"function that reuses an internal name (download_sources, verify_integrity_one, " +
 			"create_package, …) silently replaces makepkg's implementation — a way to disable integrity " +
@@ -73,8 +81,9 @@ var execRules = []Rule{
 		Check: checkMakepkgFuncOverride,
 	},
 	{
-		ID:   "PB309",
-		Name: "hidden-unicode",
+		ID:       "PB309",
+		Name:     "hidden-unicode",
+		Severity: Warn, MaxSeverity: Error, // error for bidi controls, which reorder what you read
 		Doc: "Bidirectional-override and invisible/zero-width characters can make the rendered source " +
 			"differ from what the shell executes (the \"Trojan Source\" class of attacks). A PKGBUILD is " +
 			"ASCII shell; these controls have no legitimate place in it.",

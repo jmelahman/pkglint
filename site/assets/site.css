@@ -539,6 +539,14 @@ td.rid { white-space: nowrap; font: 600 0.875rem/1.5 var(--mono); }
 td.rname { font: 400 0.875rem/1.5 var(--mono); color: var(--dim); white-space: nowrap; }
 td.rdoc { font-size: 0.875rem; }
 td.rfix { width: 1%; }
+/* Severity rides in badges, so the cell only has to refuse to wrap: a range
+   broken across two lines would read as two separate rules. */
+td.rsev { width: 1%; white-space: nowrap; }
+/* The dash is spelled out rather than inherited: it also renders inside the
+   header's invisible sizer, where the surrounding font is the condensed
+   header face, and a sizer that measures wider than the cells it sizes would
+   pad the column by the difference. */
+.sevto { color: var(--dim); padding: 0 0.15rem; font: 400 0.8125rem/1 var(--mono); }
 /* An invisible copy of a column's widest possible content, rendered in its
    header cell: zero height, but the width still counts toward the column, so
    the seven category tables all land on the same widths. The header's
@@ -629,6 +637,10 @@ td.rfix { width: 1%; }
   .ruletable tr { padding: 1rem 0; border-bottom: 1px solid var(--rule-soft); }
   .ruletable tr:last-child { border-bottom: 0; }
   .ruletable td { border: 0; padding: 0; }
-  .ruletable td.rid, .ruletable td.rname, .ruletable td.rfix { display: inline-block; margin-right: 0.6rem; }
+  .ruletable td.rid, .ruletable td.rname, .ruletable td.rsev, .ruletable td.rfix { display: inline-block; margin-right: 0.6rem; }
+  /* The 1% that shrink-wraps these two as table cells is 1% of the row once
+     they are inline-blocks, which their badges then overflow into whatever
+     sits to the right. Off the table layout, shrink-wrapping is the default. */
+  .ruletable td.rsev, .ruletable td.rfix { width: auto; }
   .ruletable td.rdoc { margin-top: 0.45rem; }
 }

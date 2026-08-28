@@ -13,11 +13,14 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"sync"
 
 	"github.com/jmelahman/pkglint/internal/rules"
 )
@@ -35,7 +38,34 @@ type stateRecord struct {
 	Drift        []string        `json:"drift,omitempty"`
 	Err          string          `json:"error,omitempty"`
 	Fingerprint  sourceState     `json:"fingerprint"`
+
+	// Rules is the fingerprint of the rule registry the findings were
+	// produced under. A record from a different registry is stale even when
+	// the PKGBUILD has not changed: without this, a pkglint release that adds
+	// or recalibrates rules would leave most of the corpus graded by the old
+	// ruleset forever, since re-lints are otherwise keyed on LastModified
+	// alone.
+	Rules string `json:"rules,omitempty"`
 }
+
+// stateEpoch invalidates every state record when bumped. The registry
+// fingerprint below catches rules being added, removed, or re-tiered on its
+// own; bump this instead when rule *logic* changes in a way the registry
+// shape cannot see and the whole corpus should re-lint.
+const stateEpoch = 1
+
+// rulesFingerprint identifies the current rule registry: the set of rule IDs
+// with their declared severity ranges and fix levels, plus stateEpoch.
+var rulesFingerprint = sync.OnceValue(func() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "epoch=%d", stateEpoch)
+	for _, r := range rules.Registry() {
+		s := r.Severities()
+		fmt.Fprintf(&b, ";%s:%d:%d:%d", r.ID, s.Low, s.High, r.FixLevel)
+	}
+	sum := sha256.Sum256([]byte(b.String()))
+	return fmt.Sprintf("%x", sum[:8])
+})
 
 // loadState reads the checked-in scan state. A missing file is the ordinary
 // first-run case, not an error; an unreadable or malformed one is reported,

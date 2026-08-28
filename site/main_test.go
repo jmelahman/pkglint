@@ -169,6 +169,7 @@ func TestScanAllReusesUnchanged(t *testing.T) {
 		Base: "demo", LastModified: 1000, Grade: "B",
 		Findings: []rules.Finding{{RuleID: "PB101"}},
 		Drift:    []string{"a note from the run that saw it change"},
+		Rules:    rulesFingerprint(),
 	}}
 
 	// cache points nowhere: a fetch would fail, so a passing test is proof
@@ -193,6 +194,47 @@ func TestScanAllReusesUnchanged(t *testing.T) {
 	}
 }
 
+// TestScanAllRescansOnRuleChange pins the other half of the reuse bargain: a
+// record produced under a different rule registry is stale even though the
+// PKGBUILD has not changed. The snapshot is planted in the cache, so the
+// re-lint needs no network — which is also how a real registry bump refreshes
+// most of the corpus for free.
+func TestScanAllRescansOnRuleChange(t *testing.T) {
+	cache := t.TempDir()
+	dir := filepath.Join(cache, "snapshots", "demo@1000")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pkgbuild := "pkgname=demo\npkgver=1.0\npkgrel=1\npkgdesc='A demonstration tool'\n" +
+		"arch=('any')\nurl='https://example.com'\nlicense=('MIT')\n"
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgbuild), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	seed := []metaPackage{{PackageBase: "demo", LastModified: 1000}}
+	prev := map[string]stateRecord{"demo": {
+		Base: "demo", LastModified: 1000, Grade: "F",
+		Findings: []rules.Finding{{RuleID: "PB000", Message: "from a previous ruleset"}},
+		Rules:    "0000000000000000", // not the current registry
+	}}
+
+	results, next := scanAll(seed, cache, 1, 0, prev)
+	if len(results) != 1 {
+		t.Fatalf("expected one result, got %d", len(results))
+	}
+	for _, f := range results[0].Findings {
+		if f.RuleID == "PB000" {
+			t.Errorf("stale findings survived the registry change: %+v", results[0].Findings)
+		}
+	}
+	if results[0].Grade == "F" && len(results[0].Findings) == 1 {
+		t.Errorf("result was reused despite the registry change: %+v", results[0])
+	}
+	if got := next["demo"].Rules; got != rulesFingerprint() {
+		t.Errorf("refreshed record carries fingerprint %q, want the current registry's", got)
+	}
+}
+
 // TestScanAllBudget pins how a bounded run divides the corpus. Bases past the
 // budget must not be fetched, must keep their last known grade if they have
 // one, and must keep their old LastModified so a later run picks them up.
@@ -203,10 +245,10 @@ func TestScanAllBudget(t *testing.T) {
 		{PackageBase: "new", NumVotes: 10, LastModified: 3000},
 	}
 	prev := map[string]stateRecord{
-		"unchanged": {Base: "unchanged", LastModified: 1000, Grade: "A"},
+		"unchanged": {Base: "unchanged", LastModified: 1000, Grade: "A", Rules: rulesFingerprint()},
 		// Changed since it was last scanned, so it is work — but the budget is
 		// zero, so it renders at its old grade instead.
-		"known": {Base: "known", LastModified: 1, Grade: "D"},
+		"known": {Base: "known", LastModified: 1, Grade: "D", Rules: rulesFingerprint()},
 	}
 
 	// One fetch allowed against two candidates. "unchanged" is not a candidate

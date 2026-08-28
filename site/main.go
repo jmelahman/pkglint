@@ -363,8 +363,13 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 		switch {
 		// A record carrying an error is not fresh: the failure may have been a
 		// transient fetch, and a base that is genuinely gone leaves the
-		// metadata dump and so never reaches this loop again.
-		case ok && rec.Err == "" && rec.LastModified == m.LastModified:
+		// metadata dump and so never reaches this loop again. A record from an
+		// older rule registry is not fresh either — the PKGBUILD may be
+		// unchanged, but what pkglint would say about it is not; it re-lints
+		// (usually from the snapshot cache) under the budget like any other
+		// stale base, so a registry change refreshes the corpus over a few
+		// nights instead of serving old findings forever.
+		case ok && rec.Err == "" && rec.LastModified == m.LastModified && rec.Rules == rulesFingerprint():
 			results[i], keep[i] = resultFrom(m, rec), true
 			reused++
 		case budget > 0 && len(todo) >= budget:
@@ -475,6 +480,7 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 		Findings:     res.Findings,
 		Drift:        res.Drift,
 		Fingerprint:  cur,
+		Rules:        rulesFingerprint(),
 	}
 }
 

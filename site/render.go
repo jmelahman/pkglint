@@ -209,9 +209,10 @@ func renderSite(out string, results []siteResult) error {
 	rulesData := page("rules/", "Rule reference — AUR Report Card",
 		"Every check pkglint runs on a PKGBUILD, grouped by concern, with a flagged and preferred example for each.",
 		map[string]any{
-			"Groups":    groupRules(registry),
-			"FixSafe":   rules.FixSafe,
-			"FixUnsafe": rules.FixUnsafe,
+			"Groups":     groupRules(registry),
+			"FixSafe":    rules.FixSafe,
+			"FixUnsafe":  rules.FixUnsafe,
+			"WidestName": widestName(registry),
 		})
 	if err := renderTo(tmpl, "rulesindex.html", filepath.Join(out, "rules", "index.html"), rulesData); err != nil {
 		return err
@@ -365,6 +366,19 @@ func groupRules(all []rules.Rule) []ruleGroup {
 		}
 	}
 	return groups
+}
+
+// widestName returns the longest rule name in the registry. The rule reference
+// renders it invisibly in every table's Name header so the column is the same
+// width in each category, not the width of that category's longest name.
+func widestName(all []rules.Rule) string {
+	var w string
+	for _, r := range all {
+		if len(r.Name) > len(w) {
+			w = r.Name
+		}
+	}
+	return w
 }
 
 func renderTo(tmpl *template.Template, name, path string, data any) error {

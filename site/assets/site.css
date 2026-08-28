@@ -539,6 +539,13 @@ td.rid { white-space: nowrap; font: 600 0.875rem/1.5 var(--mono); }
 td.rname { font: 400 0.875rem/1.5 var(--mono); color: var(--dim); white-space: nowrap; }
 td.rdoc { font-size: 0.875rem; }
 td.rfix { width: 1%; }
+/* An invisible copy of a column's widest possible content, rendered in its
+   header cell: zero height, but the width still counts toward the column, so
+   the seven category tables all land on the same widths. The header's
+   uppercase tracking would inflate the copy, so both reset here; the name
+   sizer wears td.rname's font so it measures like a real cell. */
+.colsizer { display: block; height: 0; overflow: hidden; visibility: hidden; letter-spacing: normal; text-transform: none; }
+.rname-sizer { font: 400 0.875rem/1.5 var(--mono); }
 
 /* The grading rule, drawn as the ladder it is. */
 .ladder { display: grid; gap: 1px; margin: 0 0 1.5rem; }

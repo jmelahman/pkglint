@@ -86,9 +86,12 @@ func TestRenderFixableBadges(t *testing.T) {
 		t.Errorf("PB101 rule page should not show a fix pill:\n%s", r)
 	}
 
-	// Rule reference table lists the Fix column.
-	if idx := read(filepath.Join("rules", "index.html")); !strings.Contains(idx, "<th>Fix</th>") {
-		t.Errorf("rule reference missing Fix column:\n%s", idx)
+	// Rule reference table lists the Fix column, and its header carries the
+	// invisible --unsafe-fix sizer that holds the column at one width even in
+	// categories with no fixable rules.
+	idx := read(filepath.Join("rules", "index.html"))
+	if !strings.Contains(idx, `<th>Fix<span class="colsizer">`) {
+		t.Errorf("rule reference missing Fix column sizer:\n%s", idx)
 	}
 }
 

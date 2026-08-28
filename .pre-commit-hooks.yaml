@@ -1,0 +1,42 @@
+# Hooks this repo exposes to *other* repos, so a packaging tree can lint its
+# own PKGBUILDs on commit with a .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/jmelahman/pkglint
+#       rev: v1.0.1
+#       hooks:
+#         - id: pkglint
+
+- id: pkglint
+  name: pkglint
+  description: statically analyze PKGBUILDs for source-integrity, hermeticity, and code-execution problems
+  entry: pkglint
+  language: golang
+  # Only PKGBUILDs are passed; pkglint picks up each one's .SRCINFO and install
+  # scriptlets from the same directory itself. A commit that touches only a
+  # scriptlet therefore doesn't trigger this hook — add
+  # `files: (^|/)(PKGBUILD|.*\.install)$` downstream if that matters, but note
+  # pkglint must still be handed the PKGBUILD, not the scriptlet.
+  files: (^|/)PKGBUILD$
+  # Tune per repo with e.g. `args: [--ignore, PB105, --fail-on, critical]`.
+  minimum_pre_commit_version: "3.0.0"
+
+- id: pkglint-fix
+  name: pkglint (autofix)
+  description: apply pkglint's safe auto-fixes to PKGBUILDs in place
+  entry: pkglint --fix
+  language: golang
+  files: (^|/)PKGBUILD$
+  # Committing shouldn't reach the network; drop this with `args: []` to let
+  # fixes that need it (resolving a VCS ref to a commit) run. Swap for
+  # `args: [--unsafe-fix]` to also apply behavior-changing rewrites.
+  args: ["--offline"]
+  minimum_pre_commit_version: "3.0.0"
+
+- id: pkglint-system
+  name: pkglint (system)
+  description: same as pkglint, but runs the pkglint already installed on the machine
+  entry: pkglint
+  language: system
+  files: (^|/)PKGBUILD$
+  # `args: [--fix]` turns this into the autofix hook without a Go toolchain.

@@ -292,6 +292,13 @@ func TestRenderMaintainerFilter(t *testing.T) {
 			t.Errorf("site.js missing %s: the roster's maintainer filter is not wired up", want)
 		}
 	}
+	// The query is shareable: ?search= seeds the box on load and typing
+	// mirrors it back, so a link to a filtered view survives being sent.
+	for _, want := range []string{`.get("search")`, "history.replaceState"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("site.js missing %s: the ?search= deep link is not wired up", want)
+		}
+	}
 }
 
 // TestClip covers the description shortener: previews cut a long description

@@ -229,12 +229,41 @@
     });
   });
 
-  if (search) search.addEventListener("input", apply);
+  // The query lives in the URL as well as the box: ?search=@lone_wolf opens
+  // the roster already narrowed, which is the only way a static site can hand
+  // out a link to a filtered view — a maintainer pointing at their own
+  // packages being the case that pays for it. Typing mirrors the box back
+  // with replaceState, one entry, so the address bar always names the view on
+  // screen and Back still leaves the page rather than un-typing the query.
+  function reflect() {
+    if (!search || !window.URLSearchParams || !window.history ||
+      !history.replaceState) return;
+    var params = new URLSearchParams(location.search);
+    var raw = search.value.trim();
+    if (raw) params.set("search", raw);
+    else params.delete("search");
+    var qs = params.toString();
+    history.replaceState(null, "",
+      location.pathname + (qs ? "?" + qs : "") + location.hash);
+  }
+
+  if (search && window.URLSearchParams) {
+    var seeded = new URLSearchParams(location.search).get("search");
+    if (seeded) search.value = seeded;
+  }
+
+  if (search) {
+    search.addEventListener("input", function () {
+      reflect();
+      apply();
+    });
+  }
 
   if (clear) {
     clear.addEventListener("click", function () {
       if (search) search.value = "";
       grades = Object.create(null);
+      reflect();
       apply();
       if (search) search.focus();
     });

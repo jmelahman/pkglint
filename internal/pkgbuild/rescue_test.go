@@ -105,6 +105,61 @@ func TestRescueInlineArray(t *testing.T) {
 	}
 }
 
+// TestRescueArithFallback covers `$((( cmd )) ...)`: bash retries the failed
+// arithmetic parse as a command substitution; upstream reports the unmatched
+// `))`. Both cases pass `bash -n`.
+func TestRescueArithFallback(t *testing.T) {
+	t.Run("configure flag toggle", func(t *testing.T) {
+		src := "flag=1\nbuild() {\n  ./configure $((( flag )) && echo --enable-tests)\n}\n"
+		pkg := loadPKGBUILD(t, src)
+		if string(pkg.PKGBUILD.Raw) != src {
+			t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+		}
+		if pkg.PKGBUILD.Functions["build"] == nil {
+			t.Errorf("build() not extracted")
+		}
+		// The restored paren text must survive: findings quote code from Raw.
+		if !strings.Contains(string(pkg.PKGBUILD.Raw), "$((( flag ))") {
+			t.Errorf("arithmetic command text lost from Raw")
+		}
+	})
+
+	t.Run("assignment form", func(t *testing.T) {
+		src := "a=$((( x )) && echo y)\n"
+		pkg := loadPKGBUILD(t, src)
+		if string(pkg.PKGBUILD.Raw) != src {
+			t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+		}
+	})
+
+	// Real arithmetic in the same spelling must not round-trip through the
+	// rescue: `$(((1+2)*3))` parses as arithmetic on the first attempt.
+	t.Run("healthy arithmetic untouched", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "a=$(((1+2)*3))\n")
+		if pkg.Vars["a"] == nil {
+			t.Fatal("a not extracted")
+		}
+	})
+}
+
+// TestRescueHeredocText covers non-shell text — Markdown code fences, inline
+// backquotes — in an unquoted heredoc body. Bash defers the body's expansions
+// to when the redirection runs, so `bash -n` accepts this; upstream parses the
+// backquote substitution eagerly and fails on its content.
+func TestRescueHeredocText(t *testing.T) {
+	src := "package() {\n  cat <<EOF\nNotes:\n```\nfoo(s) bar\n```\nUses `file`, see $pkgdir docs.\nEOF\n}\n"
+	pkg := loadPKGBUILD(t, src)
+	if string(pkg.PKGBUILD.Raw) != src {
+		t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+	}
+	if pkg.PKGBUILD.Functions["package"] == nil {
+		t.Errorf("package() not extracted")
+	}
+	if !strings.Contains(string(pkg.PKGBUILD.Raw), "Uses `file`") {
+		t.Errorf("backquote text lost from Raw")
+	}
+}
+
 // TestRescueGivesUp pins the failure mode: input that bash itself rejects, or
 // that the rescue cannot restore faithfully, must surface the original parse
 // error rather than a silently divergent AST.
@@ -120,6 +175,9 @@ func TestRescueGivesUp(t *testing.T) {
 		// The rewritten `~` would become an arithmetic operator, not a
 		// literal, so restoration must veto the rescue.
 		{"expansion glued to arith base", "a=$(($x#2))\n"},
+		// bash rejects this too: the paren error is outside any heredoc, so
+		// no rescue may apply.
+		{"paren in ordinary command", "build() {\n  echo task(s)\n}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := parseUnit("PKGBUILD", []byte(tc.src), false); err == nil {

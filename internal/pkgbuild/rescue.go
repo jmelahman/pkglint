@@ -63,7 +63,8 @@ func rescueParse(path string, raw []byte) *syntax.File {
 		if !ok {
 			return nil
 		}
-		if !rescueSubscript(work, off, restore) && !rescueInlineArray(work, msg, off, structural) {
+		if !rescueSubscript(work, off, restore) && !rescueInlineArray(work, msg, off, structural) &&
+			!rescueArithFallback(work, msg, off, restore) && !rescueHeredocText(work, off, restore) {
 			return nil
 		}
 	}
@@ -213,6 +214,114 @@ func rescueInlineArray(work []byte, msg string, off int, structural map[int]bool
 	structural[end+1] = true
 	work[end+1] = ';'
 	return true
+}
+
+// rescueArithFallback handles `$((( cmd )) ...)`: a command substitution whose
+// first command is an arithmetic command. Bash resolves the `$((` ambiguity by
+// attempting an arithmetic expansion and re-reading the construct as a command
+// substitution when that parse fails; upstream commits to arithmetic and
+// reports the unmatched `))`. The arithmetic command's own paren pairs are
+// blanked to `_`, turning it into an ordinary command word, and restored
+// afterwards — the rescued statement runs a command spelled `((`, which no
+// rule treats specially, and every rendered value keeps the original text.
+func rescueArithFallback(work []byte, msg string, off int, restore map[int]byte) bool {
+	if !strings.Contains(msg, "without matching `$((` with `))`") {
+		return false
+	}
+	// Only the unambiguous fallback shape: `$(((` where the inner `((...))`
+	// pair closes together. Anything else keeps the original error.
+	if off+3 >= len(work) || work[off] != '$' || work[off+1] != '(' || work[off+2] != '(' || work[off+3] != '(' {
+		return false
+	}
+	q := arrayEnd(work, off+4)
+	if q < 0 || q+1 >= len(work) || work[q+1] != ')' {
+		return false
+	}
+	for _, i := range []int{off + 2, off + 3, q, q + 1} {
+		if work[i] == '_' {
+			return false // already rewritten once; do not loop
+		}
+		if _, seen := restore[i]; !seen {
+			restore[i] = work[i]
+		}
+		work[i] = '_'
+	}
+	return true
+}
+
+// rescueHeredocText handles parse failures inside the body of an unquoted
+// here-document. Bash stores the body as text at parse time and only performs
+// its expansions when the redirection runs, so `bash -n` accepts a body whose
+// backquoted regions are not shell at all — Markdown code fences in a
+// user-facing message are the shape seen in the wild. Upstream parses those
+// expansions eagerly and fails. Every backquote in the enclosing body is
+// blanked to `_` and restored afterwards; the body's `$` expansions stay live.
+// A wrong guess about the body's extent is caught downstream: either the
+// rewritten file still fails to parse or the bytes do not resurface in the
+// body's literal, and the rescue is discarded.
+func rescueHeredocText(work []byte, off int, restore map[int]byte) bool {
+	for i := 0; i+1 < off; i++ {
+		if work[i] != '<' || work[i+1] != '<' {
+			continue
+		}
+		if (i > 0 && work[i-1] == '<') || (i+2 < len(work) && work[i+2] == '<') {
+			i++ // <<<: a herestring, not a heredoc
+			continue
+		}
+		j := i + 2
+		if j < len(work) && work[j] == '-' {
+			j++
+		}
+		for j < len(work) && (work[j] == ' ' || work[j] == '\t') {
+			j++
+		}
+		ds := j
+		for j < len(work) && isIdentByte(work[j]) {
+			j++
+		}
+		if j == ds {
+			continue // quoted or exotic delimiter: bash treats the body literally, upstream agrees
+		}
+		delim := string(work[ds:j])
+		nl := bytes.IndexByte(work[j:], '\n')
+		if nl < 0 {
+			return false
+		}
+		bodyStart := j + nl + 1
+		if off < bodyStart {
+			continue
+		}
+		bodyEnd := -1
+		for k := bodyStart; k < len(work); {
+			lineEnd := bytes.IndexByte(work[k:], '\n')
+			if lineEnd < 0 {
+				lineEnd = len(work) - k
+			}
+			// <<- strips leading tabs from the terminator; plain << does not,
+			// but matching both here only widens where the scan stops looking.
+			if string(bytes.TrimLeft(work[k:k+lineEnd], "\t")) == delim {
+				bodyEnd = k
+				break
+			}
+			k += lineEnd + 1
+		}
+		if bodyEnd < 0 || off >= bodyEnd {
+			continue
+		}
+		changed := false
+		for k := bodyStart; k < bodyEnd; k++ {
+			if work[k] != '`' {
+				continue
+			}
+			if _, seen := restore[k]; !seen {
+				restore[k] = work[k]
+			}
+			work[k] = '_'
+			changed = true
+		}
+		return changed
+	}
+	return false
 }
 
 // arrayEnd scans from just inside an array literal's opening paren to its

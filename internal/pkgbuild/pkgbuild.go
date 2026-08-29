@@ -247,8 +247,11 @@ func (p *Package) Scalar(name string) (string, bool) {
 
 var varRef = regexp.MustCompile(`\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)`)
 
-// Expand substitutes $name / ${name} references using known top-level scalar
-// variables. Unknown references are left as-is.
+// Expand substitutes $name / ${name} references using known top-level
+// variables. An unsubscripted reference to an array expands to its first
+// element ($arr means ${arr[0]} in bash), which split PKGBUILDs rely on:
+// pkgname=(a b); source=(${pkgname}.service) fetches a.service. Unknown
+// references are left as-is.
 func (p *Package) Expand(s string) string {
 	for range 5 {
 		if !strings.Contains(s, "$") {
@@ -256,7 +259,17 @@ func (p *Package) Expand(s string) string {
 		}
 		out := varRef.ReplaceAllStringFunc(s, func(m string) string {
 			name := strings.Trim(m[1:], "{}")
-			if v, ok := p.Vars[name]; ok && !v.Array && len(v.Values) == 1 {
+			v, ok := p.Vars[name]
+			if !ok {
+				return m
+			}
+			if v.Array {
+				if len(v.Values) == 0 {
+					return ""
+				}
+				return v.Values[0]
+			}
+			if len(v.Values) == 1 {
 				return v.Values[0]
 			}
 			return m

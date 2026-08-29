@@ -1537,3 +1537,57 @@ func TestDistinctFindingsAtOneLocationSurvive(t *testing.T) {
 		seen[k] = true
 	}
 }
+
+// TestSplitPackageVarRendering pins how $pkgname resolves in a split package:
+// bash expands the bare array reference to its first element everywhere,
+// except inside package_<name>() where makepkg rebinds pkgname to that split.
+func TestSplitPackageVarRendering(t *testing.T) {
+	dir := t.TempDir()
+	content := `pkgbase=demo
+pkgname=(demo demo-docs)
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+
+build() {
+  touch $pkgname.built
+}
+
+package_demo() {
+  install -Dm644 ${pkgname}.service "$pkgdir/usr/lib/systemd/system/${pkgname}.service"
+}
+
+package_demo-docs() {
+  install -Dm644 COPYING -t "$pkgdir/usr/share/licenses/${pkgname}/"
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := pkgbuild.Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	ctx := NewContext(pkg)
+
+	argsIn := func(fn string) []string {
+		t.Helper()
+		for _, c := range ctx.Commands() {
+			if c.Fn == fn {
+				return c.Args
+			}
+		}
+		t.Fatalf("no command found in %s()", fn)
+		return nil
+	}
+
+	if args := argsIn("build"); len(args) != 1 || args[0] != "demo.built" {
+		t.Errorf("build(): $pkgname should render as the array's first element, got %v", args)
+	}
+	if args := argsIn("package_demo"); len(args) < 3 || args[1] != "demo.service" {
+		t.Errorf("package_demo(): ${pkgname}.service should render as demo.service, got %v", args)
+	}
+	if args := argsIn("package_demo-docs"); len(args) < 4 || args[3] != "$pkgdir/usr/share/licenses/demo-docs/" {
+		t.Errorf("package_demo-docs(): pkgname should rebind to the split's own name, got %v", args)
+	}
+}

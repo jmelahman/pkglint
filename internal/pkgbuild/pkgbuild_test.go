@@ -144,6 +144,22 @@ func TestExpandScalar(t *testing.T) {
 		}
 	})
 
+	// $arr means ${arr[0]} in bash; split PKGBUILDs like cyrus-imapd rely on
+	// this for source entries such as ${pkgname}.service.
+	t.Run("array reference expands to first element", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "pkgname=(cyrus-imapd cyrus-imapd-docs)\n")
+		if got := pkg.Expand("$pkgname.service"); got != "cyrus-imapd.service" {
+			t.Errorf("Expand($pkgname.service) = %q, want %q", got, "cyrus-imapd.service")
+		}
+	})
+
+	t.Run("empty array expands to empty string", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "groups=()\n")
+		if got := pkg.Expand("x${groups}y"); got != "xy" {
+			t.Errorf("Expand(x${groups}y) = %q, want %q", got, "xy")
+		}
+	})
+
 	t.Run("missing variable", func(t *testing.T) {
 		pkg := loadPKGBUILD(t, "pkgver=1.0\n")
 		if got, ok := pkg.Scalar("nope"); ok {

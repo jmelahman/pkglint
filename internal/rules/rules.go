@@ -5,7 +5,9 @@ package rules
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
+	"strings"
 
 	"github.com/jmelahman/pkglint/internal/alpmdb"
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -141,6 +143,9 @@ type Context struct {
 	DB   *alpmdb.DB       // pacman local database; nil when unavailable
 	cmds []Command
 	vars map[string]string
+	// splitVars caches per-split-package variants of vars where pkgname is
+	// bound to that split's name, matching how makepkg runs package_<name>().
+	splitVars map[string]map[string]string
 
 	pkgFacts *packageFacts // lazily computed facts shared by package rules
 }
@@ -161,10 +166,14 @@ type Command struct {
 
 // NewContext precomputes shared state for rules.
 func NewContext(pkg *pkgbuild.Package) *Context {
-	ctx := &Context{Pkg: pkg, vars: map[string]string{}}
+	ctx := &Context{Pkg: pkg, vars: map[string]string{}, splitVars: map[string]map[string]string{}}
 	for name, v := range pkg.Vars {
-		if !v.Array && len(v.Values) == 1 {
+		// Scalars render to exactly one value; for arrays, bash expands an
+		// unsubscripted $name to the first element (and an empty array to "").
+		if len(v.Values) > 0 {
 			ctx.vars[name] = pkg.Expand(v.Values[0])
+		} else if v.Array {
+			ctx.vars[name] = ""
 		}
 	}
 	units := pkg.Units()
@@ -207,11 +216,45 @@ var wrappers = map[string]bool{
 	"exec": true, "builtin": true, "sudo": true, "doas": true,
 }
 
+// varsFor returns the variable map for rendering words inside fn. makepkg
+// runs each split's package_<name>() with pkgname rebound to that split, so
+// inside those functions $pkgname is the split's own name rather than the
+// pkgname array's first element.
+func (ctx *Context) varsFor(fn string) map[string]string {
+	split, ok := strings.CutPrefix(fn, "package_")
+	if !ok {
+		return ctx.vars
+	}
+	if m, ok := ctx.splitVars[split]; ok {
+		return m
+	}
+	v, ok := ctx.Pkg.Vars["pkgname"]
+	if !ok || !v.Array {
+		return ctx.vars
+	}
+	declared := false
+	for _, val := range v.Values {
+		if ctx.Pkg.Expand(val) == split {
+			declared = true
+			break
+		}
+	}
+	if !declared {
+		return ctx.vars
+	}
+	m := make(map[string]string, len(ctx.vars))
+	maps.Copy(m, ctx.vars)
+	m["pkgname"] = split
+	ctx.splitVars[split] = m
+	return m
+}
+
 func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, call *syntax.CallExpr) Command {
 	cmd := Command{Unit: u, Fn: fn, Stmt: stmt, Call: call}
+	vars := ctx.varsFor(fn)
 	args := call.Args
 	for len(args) > 0 {
-		name, dyn := pkgbuild.RenderWord(args[0], ctx.vars)
+		name, dyn := pkgbuild.RenderWord(args[0], vars)
 		if cmd.RawName == "" {
 			cmd.RawName = name
 		}
@@ -226,7 +269,7 @@ func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, c
 			args = args[1:]
 			// Skip the wrapper's flags and VAR=val words.
 			for len(args) > 0 {
-				s, d := pkgbuild.RenderWord(args[0], ctx.vars)
+				s, d := pkgbuild.RenderWord(args[0], vars)
 				if !d && (hasPrefixAny(s, "-") || isAssignWord(s)) {
 					args = args[1:]
 					continue
@@ -240,7 +283,7 @@ func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, c
 		break
 	}
 	for _, w := range args {
-		s, dyn := pkgbuild.RenderWord(w, ctx.vars)
+		s, dyn := pkgbuild.RenderWord(w, vars)
 		cmd.Args = append(cmd.Args, s)
 		cmd.ArgDyn = append(cmd.ArgDyn, dyn)
 	}

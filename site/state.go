@@ -52,7 +52,7 @@ type stateRecord struct {
 // fingerprint below catches rules being added, removed, or re-tiered on its
 // own; bump this instead when rule *logic* changes in a way the registry
 // shape cannot see and the whole corpus should re-lint.
-const stateEpoch = 1
+const stateEpoch = 2
 
 // rulesFingerprint identifies the current rule registry: the set of rule IDs
 // with their declared severity ranges and fix levels, plus stateEpoch.

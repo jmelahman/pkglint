@@ -62,6 +62,39 @@ sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' '
 	}
 }
 
+// TestSourcesSplitPackagePkgname pins the cyrus-imapd shape: a split package
+// whose source array references ${pkgname}, which bash expands to the
+// array's first element.
+func TestSourcesSplitPackagePkgname(t *testing.T) {
+	dir := t.TempDir()
+	content := `pkgbase=cyrus-imapd
+pkgname=(cyrus-imapd cyrus-imapd-docs)
+pkgver=3.6.1
+pkgrel=1
+arch=('x86_64')
+source=(${pkgname}.service ${pkgname}.sysusers)
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
+            '60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752')
+`
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srcs := pkg.Sources()
+	if len(srcs) != 2 {
+		t.Fatalf("expected 2 sources, got %d: %+v", len(srcs), srcs)
+	}
+	if srcs[0].Expanded != "cyrus-imapd.service" || !srcs[0].Local {
+		t.Errorf("first source should expand to the local file cyrus-imapd.service: %+v", srcs[0])
+	}
+	if srcs[1].Expanded != "cyrus-imapd.sysusers" || !srcs[1].Local {
+		t.Errorf("second source should expand to the local file cyrus-imapd.sysusers: %+v", srcs[1])
+	}
+}
+
 // TestParseSourceEntry pins makepkg's [filename::]url[#fragment][?query]
 // splitting for the well-defined orderings.
 func TestParseSourceEntry(t *testing.T) {

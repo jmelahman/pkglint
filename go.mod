@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/spf13/cobra v1.10.2
-	mvdan.cc/sh/v3 v3.13.1
+	mvdan.cc/sh/v3 v3.14.0
 )
 
 require (

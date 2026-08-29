@@ -144,7 +144,14 @@ func ParseScriptlet(path string, raw []byte) (Unit, error) {
 func parseUnit(path string, raw []byte, scriptlet bool) (Unit, error) {
 	f, err := newParser().Parse(bytes.NewReader(raw), path)
 	if err != nil {
-		return Unit{}, fmt.Errorf("parse %s: %w", path, err)
+		// Bash accepts several constructs that mvdan.cc/sh does not yet
+		// parse; rescueParse recovers a position-accurate AST for the known
+		// ones rather than leaving the whole file unscanned (see rescue.go).
+		if rf := rescueParse(path, raw); rf != nil {
+			f = rf
+		} else {
+			return Unit{}, fmt.Errorf("parse %s: %w", path, err)
+		}
 	}
 	u := Unit{
 		Path:      path,

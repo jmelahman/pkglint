@@ -77,8 +77,9 @@ func TestWriteRosterRowShape(t *testing.T) {
 	out := t.TempDir()
 	results := []siteResult{{
 		Name: "demo", Grade: "C", Votes: 42, Description: "a demo",
-		Maintainer: "someone", Findings: []rules.Finding{{RuleID: "PB101"}, {RuleID: "PB102"}},
-		Drift: []string{"a note"},
+		Maintainer: "someone", CoMaintainers: []string{"alice", "bob"},
+		Findings: []rules.Finding{{RuleID: "PB101"}, {RuleID: "PB102"}},
+		Drift:    []string{"a note"},
 	}, {
 		Name: "plain", Grade: "A",
 	}}
@@ -96,14 +97,17 @@ func TestWriteRosterRowShape(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(rows))
 	}
-	want := []any{"demo", "C", 2.0, 42.0, "a demo", "someone", 1.0}
+	// Co-maintainers are one space-joined string, the shape the row's
+	// data-comaintainers attribute uses, so site.js folds one value into its
+	// haystacks whichever way a row arrived.
+	want := []any{"demo", "C", 2.0, 42.0, "a demo", "someone", 1.0, "alice bob"}
 	if !slices.Equal(rows[0], want) {
 		t.Errorf("row = %v, want %v", rows[0], want)
 	}
-	// Drift is 0, not absent: the rows are positional, so an omitted field
-	// would shift every later one.
-	if len(rows[1]) != 7 || rows[1][6] != 0.0 {
-		t.Errorf("undrifted row = %v, want a 7th element of 0", rows[1])
+	// Drift is 0 and co-maintainers "", not absent: the rows are positional,
+	// so an omitted field would shift or drop every later one.
+	if len(rows[1]) != 8 || rows[1][6] != 0.0 || rows[1][7] != "" {
+		t.Errorf("undrifted row = %v, want 8 elements ending in 0 and %q", rows[1], "")
 	}
 }
 

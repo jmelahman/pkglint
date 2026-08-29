@@ -77,8 +77,8 @@
            the placeholder: the placeholder has to describe what typing does by
            default, and it is already as long as the field can hold. */}}
       <input type="search" id="q" placeholder="Filter by name, maintainer, or description" autocomplete="off"
-        title="Prefix the query with @ to match the maintainer only, e.g. @dbermond"
-        aria-label="Filter packages by name, maintainer, or description. Prefix the query with @ to match the maintainer only.">
+        title="Prefix the query with @ to match maintainers and co-maintainers only, e.g. @dbermond"
+        aria-label="Filter packages by name, maintainer, or description. Prefix the query with @ to match maintainers and co-maintainers only.">
       <button type="button" class="clear" id="clear" hidden>Reset</button>
       <span class="count" id="count" role="status">{{if lt .Shown .Total}}{{.Shown}} of {{.Total}} packages{{else}}{{.Total}} packages{{end}}</span>
     </div>

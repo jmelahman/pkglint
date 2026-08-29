@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -63,36 +64,42 @@ var (
 )
 
 type metaPackage struct {
-	Name         string
-	PackageBase  string
-	Version      string
-	Description  string
-	URL          string
-	Maintainer   *string
-	NumVotes     int
-	Popularity   float64
-	LastModified int64
+	Name        string
+	PackageBase string
+	Version     string
+	Description string
+	URL         string
+	Maintainer  *string
+	// CoMaintainers is absent from the dump entirely when there are none, so
+	// the zero value is the common case.
+	CoMaintainers []string
+	NumVotes      int
+	Popularity    float64
+	LastModified  int64
 }
 
 type siteResult struct {
-	Name         string          `json:"name"`
-	Base         string          `json:"base"`
-	Version      string          `json:"version"`
-	Description  string          `json:"description"`
-	Maintainer   string          `json:"maintainer"`
-	Votes        int             `json:"votes"`
-	Grade        string          `json:"grade"`
-	Findings     []rules.Finding `json:"findings"`
-	Drift        []string        `json:"drift,omitempty"` // provenance drift vs. the previous scan
-	Err          string          `json:"error,omitempty"`
-	LastModified int64           `json:"last_modified"`
+	Name        string `json:"name"`
+	Base        string `json:"base"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
+	Maintainer  string `json:"maintainer"`
+	// Co-maintainers can push to the package just as the maintainer can, so
+	// everywhere the site says or matches who maintains a package, they count.
+	CoMaintainers []string        `json:"co_maintainers,omitempty"`
+	Votes         int             `json:"votes"`
+	Grade         string          `json:"grade"`
+	Findings      []rules.Finding `json:"findings"`
+	Drift         []string        `json:"drift,omitempty"` // provenance drift vs. the previous scan
+	Err           string          `json:"error,omitempty"`
+	LastModified  int64           `json:"last_modified"`
 }
 
 func main() {
 	out := flag.String("out", "public", "output directory for the generated site")
 	cache := flag.String("cache", ".cache", "cache directory for downloads")
 	state := flag.String("state", "data/state.jsonl", "checked-in scan state; bases unchanged since it was written are not refetched")
-	maintainer := flag.String("maintainer", "", "always include this maintainer's packages")
+	maintainer := flag.String("maintainer", "", "always include the packages this user maintains or co-maintains")
 	top := flag.Int("top", 0, "also include the top-N packages by votes (0 = none)")
 	since := flag.Int("since-days", 90, "include every package base modified within the last N days (0 = none)")
 	budget := flag.Int("budget", 0, "max snapshot fetches this run (0 = no cap); bases past it keep their last known result")
@@ -268,11 +275,11 @@ func safeBase(name string) bool {
 	return name != ".." && baseRe.MatchString(name) && !strings.Contains(name, "..")
 }
 
-// selectSeed picks one representative per package base: everything by
-// maintainer, everything modified within the last sinceDays, plus the top-N
-// bases by votes. Bases with unsafe names are dropped here, the single choke
-// point, so no unsafe name reaches scanAll, results.json, the rendered links,
-// or any output filename.
+// selectSeed picks one representative per package base: everything maintainer
+// maintains or co-maintains, everything modified within the last sinceDays,
+// plus the top-N bases by votes. Bases with unsafe names are dropped here,
+// the single choke point, so no unsafe name reaches scanAll, results.json,
+// the rendered links, or any output filename.
 //
 // The result is ordered by votes, which is what makes a partial run coherent:
 // -budget spends on the front of this slice, so an incomplete corpus is the
@@ -315,7 +322,7 @@ func selectSeed(meta []metaPackage, maintainer string, top, sinceDays int, now t
 	}
 	if maintainer != "" {
 		for _, m := range bases {
-			if m.Maintainer != nil && *m.Maintainer == maintainer {
+			if maintains(m, maintainer) {
 				add(m)
 			}
 		}
@@ -339,6 +346,17 @@ func selectSeed(meta []metaPackage, maintainer string, top, sinceDays int, now t
 		add(bases[i])
 	}
 	return seed
+}
+
+// maintains reports whether who can push to m: as its maintainer, or as one of
+// its co-maintainers. The -maintainer flag exists so somebody can keep every
+// package they answer for on the site, and co-maintainership is answering for
+// a package under another title.
+func maintains(m metaPackage, who string) bool {
+	if m.Maintainer != nil && *m.Maintainer == who {
+		return true
+	}
+	return slices.Contains(m.CoMaintainers, who)
 }
 
 // scanAll produces a result for every seed package and returns the updated
@@ -429,7 +447,8 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 func resultFrom(m metaPackage, rec stateRecord) siteResult {
 	res := siteResult{
 		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
-		Description: m.Description, Votes: m.NumVotes, LastModified: m.LastModified,
+		Description: m.Description, CoMaintainers: m.CoMaintainers,
+		Votes: m.NumVotes, LastModified: m.LastModified,
 		Grade: rec.Grade, Findings: rec.Findings, Drift: rec.Drift, Err: rec.Err,
 	}
 	if m.Maintainer != nil {
@@ -444,7 +463,8 @@ func resultFrom(m metaPackage, rec stateRecord) siteResult {
 func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResult, *stateRecord) {
 	res := siteResult{
 		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
-		Description: m.Description, Votes: m.NumVotes, LastModified: m.LastModified,
+		Description: m.Description, CoMaintainers: m.CoMaintainers,
+		Votes: m.NumVotes, LastModified: m.LastModified,
 		Findings: []rules.Finding{},
 	}
 	if m.Maintainer != nil {

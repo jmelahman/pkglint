@@ -39,6 +39,23 @@ var funcs = template.FuncMap{
 	"sev":     func(s rules.Severity) string { return s.String() },
 	"doc":     renderDoc,
 	"scanErr": scanError,
+	"join":    strings.Join,
+}
+
+// MaintainedBy is the roster name cell's tooltip: who maintains the package
+// and who co-maintains it, or "" for a full orphan. It is one string built
+// here rather than pieces assembled in the template, because site.js has to
+// rebuild it verbatim for rows the server never sent — a change of wording
+// here has a twin there.
+func (r siteResult) MaintainedBy() string {
+	var parts []string
+	if r.Maintainer != "" {
+		parts = append(parts, "maintained by "+r.Maintainer)
+	}
+	if len(r.CoMaintainers) > 0 {
+		parts = append(parts, "co-maintained by "+strings.Join(r.CoMaintainers, ", "))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // scanError strips pkglint's internal snapshot path out of a parse failure,

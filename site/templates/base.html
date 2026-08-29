@@ -69,12 +69,14 @@
   </thead>
   <tbody>
   {{range .Results}}
-    {{/* The maintainer has no column of its own, so it rides in a data
-         attribute for the filter to match, and in the name cell's tooltip
-         so a row that matched on it can still say why. */}}
-    <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-maintainer="{{.Maintainer}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
+    {{/* Neither the maintainer nor the co-maintainers have a column of their
+         own, so they ride in data attributes for the filter to match, and in
+         the name cell's tooltip so a row that matched on one can still say
+         why. Co-maintainers are space-joined into one attribute, the same
+         shape roster.json carries them in. */}}
+    <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-maintainer="{{.Maintainer}}" data-comaintainers="{{join .CoMaintainers " "}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
       <td class="gcell"><span class="grade grade-{{.Grade}}">{{.Grade}}</span></td>
-      <td class="pkg"{{with .Maintainer}} title="maintained by {{.}}"{{end}}><a href="{{$.Root}}package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}}
+      <td class="pkg"{{with .MaintainedBy}} title="{{.}}"{{end}}><a href="{{$.Root}}package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}}
         <span class="drift" title="source drift since the previous scan">&#9888;</span>{{end}}</td>
       <td class="num">{{len .Findings}}</td>
       <td class="num votes">{{.Votes}}</td>

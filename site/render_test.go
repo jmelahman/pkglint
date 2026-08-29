@@ -214,15 +214,19 @@ func TestRenderLinkPreview(t *testing.T) {
 }
 
 // TestRenderMaintainerFilter covers the roster's maintainer search. The roster
-// has no maintainer column, so a data attribute is the only thing carrying the
-// value into the page — and the script that reads it lives in a separate file,
-// where renaming either half leaves a page that builds, ships, and quietly
-// matches nothing.
+// has no maintainer column, so data attributes are the only thing carrying the
+// values into the page — and the script that reads them lives in a separate
+// file, where renaming either half leaves a page that builds, ships, and
+// quietly matches nothing.
 func TestRenderMaintainerFilter(t *testing.T) {
 	results := []siteResult{
 		{Name: "demo", Base: "demo", Version: "1.0-1", Grade: "A", Maintainer: "dbermond", Findings: []rules.Finding{}},
 		// Orphaned packages have no maintainer; the AUR drops the field entirely.
 		{Name: "orphaned", Base: "orphaned", Version: "2.0-1", Grade: "A", Findings: []rules.Finding{}},
+		// A co-maintained package: everyone who can push to it improves it, so
+		// everyone who can push to it has to be findable.
+		{Name: "shared", Base: "shared", Version: "3.0-1", Grade: "B", Maintainer: "dbermond",
+			CoMaintainers: []string{"alice", "bob"}, Findings: []rules.Finding{}},
 	}
 
 	out := t.TempDir()
@@ -249,9 +253,14 @@ func TestRenderMaintainerFilter(t *testing.T) {
 		// a maintainer say why, given no column shows it.
 		`data-maintainer="dbermond"`,
 		`title="maintained by dbermond"`,
-		// An orphan still carries the attribute, empty, so the script reads a
+		// Co-maintainers ride the same way: space-joined in an attribute of
+		// their own, and named in the tooltip after the maintainer.
+		`data-comaintainers="alice bob"`,
+		`title="maintained by dbermond, co-maintained by alice, bob"`,
+		// An orphan still carries the attributes, empty, so the script reads a
 		// string on every row rather than an undefined on some of them.
 		`data-maintainer=""`,
+		`data-comaintainers=""`,
 		// Nobody searches a field the box does not admit to having.
 		`placeholder="Filter by name, maintainer, or description"`,
 	} {
@@ -269,10 +278,16 @@ func TestRenderMaintainerFilter(t *testing.T) {
 		t.Error("index.html does not document the @maintainer prefix")
 	}
 
-	// The other half of the contract: the script has to read the attribute the
+	// The package page names the co-maintainers too: it is where a search for
+	// one of them lands, so it has to corroborate what matched.
+	if pkg := read(filepath.Join("package", "shared.html")); !strings.Contains(pkg, "co-maintained by alice, bob") {
+		t.Errorf("package page does not name the co-maintainers:\n%s", pkg)
+	}
+
+	// The other half of the contract: the script has to read the attributes the
 	// template writes.
 	js := read(filepath.Join("assets", "site.js"))
-	for _, want := range []string{"tr.dataset.maintainer", `charAt(0) === "@"`} {
+	for _, want := range []string{"tr.dataset.maintainer", "tr.dataset.comaintainers", `charAt(0) === "@"`} {
 		if !strings.Contains(js, want) {
 			t.Errorf("site.js missing %s: the roster's maintainer filter is not wired up", want)
 		}

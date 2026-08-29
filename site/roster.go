@@ -22,8 +22,13 @@ import (
 // writeRoster emits the compact payload site.js searches over. It carries one
 // array per package rather than an object, and only the fields the roster
 // shows or filters on: spelling out keys 47,000 times costs more than the data.
-// The maintainer is here despite having no column, because the "@" query
-// filters on it and would otherwise reach only the server-rendered head.
+// The maintainer and co-maintainers are here despite having no column, because
+// the "@" query filters on them and would otherwise reach only the
+// server-rendered head.
+//
+// Co-maintainers travel as one space-joined string, matching the row's
+// data-comaintainers attribute — AUR usernames cannot hold a space, and one
+// string is what site.js folds into its haystacks either way.
 //
 // Order is the index's order, so the client can render straight from it
 // without re-sorting to reproduce the default view.
@@ -34,7 +39,7 @@ func writeRoster(out string, results []siteResult) error {
 		if len(r.Drift) > 0 {
 			drift = 1
 		}
-		rows = append(rows, []any{r.Name, r.Grade, len(r.Findings), r.Votes, r.Description, r.Maintainer, drift})
+		rows = append(rows, []any{r.Name, r.Grade, len(r.Findings), r.Votes, r.Description, r.Maintainer, drift, strings.Join(r.CoMaintainers, " ")})
 	}
 	f, err := os.Create(filepath.Join(out, "roster.json"))
 	if err != nil {

@@ -79,6 +79,25 @@ func TestSelectSeedDropsUnsafeBases(t *testing.T) {
 	}
 }
 
+// TestSelectSeedIncludesCoMaintained pins the -maintainer flag's reach: the
+// flag exists so somebody can keep every package they answer for on the site,
+// and co-maintainership is answering for a package under another title.
+func TestSelectSeedIncludesCoMaintained(t *testing.T) {
+	who, other := "jmelahman", "somebody-else"
+	meta := []metaPackage{
+		{PackageBase: "theirs", NumVotes: 50, Maintainer: &other},
+		{PackageBase: "shared", NumVotes: 1, Maintainer: &other, CoMaintainers: []string{"helper", who}},
+		{PackageBase: "mine", NumVotes: 1, Maintainer: &who},
+	}
+	got := map[string]bool{}
+	for _, m := range selectSeed(meta, who, 0, 0, time.Now()) {
+		got[m.PackageBase] = true
+	}
+	if len(got) != 2 || !got["mine"] || !got["shared"] {
+		t.Errorf("selectSeed = %v, want exactly [mine shared]", got)
+	}
+}
+
 // TestSelectSeedIsDeterministic pins the tie-break at the top-N cutoff. The
 // bases come out of a map and sort.Slice is not stable, so without one the
 // cutoff falls differently on every run and packages appear on the site, 404,
@@ -375,5 +394,26 @@ func TestDecodeMetaBounded(t *testing.T) {
 	}
 	if len(meta) != 1 || meta[0].PackageBase != "a" {
 		t.Errorf("decodeMeta = %+v, want one package base %q", meta, "a")
+	}
+}
+
+// TestDecodeMetaCoMaintainers pins the field's spelling against the dump's.
+// metaPackage carries no json tags, so a rename on either side would not fail
+// to decode — it would silently turn every co-maintainer into nobody, and
+// nothing else in the build would notice.
+func TestDecodeMetaCoMaintainers(t *testing.T) {
+	meta, err := decodeMeta(strings.NewReader(
+		`[{"PackageBase":"a","Maintainer":"m","CoMaintainers":["b","c"]},{"PackageBase":"lone"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta) != 2 || !slices.Equal(meta[0].CoMaintainers, []string{"b", "c"}) {
+		t.Errorf("decodeMeta = %+v, want co-maintainers [b c]", meta)
+	}
+	// The dump omits the key entirely when there are none; that must stay the
+	// zero value, not an error and not an empty-but-allocated slice the JSON
+	// output would then render as "co_maintainers": [].
+	if meta[1].CoMaintainers != nil {
+		t.Errorf("absent CoMaintainers decoded to %#v, want nil", meta[1].CoMaintainers)
 	}
 }

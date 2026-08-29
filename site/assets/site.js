@@ -48,16 +48,20 @@
   //
   // The maintainer has no column, so it is not in the row's text — it is
   // folded in by hand, or the thing people most often look a package up by is
-  // the thing the filter cannot find. It keeps its own haystack as well, for
-  // the "@" query, and its real casing for display.
-  function entry(name, grade, findings, votes, desc, maintainer, drift) {
+  // the thing the filter cannot find. The co-maintainers arrive the same way,
+  // as one space-joined string, and go into the same haystacks: a
+  // co-maintainer can push to the package just as the maintainer can, so a
+  // query for who maintains it has to find them too. Both keep their own
+  // haystack as well, for the "@" query, and their real casing for display.
+  function entry(name, grade, findings, votes, desc, maintainer, drift, comaint) {
     var m = maintainer || "";
+    var co = comaint || "";
     return {
       name: name, grade: grade, findings: findings, votes: votes,
-      desc: desc || "", maintainer: m, drift: !!drift,
-      mtext: m.toLowerCase(),
+      desc: desc || "", maintainer: m, comaint: co, drift: !!drift,
+      mtext: (m + " " + co).toLowerCase(),
       text: (grade + " " + name + " " + findings + " " + votes + " " +
-        (desc || "") + " " + m).toLowerCase()
+        (desc || "") + " " + m + " " + co).toLowerCase()
     };
   }
 
@@ -66,7 +70,7 @@
   var model = Array.prototype.map.call(body.rows, function (tr) {
     return entry(tr.dataset.name, tr.dataset.grade, +tr.dataset.findings,
       +tr.dataset.votes, tr.cells[4] ? tr.cells[4].textContent : "",
-      tr.dataset.maintainer, tr.querySelector(".drift"));
+      tr.dataset.maintainer, tr.querySelector(".drift"), tr.dataset.comaintainers);
   });
   var loaded = false;   // roster.json has replaced the seeded model
   var sortCol = null;   // null means "the order it was served in"
@@ -79,11 +83,22 @@
   // unescaped on purpose: selectSeed has already restricted bases to
   // alphanumerics and @._+-, none of which mean anything in a path segment,
   // and encoding them would spell a link to a file that is not there.
+  // maintainedBy mirrors siteResult.MaintainedBy in Go: the tooltip that lets
+  // a row matched on a handle say why, spelled once for the rows this script
+  // builds exactly as the server spells it for the rows it sent.
+  function maintainedBy(e) {
+    var parts = [];
+    if (e.maintainer) parts.push("maintained by " + e.maintainer);
+    if (e.comaint) parts.push("co-maintained by " + e.comaint.split(" ").join(", "));
+    return parts.join(", ");
+  }
+
   function buildRow(e) {
     var tr = document.createElement("tr");
     tr.dataset.grade = e.grade;
     tr.dataset.name = e.name;
     tr.dataset.maintainer = e.maintainer;
+    tr.dataset.comaintainers = e.comaint;
     tr.dataset.findings = e.findings;
     tr.dataset.votes = e.votes;
 
@@ -96,7 +111,8 @@
 
     var pkg = document.createElement("td");
     pkg.className = "pkg";
-    if (e.maintainer) pkg.title = "maintained by " + e.maintainer;
+    var who = maintainedBy(e);
+    if (who) pkg.title = who;
     var link = document.createElement("a");
     link.href = root + "package/" + e.name + ".html";
     link.textContent = e.name;
@@ -148,9 +164,10 @@
   };
 
   function apply() {
-    // A leading "@" narrows the query to the maintainer. Handles and package
-    // names share one namespace on the AUR, and plenty of packages are named
-    // after the person who maintains them, so a plain query cannot separate
+    // A leading "@" narrows the query to who maintains the package — the
+    // maintainer and every co-maintainer alike. Handles and package names
+    // share one namespace on the AUR, and plenty of packages are named after
+    // the person who maintains them, so a plain query cannot separate
     // "packages called foo" from "packages by foo". What follows the "@" is
     // still a substring, so "@dberm" finds dbermond; a bare "@" narrows to
     // nothing in particular and shows everything, same as an empty box.
@@ -260,7 +277,7 @@
       .then(function (rows) {
         if (!rows || !rows.length) return;
         model = rows.map(function (r) {
-          return entry(r[0], r[1], r[2], r[3], r[4], r[5], r[6]);
+          return entry(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]);
         });
         loaded = true;
         rest.textContent = "Searching all " + model.length + " packages. ";

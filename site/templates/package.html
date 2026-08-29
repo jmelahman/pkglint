@@ -18,6 +18,7 @@
         <p class="facts">
           <b>{{.R.Version}}</b>
           {{with .R.Maintainer}}<span>maintained by {{.}}</span>{{end}}
+          {{with .R.CoMaintainers}}<span>co-maintained by {{join . ", "}}</span>{{end}}
           <span>{{.R.Votes}} votes</span>
           <a href="https://aur.archlinux.org/pkgbase/{{.R.Base}}">AUR page</a>
           <a href="{{.Root}}badge/{{.R.Name}}.svg">badge</a>

@@ -92,6 +92,23 @@ func TestRescueAssocSubscript(t *testing.T) {
 	}
 }
 
+// TestRescueSubscriptBeforeParamOp covers a string subscript inside a
+// parameter expansion that continues with an operator rather than `}`:
+// `${_supported[armv8.1-a]:-}`. Passes `bash -n`.
+func TestRescueSubscriptBeforeParamOp(t *testing.T) {
+	src := "check() {\n  declare -A _supported\n  if [[ -n \"${_supported[armv8.1-a]:-}\" ]]; then\n    :\n  fi\n}\n"
+	pkg := loadPKGBUILD(t, src)
+	if string(pkg.PKGBUILD.Raw) != src {
+		t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+	}
+	if pkg.PKGBUILD.Functions["check"] == nil {
+		t.Errorf("check() not extracted")
+	}
+	if !strings.Contains(string(pkg.PKGBUILD.Raw), "[armv8.1-a]:-") {
+		t.Errorf("subscript text lost from Raw")
+	}
+}
+
 // TestRescueInlineArray covers `arr+=( x ) cmd`, which bash accepts as an
 // assignment in the command's temporary environment.
 func TestRescueInlineArray(t *testing.T) {

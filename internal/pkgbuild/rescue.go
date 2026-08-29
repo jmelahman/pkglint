@@ -156,13 +156,15 @@ func rescueSubscript(work []byte, off int, restore map[int]byte) bool {
 			break
 		}
 	}
-	// The bracket pair must be a subscript, not a glob: `x[k]=`, `x[k]+=` or
-	// `${x[k]}` all continue with a byte a glob never precedes.
+	// The bracket pair must be a subscript, not a glob: `x[k]=`, `x[k]+=`,
+	// `${x[k]}`, or `${x[k]` followed by a parameter-expansion operator
+	// (`${_supported[armv8.1-a]:-}`) all continue with a byte a glob never
+	// precedes at an offset the parser errored on.
 	if rb < 0 || rb == lb+1 || rb+1 >= len(work) {
 		return false
 	}
 	switch work[rb+1] {
-	case '=', '+', '}':
+	case '=', '+', '}', ':', '-', '?', '%', '#', '/', '^', ',':
 	default:
 		return false
 	}

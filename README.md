@@ -89,6 +89,25 @@ mechanical but change what the build does, so review them. An inline
 remediation isn't a mechanical rewrite (checksums, `.SRCINFO`) print a one-line
 suggestion (`updpkgsums`, `makepkg --printsrcinfo`) instead.
 
+### Commit hook
+
+This repo ships hooks for any runner that understands the
+`.pre-commit-config.yaml` convention, so a packaging tree can lint its
+PKGBUILDs on every commit:
+
+```yaml
+repos:
+  - repo: https://github.com/jmelahman/pkglint
+    rev: v1.1.1
+    hooks:
+      - id: pkglint
+```
+
+Three hook ids are available: `pkglint` builds from source with the Go
+toolchain, `pkglint-system` runs whatever `pkglint` is already on `$PATH`, and
+`pkglint-fix` applies the safe auto-fixes in place (offline by default). Tune
+any of them with e.g. `args: [--ignore, PB105, --fail-on, critical]`.
+
 ## Rules
 
 | Group         | Rules       | What they catch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |

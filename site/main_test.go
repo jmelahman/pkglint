@@ -545,7 +545,7 @@ func TestRunEndToEndOffline(t *testing.T) {
 	}
 
 	// top=1 pulls demo in regardless of its (ancient) LastModified.
-	if err := run(out, cache, statePath, "", 1, 0, 0, 1, 5); err != nil {
+	if err := run(out, cache, statePath, "", 1, 0, 0, 1, 5, 0); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 

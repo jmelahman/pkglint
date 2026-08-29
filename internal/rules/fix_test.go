@@ -462,3 +462,29 @@ func TestApplyEdits(t *testing.T) {
 		}
 	})
 }
+
+// TestFixLevelContract pins the FixLevel accessors the report-card site
+// invokes from its templates (the fixpill badge); reflection there means the
+// compiler cannot catch a rename or behavior change.
+func TestFixLevelContract(t *testing.T) {
+	for _, tc := range []struct {
+		level   FixLevel
+		fixable bool
+		safe    bool
+		flag    string
+	}{
+		{FixNone, false, false, ""},
+		{FixSafe, true, true, "--fix"},
+		{FixUnsafe, true, false, "--unsafe-fix"},
+	} {
+		if got := tc.level.Fixable(); got != tc.fixable {
+			t.Errorf("FixLevel(%d).Fixable() = %v, want %v", tc.level, got, tc.fixable)
+		}
+		if got := tc.level.Safe(); got != tc.safe {
+			t.Errorf("FixLevel(%d).Safe() = %v, want %v", tc.level, got, tc.safe)
+		}
+		if got := tc.level.Flag(); got != tc.flag {
+			t.Errorf("FixLevel(%d).Flag() = %q, want %q", tc.level, got, tc.flag)
+		}
+	}
+}

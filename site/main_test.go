@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -483,5 +485,191 @@ func TestDecodeMetaCoMaintainers(t *testing.T) {
 	// output would then render as "co_maintainers": [].
 	if meta[1].CoMaintainers != nil {
 		t.Errorf("absent CoMaintainers decoded to %#v, want nil", meta[1].CoMaintainers)
+	}
+}
+
+// gzJSON gzips a JSON document, in the shape of the cached AUR metadata dump.
+func gzJSON(t *testing.T, doc string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write([]byte(doc)); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// TestRunEndToEndOffline drives run() with a warm metadata cache and a state
+// record matching the seed, so the whole pipeline — seed selection, state
+// reuse, rendering, badges, results.json, pruning — executes without a single
+// network request.
+func TestRunEndToEndOffline(t *testing.T) {
+	tmp := t.TempDir()
+	out := filepath.Join(tmp, "out")
+	cache := filepath.Join(tmp, "cache")
+	statePath := filepath.Join(tmp, "state.jsonl")
+
+	// A same-day cached dump; loadMeta must reuse it instead of downloading.
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := `[{"Name":"demo","PackageBase":"demo","Version":"1.0-1","Description":"a demo","Maintainer":"jmelahman","NumVotes":5,"LastModified":1000}]`
+	if err := os.WriteFile(filepath.Join(cache, "packages-meta-ext-v1.json.gz"), gzJSON(t, meta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A fresh state record for the same LastModified and registry: scanAll
+	// reuses it, so no snapshot fetch happens either.
+	if err := saveState(statePath, map[string]stateRecord{"demo": {
+		Base: "demo", LastModified: 1000, Grade: "B",
+		Findings: []rules.Finding{{RuleID: "PB101", Severity: rules.Warn}},
+		Rules:    rulesFingerprint(),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Stale pages from a package no longer in the corpus: prune must drop them.
+	for _, stale := range []string{
+		filepath.Join(out, "badge", "gone.svg"),
+		filepath.Join(out, "package", "gone.html"),
+	} {
+		if err := os.MkdirAll(filepath.Dir(stale), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(stale, []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// top=1 pulls demo in regardless of its (ancient) LastModified.
+	if err := run(out, cache, statePath, "", 1, 0, 0, 1, 5); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	results, err := os.ReadFile(filepath.Join(out, "results.json"))
+	if err != nil {
+		t.Fatalf("results.json: %v", err)
+	}
+	for _, want := range []string{`"demo"`, `"B"`, `"PB101"`} {
+		if !strings.Contains(string(results), want) {
+			t.Errorf("results.json missing %s:\n%s", want, results)
+		}
+	}
+	for _, p := range []string{
+		filepath.Join(out, ".nojekyll"),
+		filepath.Join(out, "badge", "demo.svg"),
+	} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("expected output %s: %v", p, err)
+		}
+	}
+	for _, p := range []string{
+		filepath.Join(out, "badge", "gone.svg"),
+		filepath.Join(out, "package", "gone.html"),
+	} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("stale page %s survived prune (stat: %v)", p, err)
+		}
+	}
+}
+
+// tarGz builds a gzipped tarball from (name, body) pairs; a nil body makes a
+// non-regular entry (symlink), which extract must skip.
+func tarGz(t *testing.T, entries []struct {
+	name string
+	body []byte
+	link bool
+}) string {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for _, e := range entries {
+		hdr := &tar.Header{Name: e.name, Mode: 0o644, Size: int64(len(e.body))}
+		if e.link {
+			hdr.Typeflag = tar.TypeSymlink
+			hdr.Linkname = "/etc/passwd"
+			hdr.Size = 0
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatal(err)
+		}
+		if !e.link {
+			if _, err := tw.Write(e.body); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "snapshot.tar.gz")
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// TestExtractSnapshotSafety pins extract's handling of hostile tarballs: path
+// traversal flattens to a basename inside the target, symlinks are skipped,
+// and nothing is written outside dir.
+func TestExtractSnapshotSafety(t *testing.T) {
+	type entry = struct {
+		name string
+		body []byte
+		link bool
+	}
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "extracted")
+	tarPath := tarGz(t, []entry{
+		{name: "demo/PKGBUILD", body: []byte("pkgname=demo\n")},
+		{name: "../../escape", body: []byte("evil")},
+		{name: "demo/../../../also-escape", body: []byte("evil")},
+		{name: "demo/link", link: true},
+		{name: "demo/.", body: nil},
+	})
+	if err := extract(tarPath, dir); err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil || string(got) != "pkgname=demo\n" {
+		t.Errorf("PKGBUILD not extracted: %v %q", err, got)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "link")); !os.IsNotExist(err) {
+		t.Error("symlink entry should be skipped")
+	}
+	// The traversal names flatten to basenames inside dir — and must never
+	// materialize outside it.
+	for _, p := range []string{
+		filepath.Join(parent, "escape"),
+		filepath.Join(parent, "also-escape"),
+		filepath.Dir(parent) + "/escape",
+	} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("hostile entry escaped to %s (stat: %v)", p, err)
+		}
+	}
+}
+
+// TestExtractRefusesTooManyFiles pins the file-count DoS backstop.
+func TestExtractRefusesTooManyFiles(t *testing.T) {
+	type entry = struct {
+		name string
+		body []byte
+		link bool
+	}
+	var entries []entry
+	for i := 0; i <= maxSnapshotFiles; i++ {
+		entries = append(entries, entry{name: fmt.Sprintf("demo/f%d", i), body: []byte("x")})
+	}
+	err := extract(tarGz(t, entries), filepath.Join(t.TempDir(), "out"))
+	if err == nil || !strings.Contains(err.Error(), "too many files") {
+		t.Errorf("extract of %d files: err = %v, want too-many-files", maxSnapshotFiles+1, err)
 	}
 }

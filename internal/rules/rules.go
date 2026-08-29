@@ -318,16 +318,6 @@ func (c Command) HasArg(s string) bool {
 	return false
 }
 
-// HasArgPrefix reports whether any argument starts with prefix.
-func (c Command) HasArgPrefix(prefix string) bool {
-	for _, a := range c.Args {
-		if hasPrefixAny(a, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
 // Subcommand returns the first argument that does not look like a flag.
 func (c Command) Subcommand() string {
 	for _, a := range c.Args {

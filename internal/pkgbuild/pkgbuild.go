@@ -161,7 +161,9 @@ func parseUnit(path string, raw []byte, scriptlet bool) (Unit, error) {
 		Functions: map[string]*syntax.FuncDecl{},
 	}
 	for _, stmt := range f.Stmts {
-		if fd, ok := stmt.Cmd.(*syntax.FuncDecl); ok {
+		// upstream parses `()cmd` into a FuncDecl with a nil Name; keep the
+		// statement visible to rules rather than crash or drop it.
+		if fd, ok := stmt.Cmd.(*syntax.FuncDecl); ok && fd.Name != nil {
 			u.Functions[fd.Name.Value] = fd
 			continue
 		}

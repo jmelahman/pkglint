@@ -94,6 +94,132 @@ func TestPackageArchive(t *testing.T) {
 	}
 }
 
+// fixablePKGBUILD carries one safe fix (cargo without --locked), one safe
+// line-removal fix (GOSUMDB=off), one unsafe fix (npm install), and a SKIP
+// checksum that only a manual `updpkgsums` can resolve.
+const fixablePKGBUILD = `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('SKIP')
+export GOSUMDB=off
+
+build() {
+  cargo build --release
+  npm install
+}
+`
+
+// writeFixture writes a PKGBUILD into a fresh temp dir with the given mode.
+func writeFixture(t *testing.T, content string, mode os.FileMode) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), mode); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestFixDiffIsDryRun(t *testing.T) {
+	dir := writeFixture(t, fixablePKGBUILD, 0o644)
+	var buf bytes.Buffer
+	if code := run([]string{"--fix", "--diff", dir}, &buf); code != 0 {
+		t.Fatalf("--fix --diff: got exit %d, want 0\n%s", code, buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "dry run") {
+		t.Errorf("--diff output should say dry run, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- ") || !strings.Contains(out, "+   cargo build --release --locked") {
+		t.Errorf("--diff output should show before/after hunks, got:\n%s", out)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != fixablePKGBUILD {
+		t.Error("--diff must not modify the file")
+	}
+}
+
+func TestFixWritesInPlace(t *testing.T) {
+	// 0600 pins that writeFixed preserves the file's own permissions
+	// instead of resetting them to a default.
+	dir := writeFixture(t, fixablePKGBUILD, 0o600)
+	var buf bytes.Buffer
+	if code := run([]string{"--fix", dir}, &buf); code != 0 {
+		t.Fatalf("--fix: got exit %d, want 0\n%s", code, buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "applied 2 fix(es)") {
+		t.Errorf("want 2 applied fixes (cargo --locked, GOSUMDB removal), got:\n%s", out)
+	}
+	if !strings.Contains(out, "updpkgsums") {
+		t.Errorf("SKIP checksum should nudge toward updpkgsums, got:\n%s", out)
+	}
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(fixed), "cargo build --release --locked") {
+		t.Errorf("cargo --locked not applied:\n%s", fixed)
+	}
+	if strings.Contains(string(fixed), "GOSUMDB") {
+		t.Errorf("GOSUMDB=off line not removed:\n%s", fixed)
+	}
+	if strings.Contains(string(fixed), "npm ci") {
+		t.Errorf("--fix must not apply the unsafe npm-ci rewrite:\n%s", fixed)
+	}
+	fi, err := os.Stat(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("writeFixed changed permissions to %o, want 600 preserved", fi.Mode().Perm())
+	}
+}
+
+func TestUnsafeFixEscalates(t *testing.T) {
+	dir := writeFixture(t, fixablePKGBUILD, 0o644)
+	var buf bytes.Buffer
+	if code := run([]string{"--unsafe-fix", "--offline", dir}, &buf); code != 0 {
+		t.Fatalf("--unsafe-fix: got exit %d, want 0\n%s", code, buf.String())
+	}
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(fixed), "npm ci") {
+		t.Errorf("--unsafe-fix should rewrite npm install to npm ci:\n%s", fixed)
+	}
+}
+
+func TestFixNothingToDo(t *testing.T) {
+	dir := writeFixture(t, `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+`, 0o644)
+	var buf bytes.Buffer
+	if code := run([]string{"--fix", dir}, &buf); code != 0 {
+		t.Fatalf("--fix on clean package: got exit %d, want 0\n%s", code, buf.String())
+	}
+	if !strings.Contains(buf.String(), "no auto-fixable findings") {
+		t.Errorf("want a no-op message, got:\n%s", buf.String())
+	}
+	var errBuf bytes.Buffer
+	if code := run([]string{"--fix", filepath.Join(dir, "does-not-exist")}, &errBuf); code != 2 {
+		t.Errorf("--fix on a missing path: got exit %d, want 2", code)
+	}
+}
+
 // fakeGit puts a stub `git` first on PATH that records every invocation (and
 // the GIT_TERMINAL_PROMPT it was handed) in a sentinel file, then prints a
 // plausible ls-remote line. It returns a func reporting the recorded

@@ -869,6 +869,20 @@ build() {
   p=$'\x62\x61\x73\x68\x20\x2d\x63\x20\x65\x76\x69\x6c'
 }`)})
 	})
+	t.Run("PB307 base64 blob payload", func(t *testing.T) {
+		expectRule(t, "PB307", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  payload='`+strings.Repeat("QmFzZTY0", 16)+`'
+}`)})
+	})
+	t.Run("PB307 not for checksum arrays", func(t *testing.T) {
+		// The first line is exempted by its sums= assignment, the
+		// continuation line by being pure hex.
+		digest := strings.Repeat("deadbeef", 16)
+		expectNoRule(t, "PB307", map[string]string{"PKGBUILD": pkgbuildWith("", `
+sha512sums=('`+digest+`'
+            '`+digest+`')`)})
+	})
 	t.Run("PB308 overrides a makepkg internal", func(t *testing.T) {
 		expectRule(t, "PB308", map[string]string{"PKGBUILD": pkgbuildWith("", `
 verify_integrity_one() {

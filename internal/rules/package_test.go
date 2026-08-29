@@ -505,6 +505,33 @@ func TestFileOwnership(t *testing.T) {
 	if got["PB822"] != 1 {
 		t.Errorf("want 1 PB822, got %d", got["PB822"])
 	}
+
+	// Numeric-only ownership (no names in the tar header) reports the IDs.
+	fs := pkgLint(t, nil, pkgtest.Info("demo", "any"),
+		pkgtest.Member{Name: "usr/share/demo/mine", Data: []byte("x"), UID: 1000, GID: 1000})
+	found := false
+	for _, f := range fs {
+		if f.RuleID == "PB822" {
+			found = true
+			if !strings.Contains(f.Message, "1000:1000") {
+				t.Errorf("PB822 message %q, want the numeric owner 1000:1000", f.Message)
+			}
+		}
+	}
+	if !found {
+		t.Error("want a PB822 finding for numeric-only ownership")
+	}
+}
+
+func TestItoa(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{{0, "0"}, {7, "7"}, {1000, "1000"}, {-42, "-42"}} {
+		if got := itoa(tc.n); got != tc.want {
+			t.Errorf("itoa(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
 }
 
 func TestEmptyDirectories(t *testing.T) {

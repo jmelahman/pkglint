@@ -9,7 +9,7 @@
 //
 // The seed runs to tens of thousands of bases, which is more than one run can
 // fetch: see state.go for the checked-in scan state that makes that tractable,
-// and -budget for the cap on what a single run downloads.
+// and -budget and -deadline for the caps on what a single run downloads.
 package main
 
 import (
@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -103,16 +104,23 @@ func main() {
 	top := flag.Int("top", 0, "also include the top-N packages by votes (0 = none)")
 	since := flag.Int("since-days", 90, "include every package base modified within the last N days (0 = none)")
 	budget := flag.Int("budget", 0, "max snapshot fetches this run (0 = no cap); bases past it keep their last known result")
+	deadline := flag.Duration("deadline", 0, "wall-clock cap on this run; fetches not started by then wait for a later run (0 = none)")
 	jobs := flag.Int("jobs", 2, "concurrent snapshot fetches")
 	limit := flag.Int("limit", 0, "hard cap on packages scanned (0 = no cap), for smoke tests")
 	flag.Parse()
 
-	if err := run(*out, *cache, *state, *maintainer, *top, *since, *budget, *jobs, *limit); err != nil {
+	if err := run(*out, *cache, *state, *maintainer, *top, *since, *budget, *jobs, *limit, *deadline); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(out, cache, statePath, maintainer string, top, since, budget, jobs, limit int) error {
+func run(out, cache, statePath, maintainer string, top, since, budget, jobs, limit int, deadline time.Duration) error {
+	// The deadline covers the whole run, metadata download included, because
+	// what it protects is the CI job's hard kill limit, which does too.
+	var stopAt time.Time
+	if deadline > 0 {
+		stopAt = time.Now().Add(deadline)
+	}
 	for _, dir := range []string{out, cache, filepath.Join(out, "package"), filepath.Join(out, "rules"), filepath.Join(out, "badge"), filepath.Join(out, "roster")} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
@@ -140,7 +148,17 @@ func run(out, cache, statePath, maintainer string, top, since, budget, jobs, lim
 	if err != nil {
 		return fmt.Errorf("load scan state: %w", err)
 	}
-	results, state := scanAll(seed, cache, jobs, budget, prev)
+	// The checkpoint makes an interrupted run resumable: the state written so
+	// far pairs with the snapshots already in the cache, so a rerun re-lints
+	// from disk instead of refetching. Its errors are logged, not fatal — a
+	// failed checkpoint costs redundant work later, not correctness now.
+	results, state := scanAll(seed, cache, jobs, budget, prev, stopAt, func(st map[string]stateRecord) {
+		if err := saveState(statePath, st); err != nil {
+			log.Printf("checkpoint: %v", err)
+			return
+		}
+		log.Printf("checkpoint: %d state records saved", len(st))
+	})
 	if err := saveState(statePath, state); err != nil {
 		return err
 	}
@@ -359,6 +377,17 @@ func maintains(m metaPackage, who string) bool {
 	return slices.Contains(m.CoMaintainers, who)
 }
 
+// scanBatch is how many fetches run between state checkpoints. At the
+// throttle's ~1-2 fetches/s a batch is a few minutes of work — small enough
+// that an interrupted run loses little, large enough that the checkpoint
+// write is noise. A var, not a const, so tests can lower it.
+var scanBatch = 500
+
+// progressEvery is how many completed fetches between progress lines: about
+// one line a minute at the throttle's pace, against hours of otherwise
+// silent log.
+const progressEvery = 100
+
 // scanAll produces a result for every seed package and returns the updated
 // scan state: prev with every freshly scanned base overwritten, so bases that
 // drop out of the seed keep their history rather than being forgotten.
@@ -370,7 +399,16 @@ func maintains(m metaPackage, who string) bool {
 // letting goroutines race for it: the seed is votes-ordered, so deciding here
 // means a bounded run spends on the most-installed packages and does so
 // reproducibly.
-func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string]stateRecord) ([]siteResult, map[string]stateRecord) {
+//
+// The fetches run in batches of scanBatch; after each interior batch the
+// accumulated state is handed to checkpoint (if non-nil), so a run that dies
+// mid-corpus leaves state on disk matching the snapshots it already paid for.
+// A non-zero deadline is checked between batches: once past it, every
+// unfetched base is treated exactly as if it were past the budget, so the run
+// still renders, saves state, and exits cleanly with hours of CI headroom
+// intact. Batch granularity means the run can overshoot the deadline by one
+// batch — minutes, against the hours the flag exists to protect.
+func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string]stateRecord, deadline time.Time, checkpoint func(map[string]stateRecord)) ([]siteResult, map[string]stateRecord) {
 	results := make([]siteResult, len(seed))
 	keep := make([]bool, len(seed))
 	var todo []int
@@ -407,26 +445,67 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 			keep[i] = true
 		}
 	}
-
-	states := make([]*stateRecord, len(seed))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, jobs)
-	for _, i := range todo {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			results[i], states[i] = scanOne(seed[i], cache, prev)
-		}(i)
-	}
-	wg.Wait()
+	total := len(todo)
+	log.Printf("fetching %d of %d bases (reused %d, stale %d, awaiting a later run %d)",
+		total, len(seed), reused, stale, omitted)
 
 	next := make(map[string]stateRecord, len(prev)+len(seed))
 	maps.Copy(next, prev)
-	for i, st := range states {
-		if st != nil {
-			next[seed[i].PackageBase] = *st
+	states := make([]*stateRecord, len(seed))
+
+	start := time.Now()
+	var done, failed atomic.Int64
+	sem := make(chan struct{}, jobs)
+	for len(todo) > 0 {
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			for _, i := range todo {
+				if rec, ok := prev[seed[i].PackageBase]; ok {
+					results[i] = resultFrom(seed[i], rec)
+					stale++
+				} else {
+					keep[i] = false
+					omitted++
+				}
+			}
+			log.Printf("deadline passed with %d bases unfetched; they wait for a later run", len(todo))
+			break
+		}
+		batch := todo
+		if len(batch) > scanBatch {
+			batch = batch[:scanBatch]
+		}
+		todo = todo[len(batch):]
+
+		var wg sync.WaitGroup
+		for _, i := range batch {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				results[i], states[i] = scanOne(seed[i], cache, prev)
+				if results[i].Err != "" {
+					failed.Add(1)
+				}
+				if n := done.Add(1); n%progressEvery == 0 {
+					elapsed := time.Since(start)
+					eta := time.Duration(float64(elapsed) / float64(n) * float64(int64(total)-n))
+					log.Printf("progress: %d/%d fetched (%d errors) in %s, ~%s to go",
+						n, total, failed.Load(), elapsed.Round(time.Second), eta.Round(time.Minute))
+				}
+			}(i)
+		}
+		wg.Wait()
+
+		for _, i := range batch {
+			if st := states[i]; st != nil {
+				next[seed[i].PackageBase] = *st
+			}
+		}
+		// The final batch is covered by the caller's own save, so only
+		// interior checkpoints are worth a write.
+		if checkpoint != nil && len(todo) > 0 {
+			checkpoint(next)
 		}
 	}
 
@@ -436,8 +515,8 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 			kept = append(kept, results[i])
 		}
 	}
-	log.Printf("scanned %d, reused %d, stale %d, awaiting a later run %d (%d rendered)",
-		len(todo), reused, stale, omitted, len(kept))
+	log.Printf("scanned %d (%d errors), reused %d, stale %d, awaiting a later run %d (%d rendered)",
+		done.Load(), failed.Load(), reused, stale, omitted, len(kept))
 	return kept, next
 }
 
@@ -474,11 +553,13 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 	// record to this LastModified and stop the next run from retrying.
 	dir, err := fetchSnapshot(m, cache)
 	if err != nil {
+		log.Printf("scan %s: %v", m.PackageBase, err)
 		res.Grade, res.Err = "?", err.Error()
 		return res, nil
 	}
 	pkg, err := pkgbuild.Load(dir)
 	if err != nil {
+		log.Printf("scan %s: %v", m.PackageBase, err)
 		res.Grade, res.Err = "?", err.Error()
 		return res, nil
 	}
@@ -628,6 +709,13 @@ func get(url string) (*http.Response, error) {
 			lastErr = fmt.Errorf("GET %s: %s", url, resp.Status)
 			if wait, err := time.ParseDuration(resp.Header.Get("Retry-After") + "s"); err == nil && attempt < len(backoff) {
 				resp.Body.Close()
+				// Honor Retry-After, but bounded: an outlandish value would
+				// otherwise park a fetch worker — and its concurrency slot —
+				// asleep for hours, freezing the run with nothing in the log.
+				if wait > time.Minute {
+					wait = time.Minute
+				}
+				log.Printf("%v; retrying in %s", lastErr, wait)
 				time.Sleep(wait)
 				continue
 			}
@@ -639,6 +727,7 @@ func get(url string) (*http.Response, error) {
 		if attempt >= len(backoff) {
 			return nil, lastErr
 		}
+		log.Printf("%v; retrying in %s", lastErr, backoff[attempt])
 		time.Sleep(backoff[attempt])
 	}
 }

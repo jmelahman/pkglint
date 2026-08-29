@@ -193,7 +193,7 @@ func TestScanAllReusesUnchanged(t *testing.T) {
 
 	// cache points nowhere: a fetch would fail, so a passing test is proof
 	// none was attempted.
-	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 0, prev)
+	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 0, prev, time.Time{}, nil)
 	if len(results) != 1 {
 		t.Fatalf("expected one result, got %d", len(results))
 	}
@@ -237,7 +237,7 @@ func TestScanAllRescansOnRuleChange(t *testing.T) {
 		Rules:    "0000000000000000", // not the current registry
 	}}
 
-	results, next := scanAll(seed, cache, 1, 0, prev)
+	results, next := scanAll(seed, cache, 1, 0, prev, time.Time{}, nil)
 	if len(results) != 1 {
 		t.Fatalf("expected one result, got %d", len(results))
 	}
@@ -273,7 +273,7 @@ func TestScanAllBudget(t *testing.T) {
 	// One fetch allowed against two candidates. "unchanged" is not a candidate
 	// at all — it is reused — so the slot goes to "known", the more-voted of
 	// the two, and "new" waits for a later run.
-	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 1, prev)
+	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 1, prev, time.Time{}, nil)
 	got := map[string]string{}
 	for _, r := range results {
 		got[r.Name] = r.Grade
@@ -293,6 +293,74 @@ func TestScanAllBudget(t *testing.T) {
 	// failure as this snapshot's answer and never retry it.
 	if next["known"].LastModified != 1 {
 		t.Errorf("failed scan overwrote the record: %+v", next["known"])
+	}
+}
+
+// TestScanAllDeadline pins the deadline's semantics: a base whose fetch never
+// started behaves exactly as if it were past the budget — last known grade if
+// it has one, off the site if not, record untouched so a later run picks it
+// up. The deadline is already in the past and the cache points nowhere, so a
+// passing test is also proof no fetch was attempted.
+func TestScanAllDeadline(t *testing.T) {
+	seed := []metaPackage{
+		{PackageBase: "known", NumVotes: 20, LastModified: 2000},
+		{PackageBase: "new", NumVotes: 10, LastModified: 3000},
+	}
+	prev := map[string]stateRecord{
+		"known": {Base: "known", LastModified: 1, Grade: "D", Rules: rulesFingerprint()},
+	}
+
+	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 0, prev,
+		time.Now().Add(-time.Minute), nil)
+	got := map[string]string{}
+	for _, r := range results {
+		got[r.Name] = r.Grade
+	}
+	if got["known"] != "D" {
+		t.Errorf("base with history should render its last grade: %v", got)
+	}
+	if _, ok := got["new"]; ok {
+		t.Errorf("never-scanned base past the deadline should not render: %v", got)
+	}
+	if next["known"].LastModified != 1 {
+		t.Errorf("deadline overwrote the record: %+v", next["known"])
+	}
+}
+
+// TestScanAllCheckpoint pins when the checkpoint runs: once per interior
+// batch, carrying the records of every base finished so far, and not after
+// the final batch, whose records the caller's own save covers.
+func TestScanAllCheckpoint(t *testing.T) {
+	prevBatch := scanBatch
+	scanBatch = 1
+	defer func() { scanBatch = prevBatch }()
+
+	cache := t.TempDir()
+	for _, base := range []string{"one", "two"} {
+		dir := filepath.Join(cache, "snapshots", base+"@1000")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		pkgbuild := "pkgname=" + base + "\npkgver=1.0\npkgrel=1\npkgdesc='A demonstration tool'\n" +
+			"arch=('any')\nurl='https://example.com'\nlicense=('MIT')\n"
+		if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(pkgbuild), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seed := []metaPackage{
+		{PackageBase: "one", LastModified: 1000},
+		{PackageBase: "two", LastModified: 1000},
+	}
+
+	var calls int
+	scanAll(seed, cache, 1, 0, map[string]stateRecord{}, time.Time{}, func(st map[string]stateRecord) {
+		calls++
+		if _, ok := st["one"]; !ok {
+			t.Errorf("checkpoint %d is missing the finished base: %v", calls, st)
+		}
+	})
+	if calls != 1 {
+		t.Errorf("checkpoint ran %d times, want once (interior batches only)", calls)
 	}
 }
 

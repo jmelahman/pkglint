@@ -43,12 +43,25 @@ jobs:
       # limit. From an empty state the corpus fills in about three nights;
       # after that a run fetches only the bases that actually changed and
       # finishes in minutes, with the budget never binding.
+      #
+      # -deadline caps the run's wall clock: past it the run stops starting
+      # fetches and finishes with what it has, so the site and state still
+      # land instead of the job dying at the 6h kill limit with everything
+      # uncommitted. Unfetched bases simply roll to the next run, same as
+      # over-budget ones, so the state advances a little every night no matter
+      # what. At 1h the deadline, not the budget, is what bounds a fill-in
+      # night (~3600 fetches at the throttle's pace), stretching a
+      # from-empty fill over about a week — the price of never tying up a
+      # runner for longer than an hour. The generator logs progress with a
+      # rate and ETA as it fetches, so a run that is merely slow is
+      # distinguishable from one that is stuck.
       - run: >
           go run ./site
           -maintainer Jamison
           -since-days 90
           -top 500
           -budget 8000
+          -deadline 1h
           -state data/state.jsonl
           -out docs
       - uses: actions/upload-artifact@v6

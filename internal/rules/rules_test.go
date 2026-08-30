@@ -1245,6 +1245,14 @@ arch=('x86_64')`
 	t.Run("PB708 arch-specific scalar list field", func(t *testing.T) {
 		expectRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends_x86_64=gtk3\n"})
 	})
+	t.Run("PB708 indexed element write is an array write, not a scalar", func(t *testing.T) {
+		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": valid + `
+source=("https://example.com/a.tar.gz" "https://example.com/b.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+sha256sums[1]='SKIP'
+`})
+	})
 	t.Run("PB708 arch-specific array is fine", func(t *testing.T) {
 		expectNoRule(t, "PB708", map[string]string{"PKGBUILD": valid + "\ndepends_x86_64=('gtk3')\n"})
 	})

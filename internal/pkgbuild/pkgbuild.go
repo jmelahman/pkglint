@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -178,6 +179,10 @@ func (p *Package) extractTopLevel() {
 		if as.Name == nil {
 			return
 		}
+		if as.Index != nil {
+			p.recordIndexed(as)
+			return
+		}
 		v := &Var{Name: as.Name.Value, Pos: as.Pos(), Assign: as}
 		if as.Array != nil {
 			v.Array = true
@@ -235,6 +240,63 @@ func mergeAppend(prev, add *Var) *Var {
 		out.Values = []string{strings.Join(prev.Values, "") + strings.Join(add.Values, "")}
 	}
 	return out
+}
+
+// recordIndexed merges an element write (`name[i]=val`) into the recorded
+// variable. Bash marks the variable as an array and updates that one element,
+// keeping the rest, so any prior assignment must survive: overwriting it here
+// hid every other value from the rules and let PB708 mistake the variable for
+// a scalar — whose "fix", `name[i]=(val)`, bash rejects outright. As with
+// mergeAppend, a merged Var keeps the first assignment's Pos and Assign as a
+// stable identity for byte-offset edits. A subscript that is not a number
+// literal still fixes the array type but places no value.
+func (p *Package) recordIndexed(as *syntax.Assign) {
+	name := as.Name.Value
+	out := &Var{Name: name, Pos: as.Pos(), Assign: as, Array: true}
+	if prev, ok := p.Vars[name]; ok {
+		out.Pos, out.Assign = prev.Pos, prev.Assign
+		out.Values = append([]string(nil), prev.Values...)
+	}
+	if idx, ok := AssignIndex(as); ok {
+		for len(out.Values) <= idx {
+			out.Values = append(out.Values, "")
+		}
+		val, _ := RenderWord(as.Value, nil)
+		if as.Append { // `name[i]+=val` concatenates onto the element
+			out.Values[idx] += val
+		} else {
+			out.Values[idx] = val
+		}
+	}
+	p.Vars[name] = out
+}
+
+// assignIndexMax caps how far an indexed assignment may extend Values.
+// PKGBUILDs are untrusted input; `a[9999999999]=x` must not allocate a huge
+// slice just to record one element.
+const assignIndexMax = 4096
+
+// AssignIndex returns the statically-known element index of an indexed
+// assignment (`name[i]=val`). ok is false when the assignment has no
+// subscript, or when the subscript is not a plain number literal within
+// [0, assignIndexMax].
+func AssignIndex(as *syntax.Assign) (int, bool) {
+	if as == nil || as.Index == nil {
+		return 0, false
+	}
+	w, isWord := as.Index.(*syntax.Word)
+	if !isWord {
+		return 0, false
+	}
+	s, dynamic := RenderWord(w, nil)
+	if dynamic {
+		return 0, false
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 || n > assignIndexMax {
+		return 0, false
+	}
+	return n, true
 }
 
 // Scalar returns the rendered value of a scalar variable, expanded against

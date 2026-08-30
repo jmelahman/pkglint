@@ -486,6 +486,14 @@ func fixVariableTypes(ctx *Context, _ *FixEnv) []Edit {
 		if v == nil || v.Array || v.Assign == nil || v.Assign.Value == nil {
 			continue
 		}
+		// `name[i]=val` is already an array-element write; wrapping the value
+		// would produce `name[i]=(val)`, which bash rejects ("cannot assign
+		// list to array member"). Such a Var is Array=true and unreachable
+		// here, but a fixer must never be one refactor away from emitting
+		// syntax errors.
+		if v.Assign.Index != nil {
+			continue
+		}
 		// A scalar assignment never word-splits, but an unquoted expansion
 		// inside an array does; only wrap values that are fully static.
 		if hasVarRef(firstValue(v.Values)) {

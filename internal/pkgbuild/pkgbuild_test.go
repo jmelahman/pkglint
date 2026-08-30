@@ -270,6 +270,110 @@ func TestAppendAssignments(t *testing.T) {
 	})
 }
 
+// Indexed element writes (`name[i]=val`) are array updates in bash: the
+// variable becomes an array and only the addressed element changes. Treating
+// them as scalar reassignments hid every other checksum from the rules and
+// made PB708 flag — and "fix" into invalid bash — perfectly valid PKGBUILDs.
+func TestIndexedAssignments(t *testing.T) {
+	t.Run("override updates one element and keeps the rest", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "sha256sums=('AAAA' 'BBBB' 'CCCC')\nsha256sums[1]='SKIP'\n")
+		v := pkg.Vars["sha256sums"]
+		if !v.Array {
+			t.Errorf("merged Var has Array=false, want true")
+		}
+		if want := []string{"AAAA", "SKIP", "CCCC"}; !reflect.DeepEqual(v.Values, want) {
+			t.Errorf("merged Values = %v, want %v", v.Values, want)
+		}
+	})
+
+	t.Run("write past the end extends with empty elements", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "sha256sums=('AAAA')\nsha256sums[2]='CCCC'\n")
+		if got, want := pkg.Vars["sha256sums"].Values, []string{"AAAA", "", "CCCC"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("merged Values = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("indexed write with no prior assignment makes an array", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "sha256sums[1]='BBBB'\n")
+		v := pkg.Vars["sha256sums"]
+		if !v.Array {
+			t.Errorf("Var has Array=false, want true")
+		}
+		if want := []string{"", "BBBB"}; !reflect.DeepEqual(v.Values, want) {
+			t.Errorf("Values = %v, want %v", v.Values, want)
+		}
+	})
+
+	t.Run("scalar then indexed write converts to array", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "_x=foo\n_x[1]=bar\n")
+		v := pkg.Vars["_x"]
+		if !v.Array {
+			t.Errorf("Var has Array=false, want true")
+		}
+		if want := []string{"foo", "bar"}; !reflect.DeepEqual(v.Values, want) {
+			t.Errorf("Values = %v, want %v", v.Values, want)
+		}
+	})
+
+	t.Run("non-literal subscript marks the array type but places no value", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "_i=1\nsha256sums=('AAAA')\nsha256sums[$_i]='BBBB'\n")
+		v := pkg.Vars["sha256sums"]
+		if !v.Array {
+			t.Errorf("Var has Array=false, want true")
+		}
+		if want := []string{"AAAA"}; !reflect.DeepEqual(v.Values, want) {
+			t.Errorf("Values = %v, want %v", v.Values, want)
+		}
+	})
+
+	t.Run("element append concatenates", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "_x=(foo)\n_x[0]+=bar\n")
+		if got, want := pkg.Vars["_x"].Values, []string{"foobar"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("Values = %v, want %v", got, want)
+		}
+	})
+
+	// Same anchoring contract as mergeAppend: edits address the first
+	// assignment's bytes.
+	t.Run("merged var keeps the first assignment identity", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "pkgname=demo\nsha256sums=('AAAA')\nsha256sums[0]='BBBB'\n")
+		v := pkg.Vars["sha256sums"]
+		if got := int(v.Pos.Line()); got != 2 {
+			t.Errorf("merged Var Pos line = %d, want 2 (the first assignment)", got)
+		}
+		if v.Assign == nil || v.Assign.Array == nil {
+			t.Errorf("merged Var Assign = %+v, want the original array assignment", v.Assign)
+		}
+	})
+
+	// PKGBUILDs are untrusted input: a huge literal subscript must not make
+	// the parser allocate a huge Values slice.
+	t.Run("oversized literal subscript is not allocated", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "sha256sums[999999999]='AAAA'\n")
+		v := pkg.Vars["sha256sums"]
+		if !v.Array {
+			t.Errorf("Var has Array=false, want true")
+		}
+		if len(v.Values) != 0 {
+			t.Errorf("Values has %d elements, want 0", len(v.Values))
+		}
+	})
+
+	// The override must flow through to source/checksum pairing.
+	t.Run("checksum override stays index aligned", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "source=(\"a\" \"b\")\nsha256sums=('AAAA' 'BBBB')\nsha256sums[1]='SKIP'\n")
+		srcs := pkg.Sources()
+		if len(srcs) != 2 {
+			t.Fatalf("Sources() returned %d entries, want 2", len(srcs))
+		}
+		for i, want := range []string{"AAAA", "SKIP"} {
+			if got := pkg.SumsFor(srcs[i]); !reflect.DeepEqual(got, []string{want}) {
+				t.Errorf("SumsFor(index %d) = %v, want [%q]", i, got, want)
+			}
+		}
+	})
+}
+
 // TestParseSuppressions pins the inline "# pkglint: ignore=" directive parser.
 // Cross-file line collisions are deliberately not covered here.
 func TestParseSuppressions(t *testing.T) {

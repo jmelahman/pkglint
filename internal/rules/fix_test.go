@@ -213,6 +213,21 @@ sha256sums=('SKIP')
 		mustContain(t, got, "git+https://example.com/new.git#commit="+sha)
 		mustContain(t, got, "git+https://example.com/old.git#tag=v0")
 	})
+
+	t.Run("indexed override neither resets numbering nor shifts elements", func(t *testing.T) {
+		// `source[0]=` updates one element in place: the override's own text
+		// is what the fix must rewrite, and the untouched element 1 must keep
+		// its numbering (no reset, no consumed index).
+		got := fixAll(t, map[string]string{"PKGBUILD": vcsPinHeader +
+			`source=("git+https://example.com/old.git#tag=v0"
+        "git+https://example.com/b.git#tag=v2")
+source[0]="git+https://example.com/new.git#tag=v1"
+sha256sums=('SKIP' 'SKIP')
+`}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "git+https://example.com/new.git#commit="+sha)
+		mustContain(t, got, "git+https://example.com/b.git#commit="+sha)
+		mustContain(t, got, "git+https://example.com/old.git#tag=v0")
+	})
 }
 
 func TestFixGoDownloads(t *testing.T) {
@@ -352,6 +367,23 @@ depends=$_deps
 `}, FixSafe, nil)
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("dynamic scalar should not be wrapped, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	// Indexed element writes are valid array updates; wrapping one produced
+	// `sha512sums[6]=('SKIP')`, which bash rejects ("cannot assign list to
+	// array member") — and only the last write was touched, since earlier
+	// ones were clobbered in Vars.
+	t.Run("indexed element writes are left alone", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+sha512sums=('a' 'b' 'c' 'd' 'e' 'f' 'g')
+sha512sums[4]='SKIP'
+sha512sums[6]='SKIP'
+`}, FixSafe, nil)
+		if out, ok := got["PKGBUILD"]; ok {
+			t.Errorf("indexed writes should not be rewritten, got:\n%s", out)
 		}
 	})
 }

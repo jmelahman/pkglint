@@ -272,6 +272,21 @@ func sourceElems(u *pkgbuild.Unit) map[string]*syntax.Word {
 			return
 		}
 		arch := strings.TrimPrefix(strings.TrimPrefix(name, "source"), "_")
+		if as.Index != nil {
+			// `source[i]=url` updates one element in place — no reset, no new
+			// element — mirroring Package.recordIndexed. Remap the element only
+			// for a literal index; extend the numbering when the write lands
+			// past the end, as the merged Values then do.
+			if idx, ok := pkgbuild.AssignIndex(as); ok {
+				if !as.Append {
+					out[elemKey(arch, idx)] = as.Value
+				}
+				if idx >= next[arch] {
+					next[arch] = idx + 1
+				}
+			}
+			return
+		}
 		if !as.Append {
 			for i := range next[arch] {
 				delete(out, elemKey(arch, i))

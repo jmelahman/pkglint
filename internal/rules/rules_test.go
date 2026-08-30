@@ -432,6 +432,41 @@ sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`
 	t.Run("PB110 matched counts are fine", func(t *testing.T) {
 		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith("", "")})
 	})
+	t.Run("PB110 counts through an array-reference source", func(t *testing.T) {
+		// The ttf-ms-fonts shape: one written element, three real sources.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+_files=('a.bin' 'b.bin' 'c.bin')
+_dlpath='https://example.com/pub'
+source=("${_files[@]/#/$_dlpath/}")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 mismatch through an array-reference source", func(t *testing.T) {
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+_files=('a.bin' 'b.bin' 'c.bin')
+_dlpath='https://example.com/pub'
+source=("${_files[@]/#/$_dlpath/}")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 skips a source array it cannot size", func(t *testing.T) {
+		// _files is only built inside prepare(), so the top-level reference has
+		// no statically known length; a mismatch claim would be a guess.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("${_files[@]}")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
 
 	sigNoKeys := `pkgname=demo
 pkgver=1

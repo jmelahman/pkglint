@@ -24,16 +24,28 @@ func seedCorpus(f *testing.F) {
 }
 
 // FuzzParseUnit hammers the PKGBUILD parser — including the rescue path taken
-// when bash parsing fails — with hostile input. PKGBUILDs are untrusted input
-// that is parsed but never executed, so the parser must return a unit or an
-// error, never panic or hang.
+// when bash parsing fails — plus variable extraction and source parsing on
+// top of it, with hostile input. PKGBUILDs are untrusted input that is parsed
+// but never executed, so the pipeline must return a unit or an error, never
+// panic, hang, or allocate without bound (array-reference expansion in
+// particular multiplies values and is budgeted).
 func FuzzParseUnit(f *testing.F) {
 	seedCorpus(f)
 	f.Add([]byte("pkgname=demo\npkgver=1\nbuild() {\n  make\n}\n"))
 	// A syntax error up front forces rescueParse to salvage what it can.
 	f.Add([]byte("case ,, if do done \x00\nsource=('a')\nsha256sums=('SKIP')\n"))
+	// Whole-array reference expansion, including a doubling chain the
+	// amplification cap must refuse.
+	f.Add([]byte("_f=(a b)\n_u=https://x/d\nsource=(\"${_f[@]/#/$_u/}\")\nsha256sums=('SKIP' 'SKIP')\n"))
+	f.Add([]byte("a=(x x)\nb=(\"${a[@]}\" \"${a[@]}\")\na=(\"${b[@]}\" \"${b[@]}\")\nsource=(\"${a[@]//x/xxxxxxxx}\")\n"))
 	f.Fuzz(func(t *testing.T, raw []byte) {
-		_, _ = parseUnit("PKGBUILD", raw, false)
+		u, err := parseUnit("PKGBUILD", raw, false)
+		if err != nil {
+			return
+		}
+		p := &Package{PKGBUILD: u, Vars: map[string]*Var{}}
+		p.extractTopLevel()
+		p.Sources()
 	})
 }
 

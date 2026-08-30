@@ -27,8 +27,10 @@ type SourceEntry struct {
 	// from, counting across every assignment merged into the array. It
 	// differs from Index whenever an element expands to more than one entry:
 	// `foo{,.sig}` is two entries (Index 0 and 1) written as one element
-	// (ElemIndex 0 for both). Use Index to pair with checksums, ElemIndex to
-	// address the source text.
+	// (ElemIndex 0 for both), and an array reference like "${files[@]}" is
+	// one element shared by every entry it expands to. -1 means the entry has
+	// no written element of its own (padded in by an indexed write). Use
+	// Index to pair with checksums, ElemIndex to address the source text.
 	ElemIndex int
 }
 
@@ -47,20 +49,22 @@ func (p *Package) Sources() []SourceEntry {
 		arch := strings.TrimPrefix(strings.TrimPrefix(name, "source"), "_")
 		idx := 0
 		for rawIdx, raw := range v.Values {
-			// Each entry reports its own written element's position. Values
-			// beyond Assign.Array.Elems (scalar-derived, or appended by a
-			// `+=` assignment the merge did not keep an Assign for) fall back
-			// to the array's own position.
+			// Each entry reports its own written element's position, via the
+			// Var's value→element mapping (identity until an array reference
+			// expanded). Values with no element of their own — scalar-derived,
+			// appended by a `+=` assignment the merge did not keep an Assign
+			// for — fall back to the array's own position.
+			elemIdx := v.elemAt(rawIdx)
 			pos := v.Pos
-			if v.Assign != nil && v.Assign.Array != nil && rawIdx < len(v.Assign.Array.Elems) {
-				if el := v.Assign.Array.Elems[rawIdx]; el.Value != nil {
+			if v.Assign != nil && v.Assign.Array != nil && elemIdx >= 0 && elemIdx < len(v.Assign.Array.Elems) {
+				if el := v.Assign.Array.Elems[elemIdx]; el.Value != nil {
 					pos = el.Value.Pos()
 				}
 			}
 			for _, expanded := range expandBraces(p.Expand(raw)) {
 				e := parseSourceEntry(raw, expanded)
 				e.Index = idx
-				e.ElemIndex = rawIdx
+				e.ElemIndex = elemIdx
 				e.Arch = arch
 				e.Pos = pos
 				out = append(out, e)

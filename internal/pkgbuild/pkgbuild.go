@@ -22,8 +22,37 @@ type Var struct {
 	Name   string
 	Values []string // rendered values; one element for scalar assignments
 	Array  bool
-	Pos    syntax.Pos
-	Assign *syntax.Assign // underlying AST node, for byte-offset edits
+	// ElemFor maps each Values index to the written-element counter the value
+	// came from — continuing across merged `+=` assignments — or -1 when it
+	// has no written element of its own (padded in by an indexed write). nil
+	// means the identity mapping — value i came from element i — which holds
+	// until a whole-array reference ("${files[@]}") expands one written
+	// element into a different number of values.
+	ElemFor []int
+	// ElemCount is how many written elements (or scalar assignments) merged
+	// into this Var: the counter space ElemFor indexes into. It matches the
+	// element numbering fix code derives from the AST, which is why merges
+	// track it instead of len(Values).
+	ElemCount int
+	// CountUnknown marks an array holding a whole-array reference that could
+	// not be statically expanded ("${files[@]}" with files unknown), so
+	// len(Values) is not the array's real length. Rules that compare lengths
+	// must not trust the count.
+	CountUnknown bool
+	Pos          syntax.Pos
+	Assign       *syntax.Assign // underlying AST node, for byte-offset edits
+}
+
+// elemAt returns v's written-element counter for Values[i], -1 when the value
+// has no written element of its own.
+func (v *Var) elemAt(i int) int {
+	if v.ElemFor == nil {
+		return i
+	}
+	if i < len(v.ElemFor) {
+		return v.ElemFor[i]
+	}
+	return -1
 }
 
 // Unit is a single bash file under analysis: the PKGBUILD itself or an
@@ -186,13 +215,35 @@ func (p *Package) extractTopLevel() {
 		v := &Var{Name: as.Name.Value, Pos: as.Pos(), Assign: as}
 		if as.Array != nil {
 			v.Array = true
-			for _, el := range as.Array.Elems {
+			v.ElemCount = len(as.Array.Elems)
+			expanded := false
+			for elemIdx, el := range as.Array.Elems {
+				vals, ok, isRef := p.expandArrayRef(el.Value)
+				if ok && len(v.Values)+len(vals) > assignIndexMax {
+					ok = false // hostile input must not stack expansions past the cap
+				}
+				if ok {
+					expanded = true
+					v.Values = append(v.Values, vals...)
+					for range vals {
+						v.ElemFor = append(v.ElemFor, elemIdx)
+					}
+					continue
+				}
+				if isRef {
+					v.CountUnknown = true
+				}
 				s, _ := RenderWord(el.Value, nil)
 				v.Values = append(v.Values, s)
+				v.ElemFor = append(v.ElemFor, elemIdx)
+			}
+			if !expanded {
+				v.ElemFor = nil // identity mapping; keep the compact form
 			}
 		} else if as.Value != nil {
 			s, _ := RenderWord(as.Value, nil)
 			v.Values = []string{s}
+			v.ElemCount = 1
 		}
 		// `source+=(...)` appends in bash; overwriting here would hide the
 		// original assignment from every rule. Appending to a name that has no
@@ -233,9 +284,29 @@ func (p *Package) extractTopLevel() {
 // per-element positions anchor to the first assignment: appended elements have
 // no entry in Assign.Array.Elems and fall back to the array's start position.
 func mergeAppend(prev, add *Var) *Var {
-	out := &Var{Name: prev.Name, Pos: prev.Pos, Assign: prev.Assign, Array: prev.Array || add.Array}
+	out := &Var{
+		Name: prev.Name, Pos: prev.Pos, Assign: prev.Assign, Array: prev.Array || add.Array,
+		ElemCount:    prev.ElemCount + add.ElemCount,
+		CountUnknown: prev.CountUnknown || add.CountUnknown,
+	}
 	if out.Array {
 		out.Values = append(append([]string{}, prev.Values...), add.Values...)
+		// Element counters continue across the merge, offset by how many
+		// elements prev consumed — the same numbering fix code counts over the
+		// AST. Only worth materializing once either side left identity.
+		if prev.ElemFor != nil || add.ElemFor != nil {
+			out.ElemFor = make([]int, 0, len(out.Values))
+			for i := range prev.Values {
+				out.ElemFor = append(out.ElemFor, prev.elemAt(i))
+			}
+			for i := range add.Values {
+				e := add.elemAt(i)
+				if e >= 0 {
+					e += prev.ElemCount
+				}
+				out.ElemFor = append(out.ElemFor, e)
+			}
+		}
 	} else {
 		out.Values = []string{strings.Join(prev.Values, "") + strings.Join(add.Values, "")}
 	}
@@ -256,16 +327,29 @@ func (p *Package) recordIndexed(as *syntax.Assign) {
 	if prev, ok := p.Vars[name]; ok {
 		out.Pos, out.Assign = prev.Pos, prev.Assign
 		out.Values = append([]string(nil), prev.Values...)
+		out.ElemFor = append([]int(nil), prev.ElemFor...)
+		out.ElemCount = prev.ElemCount
+		out.CountUnknown = prev.CountUnknown
 	}
 	if idx, ok := AssignIndex(as); ok {
 		for len(out.Values) <= idx {
 			out.Values = append(out.Values, "")
+			if out.ElemFor != nil {
+				out.ElemFor = append(out.ElemFor, -1) // padding has no written element
+			}
 		}
 		val, _ := RenderWord(as.Value, nil)
 		if as.Append { // `name[i]+=val` concatenates onto the element
 			out.Values[idx] += val
 		} else {
 			out.Values[idx] = val
+			if out.ElemFor != nil {
+				// The written element's text no longer produces this value.
+				out.ElemFor[idx] = -1
+			}
+		}
+		if idx >= out.ElemCount {
+			out.ElemCount = idx + 1
 		}
 	}
 	p.Vars[name] = out
@@ -435,6 +519,181 @@ func RenderWord(w *syntax.Word, vars map[string]string) (s string, dynamic bool)
 	var b strings.Builder
 	dyn := renderParts(&b, w.Parts, vars)
 	return b.String(), dyn
+}
+
+// expandArrayRef statically expands an array element that is a whole-array
+// reference — `"${files[@]}"` alone in its word, plain or with makepkg's
+// prefix/suffix idiom (`"${files[@]/#/$url/}"` prepends, `"${files[@]/%/.sig}"`
+// appends) or a literal-pattern replacement — into one value per element of the
+// referenced array. Values keep unexpanded $refs (the prefix above stays
+// "$url/") for Expand to resolve at use, exactly like directly written
+// elements.
+//
+// ok reports a successful expansion. isRef reports that the element names a
+// whole array even when it cannot be expanded — the caller then knows the
+// rendered value count is not the array's real length. A reference whose
+// operation preserves element count but hides content (glob replacements,
+// prefix/suffix strips, case conversion) still expands, to one dynamic marker
+// per element: the count is what checksum pairing needs. Static text around
+// the reference is kept where bash puts it — "$url/${files[@]}" prefixes the
+// first element only; the per-element idiom is the `/#/` replacement. A quoted
+// "${files[*]}" joins into a single word and `${#files[@]}` is a count, so
+// neither is a multi-element reference.
+func (p *Package) expandArrayRef(w *syntax.Word) (vals []string, ok, isRef bool) {
+	if w == nil {
+		return nil, false, false
+	}
+	// Locate the word's single whole-array reference; everything around it must
+	// render statically and becomes a prefix on the first element and a suffix
+	// on the last, which is where bash attaches surrounding text in
+	// "$url/${files[@]}". Two references, or dynamic surrounding text, is a
+	// count we refuse to guess at.
+	var pre, post strings.Builder
+	var ref *syntax.ParamExp
+	bad := false
+	var scan func(parts []syntax.WordPart, inQuotes bool)
+	scan = func(parts []syntax.WordPart, inQuotes bool) {
+		for _, part := range parts {
+			if bad {
+				return
+			}
+			if dq, isDq := part.(*syntax.DblQuoted); isDq && !inQuotes {
+				scan(dq.Parts, true)
+				continue
+			}
+			if pe, isPe := part.(*syntax.ParamExp); isPe && isWholeArrayRef(pe, inQuotes) {
+				if ref != nil {
+					bad = true
+					return
+				}
+				ref = pe
+				continue
+			}
+			b := &pre
+			if ref != nil {
+				b = &post
+			}
+			if renderParts(b, []syntax.WordPart{part}, nil) {
+				bad = true
+				return
+			}
+		}
+	}
+	scan(w.Parts, false)
+	if ref == nil {
+		return nil, false, false
+	}
+	if bad {
+		return nil, false, true
+	}
+	pe := ref
+	if pe.Excl || pe.Names != 0 || pe.Slice != nil {
+		return nil, false, true // index lists and slices change the count
+	}
+	src, known := p.Vars[pe.Param.Value]
+	if !known || !src.Array || src.CountUnknown {
+		return nil, false, true
+	}
+	// PKGBUILDs are untrusted input. Chained references double values per
+	// assignment and replacements multiply content, so refuse anything past
+	// the same per-assignment ceiling indexed writes use, and budget the
+	// bytes produced below.
+	if len(src.Values) > assignIndexMax {
+		return nil, false, true
+	}
+	rewrite := func(s string) (string, bool) { return s, true }
+	switch {
+	case pe.Repl != nil:
+		orig, dynO := RenderWord(pe.Repl.Orig, nil)
+		with, dynW := RenderWord(pe.Repl.With, nil)
+		switch {
+		case dynO || dynW:
+			rewrite = nil
+		case !pe.Repl.All && orig == "#": // empty pattern anchored at start: prepend
+			rewrite = func(s string) (string, bool) { return with + s, true }
+		case !pe.Repl.All && orig == "%": // empty pattern anchored at end: append
+			rewrite = func(s string) (string, bool) { return s + with, true }
+		case orig != "" && !strings.ContainsAny(orig, `*?[#%\$`):
+			if pe.Repl.All {
+				rewrite = func(s string) (string, bool) {
+					// Bound the output before building it: every match grows
+					// the string by the replacement's surplus.
+					grown := len(s) + strings.Count(s, orig)*len(with)
+					if grown > arrayRefMaxBytes {
+						return "", false
+					}
+					return strings.ReplaceAll(s, orig, with), true
+				}
+			} else {
+				rewrite = func(s string) (string, bool) { return strings.Replace(s, orig, with, 1), true }
+			}
+		default:
+			rewrite = nil // glob or anchored pattern: content unknown, count kept
+		}
+	case pe.Exp != nil:
+		switch pe.Exp.Op {
+		case syntax.RemSmallPrefix, syntax.RemLargePrefix, syntax.RemSmallSuffix, syntax.RemLargeSuffix,
+			syntax.UpperFirst, syntax.UpperAll, syntax.LowerFirst, syntax.LowerAll:
+			rewrite = nil // strips and case conversion preserve the count
+		default:
+			return nil, false, true // ${files[@]:-...} and friends change it
+		}
+	}
+	if len(src.Values) == 0 {
+		// An empty array expands to zero words — unless surrounding text keeps
+		// one word alive, as "pre${a[@]}post" does in bash.
+		if pre.Len() == 0 && post.Len() == 0 {
+			return []string{}, true, true
+		}
+		return []string{pre.String() + post.String()}, true, true
+	}
+	total := 0
+	vals = make([]string, len(src.Values))
+	for i, s := range src.Values {
+		if rewrite == nil {
+			vals[i] = "\x00"
+		} else {
+			v, fits := rewrite(s)
+			if !fits {
+				return nil, false, true
+			}
+			vals[i] = v
+		}
+		if i == 0 {
+			vals[i] = pre.String() + vals[i]
+		}
+		if i == len(src.Values)-1 {
+			vals[i] += post.String()
+		}
+		if total += len(vals[i]); total > arrayRefMaxBytes {
+			return nil, false, true
+		}
+	}
+	return vals, true, true
+}
+
+// arrayRefMaxBytes caps the content one array-reference expansion may produce.
+// No real PKGBUILD comes near it; a hostile one chaining replacements to
+// multiply string content must not allocate its way out of static analysis.
+const arrayRefMaxBytes = 1 << 20
+
+// isWholeArrayRef reports whether the parameter expansion names every element
+// of an array: ${a[@]} or unquoted ${a[*]}, in any of the operation forms
+// expandArrayRef handles. ${#a[@]} is a count and a quoted "${a[*]}" joins into
+// one word, so neither qualifies.
+func isWholeArrayRef(pe *syntax.ParamExp, inQuotes bool) bool {
+	if pe.Length || pe.Index == nil {
+		return false
+	}
+	iw, isWord := pe.Index.(*syntax.Word)
+	if !isWord {
+		return false
+	}
+	idx, dyn := RenderWord(iw, nil)
+	if dyn {
+		return false
+	}
+	return idx == "@" || (idx == "*" && !inQuotes)
 }
 
 func renderParts(b *strings.Builder, parts []syntax.WordPart, vars map[string]string) bool {

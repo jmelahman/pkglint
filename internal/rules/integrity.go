@@ -356,6 +356,16 @@ func checkChecksumCounts(ctx *Context) []Finding {
 	}
 	var out []Finding
 	for arch, n := range counts {
+		srcName := "source"
+		if arch != "" {
+			srcName += "_" + arch
+		}
+		// An array reference the parser could not size ("${_files[@]}" with
+		// _files built dynamically) makes the source count meaningless; a
+		// mismatch claim would be a guess.
+		if v := ctx.Pkg.Vars[srcName]; v != nil && v.CountUnknown {
+			continue
+		}
 		sums := ctx.Pkg.Checksums(arch)
 		for _, algo := range sumAlgoNames {
 			vals, ok := sums[algo]
@@ -367,6 +377,9 @@ func checkChecksumCounts(ctx *Context) []Finding {
 				name += "_" + arch
 			}
 			v := ctx.Pkg.Vars[name]
+			if v.CountUnknown {
+				continue // the sums array's own length is not statically known
+			}
 			out = append(out, findingAt("PB110", Error, ctx.Pkg.PKGBUILD.Path, v.Pos,
 				"%s has %d checksum(s) but there are %d source(s) for this arch; makepkg pairs them by index",
 				name, len(vals), n))

@@ -1,10 +1,12 @@
 package pkgbuild
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -60,6 +62,187 @@ sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08' '
 	if sums := pkg.SumsFor(srcs[1]); len(sums) != 1 || sums[0] != "SKIP" {
 		t.Errorf("sig source should pair with the SKIP sum, got %v", sums)
 	}
+}
+
+// TestSourcesArrayRefExpansion pins the ttf-ms-fonts shape: a source array
+// built by prefixing every element of a helper array, whose real length only
+// exists after expanding the array reference. Each expanded entry pairs with
+// its checksum by index and reports the written element's position.
+func TestSourcesArrayRefExpansion(t *testing.T) {
+	pkg := loadPKGBUILD(t, `pkgname=demo
+pkgver=1.0
+_files=('one.bin'
+        'two.bin'
+        'three.bin')
+_dlpath="https://example.com/pub"
+source=("${_files[@]/#/$_dlpath/}")
+sha256sums=('aaaa' 'bbbb' 'cccc')
+`)
+	srcs := pkg.Sources()
+	if len(srcs) != 3 {
+		t.Fatalf("Sources() = %d entries, want 3: %+v", len(srcs), srcs)
+	}
+	for i, want := range []string{"one.bin", "two.bin", "three.bin"} {
+		e := srcs[i]
+		if e.URL != "https://example.com/pub/"+want {
+			t.Errorf("Sources()[%d].URL = %q, want https://example.com/pub/%s", i, e.URL, want)
+		}
+		if e.Index != i || e.ElemIndex != 0 {
+			t.Errorf("Sources()[%d] Index/ElemIndex = %d/%d, want %d/0", i, e.Index, e.ElemIndex, i)
+		}
+		// All three genuinely occupy the one written element on line 7.
+		if e.Pos.Line() != 7 || e.Pos.Col() != 9 {
+			t.Errorf("Sources()[%d] at %d:%d, want 7:9", i, e.Pos.Line(), e.Pos.Col())
+		}
+	}
+	if got := pkg.SumsFor(srcs[2]); len(got) != 1 || got[0] != "cccc" {
+		t.Errorf("SumsFor(index 2) = %v, want [cccc]", got)
+	}
+	if pkg.Vars["source"].CountUnknown {
+		t.Error("source.CountUnknown = true for a statically sized expansion")
+	}
+}
+
+// TestArrayRefExpansionForms pins which whole-array reference forms expand,
+// which keep only the element count, and which leave the count unknown.
+func TestArrayRefExpansionForms(t *testing.T) {
+	const files = "_files=('a.bin' 'b.bin' 'c.bin')\n"
+	dyn3 := []string{"\x00", "\x00", "\x00"}
+	for _, tc := range []struct {
+		name    string
+		decl    string   // assignments preceding source=
+		elem    string   // the single written source element
+		want    []string // nil: only check the count
+		wantN   int
+		unknown bool
+	}{
+		{"plain quoted", files, `"${_files[@]}"`, []string{"a.bin", "b.bin", "c.bin"}, 3, false},
+		{"plain unquoted", files, `${_files[@]}`, []string{"a.bin", "b.bin", "c.bin"}, 3, false},
+		{"unquoted star", files, `${_files[*]}`, []string{"a.bin", "b.bin", "c.bin"}, 3, false},
+		{"prefix idiom keeps the ref unexpanded", files + "_url='https://x.example/d'\n",
+			`"${_files[@]/#/$_url/}"`, []string{"$_url/a.bin", "$_url/b.bin", "$_url/c.bin"}, 3, false},
+		{"suffix idiom", files, `"${_files[@]/%/.sig}"`, []string{"a.bin.sig", "b.bin.sig", "c.bin.sig"}, 3, false},
+		{"inline prefix lands on the first element only", files,
+			`"https://x.example/d/${_files[@]}"`, []string{"https://x.example/d/a.bin", "b.bin", "c.bin"}, 3, false},
+		{"literal replacement", files, `"${_files[@]/.bin/.dat}"`, []string{"a.dat", "b.dat", "c.dat"}, 3, false},
+		{"glob replacement keeps only the count", files, `"${_files[@]/?.bin/x}"`, dyn3, 3, false},
+		{"suffix strip keeps only the count", files, `"${_files[@]%.bin}"`, dyn3, 3, false},
+		{"quoted star joins into one word", files, `"${_files[*]}"`, nil, 1, false},
+		{"length is a count, not a reference", files, `"${#_files[@]}"`, nil, 1, false},
+		{"unknown array", "", `"${_missing[@]}"`, nil, 1, true},
+		{"slice changes the count", files, `"${_files[@]:1}"`, nil, 1, true},
+		{"two references", files, `"${_files[@]}${_files[@]}"`, nil, 1, true},
+		{"empty array vanishes", "_files=()\n", `"${_files[@]}"`, []string{}, 0, false},
+		{"empty array with surrounding text keeps a word", "_files=()\n",
+			`"pre-${_files[@]}"`, []string{"pre-"}, 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pkg := loadPKGBUILD(t, "pkgname=demo\n"+tc.decl+"source=("+tc.elem+")\n")
+			v := pkg.Vars["source"]
+			if v == nil {
+				t.Fatal("source not recorded")
+			}
+			if len(v.Values) != tc.wantN {
+				t.Fatalf("len(Values) = %d, want %d: %q", len(v.Values), tc.wantN, v.Values)
+			}
+			if tc.want != nil && !reflect.DeepEqual(append([]string{}, v.Values...), tc.want) {
+				t.Errorf("Values = %q, want %q", v.Values, tc.want)
+			}
+			if v.CountUnknown != tc.unknown {
+				t.Errorf("CountUnknown = %v, want %v", v.CountUnknown, tc.unknown)
+			}
+		})
+	}
+}
+
+// TestSourcesArrayRefNeighbors pins that elements around an expanded array
+// reference keep their own positions and element indices, and that a later
+// `+=` append still merges in behind the expansion.
+func TestSourcesArrayRefNeighbors(t *testing.T) {
+	// `source=(` opens on line 3: elements sit at 3:9, 4:9, 5:9. The appended
+	// element continues the written-element numbering (index 3) so fix code
+	// can still address its text, but has no AST element in the merged Var and
+	// falls back to the array position 3:1.
+	pkg := loadPKGBUILD(t, `pkgname=demo
+_files=('a.bin' 'b.bin')
+source=('pre.tar.gz'
+        "${_files[@]}"
+        'post.tar.gz')
+sha256sums=('s0' 's1' 's2' 's3' 's4')
+source+=('extra.tar.gz')
+`)
+	srcs := pkg.Sources()
+	if len(srcs) != 5 {
+		t.Fatalf("Sources() = %d entries, want 5: %+v", len(srcs), srcs)
+	}
+	wants := []struct {
+		url       string
+		elemIndex int
+		line, col uint
+	}{
+		{"pre.tar.gz", 0, 3, 9},
+		{"a.bin", 1, 4, 9},
+		{"b.bin", 1, 4, 9},
+		{"post.tar.gz", 2, 5, 9},
+		{"extra.tar.gz", 3, 3, 1},
+	}
+	for i, want := range wants {
+		e := srcs[i]
+		if e.URL != want.url || e.Index != i || e.ElemIndex != want.elemIndex {
+			t.Errorf("Sources()[%d] = %q Index=%d ElemIndex=%d, want %q/%d/%d",
+				i, e.URL, e.Index, e.ElemIndex, want.url, i, want.elemIndex)
+		}
+		if e.Pos.Line() != want.line || e.Pos.Col() != want.col {
+			t.Errorf("Sources()[%d] at %d:%d, want %d:%d", i, e.Pos.Line(), e.Pos.Col(), want.line, want.col)
+		}
+	}
+	if got := pkg.SumsFor(srcs[3]); len(got) != 1 || got[0] != "s3" {
+		t.Errorf("SumsFor(post.tar.gz) = %v, want [s3]", got)
+	}
+}
+
+// TestArrayRefAmplificationCapped pins the untrusted-input guards: chained
+// whole-array references double values per assignment and chained replacements
+// multiply content, and a hostile PKGBUILD must run out of budget, not memory.
+// Past the cap the variable is CountUnknown, never silently miscounted.
+func TestArrayRefAmplificationCapped(t *testing.T) {
+	t.Run("value-count doubling", func(t *testing.T) {
+		var b strings.Builder
+		b.WriteString("pkgname=demo\na0=(x x x x x x x x)\n")
+		for i := 1; i <= 30; i++ {
+			fmt.Fprintf(&b, "a%d=(\"${a%d[@]}\" \"${a%d[@]}\")\n", i, i-1, i-1)
+		}
+		b.WriteString("source=(\"${a30[@]}\")\n")
+		pkg := loadPKGBUILD(t, b.String())
+		total := 0
+		for _, v := range pkg.Vars {
+			total += len(v.Values)
+		}
+		if total > 100_000 {
+			t.Fatalf("expansion produced %d values; the cap did not hold", total)
+		}
+		if !pkg.Vars["source"].CountUnknown {
+			t.Error("source.CountUnknown = false after a refused expansion chain")
+		}
+	})
+
+	t.Run("content multiplication", func(t *testing.T) {
+		var b strings.Builder
+		b.WriteString("pkgname=demo\nb0=('" + strings.Repeat("a", 64) + "')\n")
+		for i := 1; i <= 12; i++ {
+			fmt.Fprintf(&b, "b%d=(\"${b%d[@]//a/aaaaaaaa}\")\n", i, i-1)
+		}
+		pkg := loadPKGBUILD(t, b.String())
+		total := 0
+		for _, v := range pkg.Vars {
+			for _, s := range v.Values {
+				total += len(s)
+			}
+		}
+		if total > 8<<20 {
+			t.Fatalf("expansion produced %d bytes; the cap did not hold", total)
+		}
+	})
 }
 
 // TestSourcesSplitPackagePkgname pins the cyrus-imapd shape: a split package

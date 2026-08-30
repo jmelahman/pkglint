@@ -1,0 +1,5 @@
+arrayref: grade D, 4 finding(s)
+  PKGBUILD:18:9: error [PB104] source "$_dlpath/one.bin" is fetched over unencrypted http://
+  PKGBUILD:18:9: error [PB104] source "$_dlpath/three.bin" is fetched over unencrypted http://
+  PKGBUILD:18:9: error [PB104] source "$_dlpath/two.bin" is fetched over unencrypted http://
+  PKGBUILD:24:1: error [PB110] sha256sums_x86_64 has 1 checksum(s) but there are 2 source(s) for this arch; makepkg pairs them by index

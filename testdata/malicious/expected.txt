@@ -16,3 +16,4 @@ malicious: grade F, 15 finding(s)
   badpkg.install:4:43: critical [PB502] scriptlet writes to "/var/spool/cron/root", a persistence location outside pacman's tracking
 
 1 package linted: 1 with findings
+2 finding(s) fixable with --unsafe-fix

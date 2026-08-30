@@ -144,6 +144,77 @@ func TestRenderTextSummary(t *testing.T) {
 	}
 }
 
+// TestRenderTextFixSummary pins the auto-fix tally that closes the run: safe
+// and unsafe findings are counted separately under the flag that applies them,
+// and a run with nothing fixable says nothing at all. Rule IDs come from the
+// registry so the test follows rules gaining or losing fixes.
+func TestRenderTextFixSummary(t *testing.T) {
+	var safeID, unsafeID, noneID string
+	for _, r := range rules.Registry() {
+		switch {
+		case r.FixLevel == rules.FixSafe && safeID == "":
+			safeID = r.ID
+		case r.FixLevel == rules.FixUnsafe && unsafeID == "":
+			unsafeID = r.ID
+		case r.FixLevel == rules.FixNone && noneID == "":
+			noneID = r.ID
+		}
+	}
+	if safeID == "" || unsafeID == "" || noneID == "" {
+		t.Fatalf("registry lacks a rule at some fix level (safe=%q unsafe=%q none=%q)", safeID, unsafeID, noneID)
+	}
+	finding := func(id string) rules.Finding {
+		return rules.Finding{RuleID: id, Severity: rules.Warn, Message: "m", Path: "p", Line: 1, Col: 1}
+	}
+
+	cases := []struct {
+		name     string
+		findings []rules.Finding
+		want     string
+	}{
+		{"both levels", []rules.Finding{finding(safeID), finding(safeID), finding(unsafeID), finding(noneID)},
+			"2 finding(s) fixable with --fix, 1 more with --unsafe-fix"},
+		{"safe only", []rules.Finding{finding(safeID), finding(noneID)},
+			"1 finding(s) fixable with --fix"},
+		{"unsafe only", []rules.Finding{finding(unsafeID)},
+			"1 finding(s) fixable with --unsafe-fix"},
+		{"nothing fixable", []rules.Finding{finding(noneID)}, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			RenderText(&buf, []PackageReport{New("/some/dir/pkg", c.findings)}, false, false)
+			last := ""
+			if lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n"); len(lines) > 0 {
+				last = lines[len(lines)-1]
+			}
+			if c.want == "" {
+				if strings.Contains(buf.String(), "fixable") {
+					t.Errorf("unfixable findings advertised a fix:\n%s", buf.String())
+				}
+				if !strings.HasSuffix(last, "linted: 1 with findings") {
+					t.Errorf("summary is not the last line:\n%s", buf.String())
+				}
+				return
+			}
+			if last != c.want {
+				t.Errorf("fix tally = %q, want %q\n%s", last, c.want, buf.String())
+			}
+		})
+	}
+
+	// Counts span every package in the run, not just the first.
+	var buf bytes.Buffer
+	RenderText(&buf, []PackageReport{
+		New("/some/dir/a", []rules.Finding{finding(safeID)}),
+		New("/some/dir/b", []rules.Finding{finding(safeID)}),
+		NewError("/some/dir/c", errors.New("boom")),
+	}, false, false)
+	if !strings.Contains(buf.String(), "2 finding(s) fixable with --fix\n") {
+		t.Errorf("tally did not span packages:\n%s", buf.String())
+	}
+}
+
 // stripSGR removes ANSI SGR sequences (ESC [ … m), the only escapes the
 // styler emits.
 func stripSGR(s string) string {

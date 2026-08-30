@@ -169,8 +169,9 @@ func (s styler) grade(g string) string {
 // trusted tokens (and the already-sanitized name), so untrusted content can
 // neither carry its own escapes nor break out of ours.
 //
-// Packages with no findings are silent unless verbose is set; a one-line
-// summary at the end accounts for every package either way.
+// Packages with no findings are silent unless verbose is set; a summary at the
+// end accounts for every package either way, followed by the auto-fix tally
+// when any finding has a fix.
 func RenderText(w io.Writer, reports []PackageReport, color, verbose bool) {
 	s := styler(color)
 	printed := 0
@@ -208,6 +209,9 @@ func RenderText(w io.Writer, reports []PackageReport, color, verbose bool) {
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintf(w, "%s\n", summarize(reports))
+	if fixes := summarizeFixes(reports); fixes != "" {
+		fmt.Fprintf(w, "%s\n", fixes)
+	}
 }
 
 // summarize condenses the run into one line: how many packages were linted and
@@ -244,6 +248,43 @@ func summarize(reports []PackageReport) string {
 		out += ": " + strings.Join(parts, ", ")
 	}
 	return out
+}
+
+// summarizeFixes counts the findings whose rule declares an auto-fix and names
+// the flag that applies each group, so the run ends by saying how much of it a
+// rerun could repair. --unsafe-fix implies --fix, hence "more": its count is
+// what the unsafe level adds on top of the safe one.
+//
+// The tally reads the rule registry, not the fixers, so it counts findings a
+// fix *targets*. A few fixes need state the linter does not have — sources on
+// disk for a digest, a probe of the https host — and stay unapplied; the count
+// is an upper bound for those, which is why it advertises flags rather than
+// promising a number of rewrites. Empty when nothing is fixable.
+func summarizeFixes(reports []PackageReport) string {
+	levels := make(map[string]rules.FixLevel)
+	for _, r := range rules.Registry() {
+		levels[r.ID] = r.FixLevel
+	}
+	safe, unsafe := 0, 0
+	for _, r := range reports {
+		for _, f := range r.Findings {
+			switch levels[f.RuleID] {
+			case rules.FixSafe:
+				safe++
+			case rules.FixUnsafe:
+				unsafe++
+			}
+		}
+	}
+	switch {
+	case safe > 0 && unsafe > 0:
+		return fmt.Sprintf("%d finding(s) fixable with --fix, %d more with --unsafe-fix", safe, unsafe)
+	case safe > 0:
+		return fmt.Sprintf("%d finding(s) fixable with --fix", safe)
+	case unsafe > 0:
+		return fmt.Sprintf("%d finding(s) fixable with --unsafe-fix", unsafe)
+	}
+	return ""
 }
 
 // RenderJSON writes reports as a JSON array.

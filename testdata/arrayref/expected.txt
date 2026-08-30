@@ -5,3 +5,4 @@ arrayref: grade D, 4 finding(s)
   PKGBUILD:24:1: error [PB110] sha256sums_x86_64 has 1 checksum(s) but there are 2 source(s) for this arch; makepkg pairs them by index
 
 1 package linted: 1 with findings
+3 finding(s) fixable with --unsafe-fix

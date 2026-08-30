@@ -26,10 +26,16 @@ somepkg: grade F, 3 finding(s)
   PKGBUILD:24:3: error [PB402] sudo escalates privileges during a build; ...
 
 1 package linted: 1 with findings
+1 finding(s) fixable with --unsafe-fix
 ```
 
 Packages with nothing to report stay out of the way — they are only counted in
-the closing summary line (`--verbose` lists them individually).
+the closing summary line (`--verbose` lists them individually). The line after
+it tallies the findings a rule can rewrite, split by the flag that applies them
+(`--fix` for behavior-preserving fixes, `--unsafe-fix` for the rest). A few
+fixes also need state the linter does not have — the sources on disk for a
+digest, an https host that answers — so the tally is what a fix run will
+attempt, not a promise of that many rewrites.
 
 ## Install
 

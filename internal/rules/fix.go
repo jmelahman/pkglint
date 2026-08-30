@@ -846,12 +846,16 @@ func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
 	u := c.Unit
 	indent := lineIndent(u.Raw, off(c.Stmt.Pos()))
 	line := int(c.Stmt.Pos().Line())
-	download := "go mod download -modcacherw\n"
-	for _, v := range assignmentsTo(ctx, "GOFLAGS") {
-		if strings.Contains(v, "-modcacherw") {
-			download = "go mod download\n"
-			break
+	// GOFLAGS is only read from prepare()'s own environment, so an export
+	// in build() — the guidelines' usual home for it — does not cover a
+	// download that runs a phase earlier.
+	download := func(at int) string {
+		for _, v := range assignmentsInScope(u, "GOFLAGS", "prepare", at, nil) {
+			if strings.Contains(v, "-modcacherw") {
+				return "go mod download\n"
+			}
 		}
+		return "go mod download -modcacherw\n"
 	}
 
 	if fd := u.Functions["prepare"]; fd != nil {
@@ -869,7 +873,7 @@ func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
 		if !fnHasCommand(ctx, u, "prepare", "cd") {
 			b.WriteString(cdLine(ctx, u, c.Fn))
 		}
-		b.WriteString(indent + download)
+		b.WriteString(indent + download(at))
 		return Edit{
 			Path: u.Path, Start: at, End: at, New: b.String(), Line: line,
 			Desc: "add `go mod download` to prepare() so the build needn't fetch",
@@ -884,7 +888,7 @@ func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
 	var b strings.Builder
 	b.WriteString("prepare() {\n")
 	b.WriteString(cdLine(ctx, u, c.Fn))
-	b.WriteString(indent + download)
+	b.WriteString(indent + download(at))
 	b.WriteString("}\n\n")
 	return Edit{
 		Path: u.Path, Start: at, End: at, New: b.String(), Line: line,
@@ -970,10 +974,9 @@ func goFlagInsertion(c Command) (int, bool) {
 // goFlagEdits inserts flag into every command in cmds that neither passes it
 // nor inherits it from a GOFLAGS assignment.
 func goFlagEdits(ctx *Context, cmds []Command, flagPrefix, flag string) []Edit {
-	goflags := assignmentsTo(ctx, "GOFLAGS")
 	var edits []Edit
 	for _, c := range cmds {
-		if goFlagAddressed(goflags, c, flagPrefix) {
+		if goFlagAddressed(assignmentsTo(ctx, "GOFLAGS", c), c, flagPrefix) {
 			continue
 		}
 		at, ok := goFlagInsertion(c)

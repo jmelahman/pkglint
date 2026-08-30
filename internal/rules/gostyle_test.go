@@ -73,6 +73,54 @@ prepare() {
 }`)})
 	})
 
+	t.Run("GOFLAGS is scoped to the phases that can still see it", func(t *testing.T) {
+		// build() exports GOFLAGS long after prepare() has finished, so the
+		// download ran against a read-only cache regardless.
+		expectRule(t, "PB916", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  go mod download
+}
+build() {
+  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+  go build -o demo .
+}`)})
+		// Set at the top level, it is sourced before every phase.
+		expectNoRule(t, "PB916", map[string]string{"PKGBUILD": pkgbuildWith("", `
+export GOFLAGS="-trimpath -modcacherw"
+
+prepare() {
+  go mod download
+}`)})
+		// Set in prepare(), it also reaches the later phases.
+		expectNoRule(t, "PB916", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  export GOFLAGS="-trimpath -modcacherw"
+  go mod download
+}
+build() {
+  go build -o demo .
+}`)})
+	})
+
+	t.Run("an export below the command it would cover does not count", func(t *testing.T) {
+		expectRule(t, "PB915", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go build -buildmode=pie -o demo .
+  export GOFLAGS="-trimpath"
+}`)})
+	})
+
+	t.Run("an environment prefix covers only its own command", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  GOFLAGS=-trimpath go build -buildmode=pie -o demo ./cmd/demo
+  go build -buildmode=pie -o democtl ./cmd/democtl
+}`)}
+		if n := ruleIDs(lint(t, files))["PB915"]; n != 1 {
+			t.Errorf("PB915 fired %d times, want 1 (only the unprefixed build)", n)
+		}
+	})
+
 	t.Run("CGO_ENABLED=0 silences the cgo-forwarding rule", func(t *testing.T) {
 		expectNoRule(t, "PB917", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
@@ -139,6 +187,29 @@ build() {
 		if strings.Contains(got, "go build -buildmode") {
 			t.Errorf("flags were inserted despite GOFLAGS carrying them:\n%s", got)
 		}
+	})
+
+	t.Run("the download PB204 writes carries -modcacherw of its own", func(t *testing.T) {
+		// GOFLAGS is exported in build(), a phase after the prepare() the fix
+		// creates, so the inserted download cannot inherit the flag.
+		got := fixPKGBUILD(t, `
+build() {
+  cd "$pkgname" || exit
+  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+  go build -o demo .
+}`, FixUnsafe, nil)
+		mustContain(t, got, "prepare() {\n  cd \"$pkgname\" || exit\n  go mod download -modcacherw\n}")
+	})
+
+	t.Run("a top-level GOFLAGS does cover the inserted download", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+export GOFLAGS="-buildmode=pie -trimpath -modcacherw"
+
+build() {
+  go build -o demo .
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, "prepare() {\n  go mod download\n}")
+		mustNotContain(t, got, "go mod download -modcacherw")
 	})
 
 	t.Run("fix is idempotent", func(t *testing.T) {

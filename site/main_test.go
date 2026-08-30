@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -425,6 +427,71 @@ func restoreDownloadCeiling(t *testing.T, limit int64) func() {
 	return func() { maxDownloadBytes = prev }
 }
 
+func restoreEmptyBodyBackoff(t *testing.T, backoff []time.Duration) func() {
+	t.Helper()
+	prev := emptyBodyBackoff
+	emptyBodyBackoff = backoff
+	return func() { emptyBodyBackoff = prev }
+}
+
+func restoreSnapshotURL(t *testing.T, url string) func() {
+	t.Helper()
+	prev := snapshotURL
+	snapshotURL = url
+	return func() { snapshotURL = prev }
+}
+
+// TestDownloadRetriesEmptyBody pins the cgit hiccup that used to surface as a
+// bare "scan <base>: EOF": a 200 with no bytes behind it is a transient
+// server-side failure, and one retry rides it out.
+func TestDownloadRetriesEmptyBody(t *testing.T) {
+	defer restoreEmptyBodyBackoff(t, []time.Duration{time.Millisecond})()
+
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) == 1 {
+			return // 200, zero bytes
+		}
+		w.Write([]byte("tarball"))
+	}))
+	defer srv.Close()
+
+	path := filepath.Join(t.TempDir(), "snap.tar.gz")
+	if err := download(srv.URL, path); err != nil {
+		t.Fatalf("download: %v", err)
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != "tarball" {
+		t.Errorf("file = %q (%v), want the retried body", got, err)
+	}
+	if n := hits.Load(); n != 2 {
+		t.Errorf("server saw %d requests, want 2", n)
+	}
+}
+
+func TestDownloadGivesUpOnPersistentEmptyBody(t *testing.T) {
+	defer restoreEmptyBodyBackoff(t, []time.Duration{time.Millisecond})()
+
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+	}))
+	defer srv.Close()
+
+	path := filepath.Join(t.TempDir(), "snap.tar.gz")
+	err := download(srv.URL, path)
+	if err == nil || !errors.Is(err, errEmptyBody) {
+		t.Fatalf("download = %v, want an empty-body error", err)
+	}
+	if n := hits.Load(); n != 2 {
+		t.Errorf("server saw %d requests, want one per backoff step plus one", n)
+	}
+	for _, p := range []string{path, path + ".tmp"} {
+		if _, statErr := os.Stat(p); !os.IsNotExist(statErr) {
+			t.Errorf("%s should not exist after a failed download (stat: %v)", p, statErr)
+		}
+	}
+}
+
 // TestDecodeMetaBounded shows the metadata decoder stops at the ceiling
 // instead of inflating an arbitrarily large gzip stream into memory.
 func TestDecodeMetaBounded(t *testing.T) {
@@ -654,6 +721,71 @@ func TestExtractSnapshotSafety(t *testing.T) {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Errorf("hostile entry escaped to %s (stat: %v)", p, err)
 		}
+	}
+}
+
+// TestFetchSnapshotFailedExtractLeavesNoCache pins the poisoning edge: an
+// extraction that dies after writing PKGBUILD must remove the directory, or
+// the stat-based cache check would trust the truncated snapshot on every
+// later run (.cache persists across CI runs) and pin the base to it until its
+// next upstream update.
+func TestFetchSnapshotFailedExtractLeavesNoCache(t *testing.T) {
+	type entry = struct {
+		name string
+		body []byte
+		link bool
+	}
+	// Incompressible filler, so cutting the tail of the *compressed* stream
+	// lands inside this entry's data — after PKGBUILD is already on disk.
+	filler := make([]byte, 64<<10)
+	seed := uint32(1)
+	for i := range filler {
+		seed = seed*1664525 + 1013904223
+		filler[i] = byte(seed >> 24)
+	}
+	good, err := os.ReadFile(tarGz(t, []entry{
+		{name: "demo/PKGBUILD", body: []byte("pkgname=demo\n")},
+		{name: "demo/big", body: filler},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	truncated := good[:len(good)/2]
+
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) == 1 {
+			w.Write(truncated)
+			return
+		}
+		w.Write(good)
+	}))
+	defer srv.Close()
+	defer restoreSnapshotURL(t, srv.URL+"/%s.tar.gz")()
+
+	cache := t.TempDir()
+	m := metaPackage{PackageBase: "demo", LastModified: 42}
+	_, err = fetchSnapshot(m, cache)
+	if err == nil {
+		t.Fatal("fetchSnapshot of a truncated tarball returned nil error")
+	}
+	if !strings.Contains(err.Error(), "extract snapshot") {
+		t.Errorf("error = %v, want extract-stage context", err)
+	}
+	dir := filepath.Join(cache, "snapshots", "demo@42")
+	if _, statErr := os.Stat(dir); !os.IsNotExist(statErr) {
+		t.Errorf("failed extraction left %s behind (stat: %v)", dir, statErr)
+	}
+	// With nothing poisoned, the next run's fetch re-downloads and succeeds.
+	got, err := fetchSnapshot(m, cache)
+	if err != nil {
+		t.Fatalf("second fetchSnapshot: %v", err)
+	}
+	if b, readErr := os.ReadFile(filepath.Join(got, "PKGBUILD")); readErr != nil || string(b) != "pkgname=demo\n" {
+		t.Errorf("PKGBUILD after retry = %q (%v)", b, readErr)
+	}
+	if n := hits.Load(); n != 2 {
+		t.Errorf("server saw %d requests, want a re-download on the second call", n)
 	}
 }
 

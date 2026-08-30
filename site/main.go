@@ -16,6 +16,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -38,9 +39,8 @@ import (
 )
 
 const (
-	metaURL     = "https://aur.archlinux.org/packages-meta-ext-v1.json.gz"
-	snapshotURL = "https://aur.archlinux.org/cgit/aur.git/snapshot/%s.tar.gz"
-	userAgent   = "pkglint-site (+https://github.com/jmelahman/pkglint)"
+	metaURL   = "https://aur.archlinux.org/packages-meta-ext-v1.json.gz"
+	userAgent = "pkglint-site (+https://github.com/jmelahman/pkglint)"
 
 	maxSnapshotFile  = 1 << 20 // per-file extraction cap
 	maxSnapshotFiles = 64
@@ -63,6 +63,9 @@ var (
 	// headroom generous.
 	maxMetaDecompressed int64 = 1 << 30 // 1 GiB
 )
+
+// snapshotURL is a var, not a const, so tests can point it at a local server.
+var snapshotURL = "https://aur.archlinux.org/cgit/aur.git/snapshot/%s.tar.gz"
 
 type metaPackage struct {
 	Name        string
@@ -594,11 +597,16 @@ func fetchSnapshot(m metaPackage, cache string) (string, error) {
 	}
 	tarPath := dir + ".tar.gz"
 	if err := download(fmt.Sprintf(snapshotURL, m.PackageBase), tarPath); err != nil {
-		return "", err
+		return "", fmt.Errorf("fetch snapshot: %w", err)
 	}
 	defer os.Remove(tarPath)
 	if err := extract(tarPath, dir); err != nil {
-		return "", err
+		// A partial extraction may already have written a PKGBUILD, and the
+		// stat above would then reuse it: with .cache persisted across CI
+		// runs, one truncated download would pin this base to a corrupt
+		// snapshot until its next upstream update. Failed means gone.
+		os.RemoveAll(dir)
+		return "", fmt.Errorf("extract snapshot: %w", err)
 	}
 	return dir, nil
 }
@@ -655,7 +663,28 @@ func extract(tarPath, dir string) error {
 // throttle spaces out requests so the AUR's rate limiting stays happy.
 var throttle = time.NewTicker(500 * time.Millisecond)
 
+// errEmptyBody marks a 200 whose body carried no bytes. cgit builds snapshot
+// tarballs on request and under load sometimes answers exactly that; get()
+// cannot catch it — the status is fine and the body still unread when it
+// returns — so download owns this one retry. Nothing this pipeline fetches is
+// legitimately empty: the smallest real snapshot is a few hundred bytes.
+var errEmptyBody = errors.New("empty response body")
+
+// emptyBodyBackoff paces those retries. A var so tests need not sleep.
+var emptyBodyBackoff = []time.Duration{2 * time.Second, 15 * time.Second}
+
 func download(url, path string) error {
+	for attempt := 0; ; attempt++ {
+		err := downloadOnce(url, path)
+		if !errors.Is(err, errEmptyBody) || attempt >= len(emptyBodyBackoff) {
+			return err
+		}
+		log.Printf("%v; retrying in %s", err, emptyBodyBackoff[attempt])
+		time.Sleep(emptyBodyBackoff[attempt])
+	}
+}
+
+func downloadOnce(url, path string) error {
 	resp, err := get(url)
 	if err != nil {
 		return err
@@ -674,6 +703,9 @@ func download(url, path string) error {
 	n, err := io.Copy(f, io.LimitReader(resp.Body, maxDownloadBytes+1))
 	if err == nil && n > maxDownloadBytes {
 		err = fmt.Errorf("download exceeded %d bytes: %s", maxDownloadBytes, url)
+	}
+	if err == nil && n == 0 {
+		err = fmt.Errorf("GET %s: %w", url, errEmptyBody)
 	}
 	if err != nil {
 		f.Close()

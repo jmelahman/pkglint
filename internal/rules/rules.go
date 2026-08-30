@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/jmelahman/pkglint/internal/alpmdb"
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -541,8 +543,22 @@ func ellipsize(s string) string {
 	return b.String()
 }
 
-// Registry is every rule, in ID order.
-func Registry() []Rule {
+// The registry is assembled once and shared. Building it means concatenating
+// nine rule groups, attaching examples, and sorting a few hundred entries —
+// cheap in isolation, but Run and its helpers ask for it several times per
+// package, and over a corpus that dominated the linter's allocations.
+//
+// The state lives behind a sync.Once rather than in a package-level
+// initializer because the rule groups reference functions that reach back into
+// the registry (PB913 runs every rule), which as a var dependency would be an
+// initialization cycle.
+var (
+	registryOnce sync.Once
+	registryAll  []Rule          // every rule, ID order
+	registryByID map[string]Rule // ID -> rule
+)
+
+func buildRegistry() {
 	all := [][]Rule{integrityRules, hermeticRules, execRules, fsRules, scriptletRules, consistencyRules, correctnessRules, packageRules, styleRules}
 	var out []Rule
 	for _, group := range all {
@@ -555,7 +571,24 @@ func Registry() []Rule {
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
+	registryAll = out
+	registryByID = make(map[string]Rule, len(out))
+	for _, r := range out {
+		registryByID[r.ID] = r
+	}
+}
+
+// registry is the shared rule slice, for callers inside the package that only
+// read it. Callers must not modify what it returns.
+func registry() []Rule {
+	registryOnce.Do(buildRegistry)
+	return registryAll
+}
+
+// Registry is every rule, in ID order. It returns a fresh slice, so a caller
+// is free to sort or filter it in place.
+func Registry() []Rule {
+	return slices.Clone(registry())
 }
 
 // Run executes every PKGBUILD-scope rule not in ignore and returns findings,
@@ -565,7 +598,7 @@ func Registry() []Rule {
 func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 	ctx := NewContext(pkg)
 	var out []Finding
-	for _, rule := range Registry() {
+	for _, rule := range registry() {
 		if rule.Scope != ScopePKGBUILD || ignore[rule.ID] {
 			continue
 		}
@@ -585,7 +618,7 @@ func Run(pkg *pkgbuild.Package, ignore map[string]bool) []Finding {
 func RunPackage(pf *pkgfile.Package, db *alpmdb.DB, ignore map[string]bool) []Finding {
 	ctx := &Context{File: pf, DB: db, vars: map[string]string{}}
 	var out []Finding
-	for _, rule := range Registry() {
+	for _, rule := range registry() {
 		if rule.Scope != ScopePackage || ignore[rule.ID] {
 			continue
 		}
@@ -622,7 +655,7 @@ func runPackageScriptlet(pf *pkgfile.Package, ignore map[string]bool) []Finding 
 	}
 	ctx := NewContext(pseudo)
 	var out []Finding
-	for _, rule := range Registry() {
+	for _, rule := range registry() {
 		if rule.Scope != ScopePKGBUILD || ignore[rule.ID] {
 			continue
 		}
@@ -674,10 +707,7 @@ func sortDedupe(out []Finding) []Finding {
 
 // RuleByID returns the rule with the given ID.
 func RuleByID(id string) (Rule, bool) {
-	for _, r := range Registry() {
-		if r.ID == id {
-			return r, true
-		}
-	}
-	return Rule{}, false
+	registryOnce.Do(buildRegistry)
+	r, ok := registryByID[id]
+	return r, ok
 }

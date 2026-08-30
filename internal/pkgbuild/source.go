@@ -41,6 +41,11 @@ var vcsProtos = map[string]bool{"git": true, "hg": true, "svn": true, "bzr": tru
 // two sources to makepkg — and Index counts expanded entries, matching how
 // makepkg pairs sources with checksums.
 func (p *Package) Sources() []SourceEntry {
+	p.sourcesOnce.Do(func() { p.sources = p.computeSources() })
+	return p.sources
+}
+
+func (p *Package) computeSources() []SourceEntry {
 	arches := p.declaredArches()
 	var out []SourceEntry
 	for name, v := range p.Vars {
@@ -96,6 +101,11 @@ func (p *Package) Sources() []SourceEntry {
 // "do not filter": losing a whole source array from the analysis is worse than
 // looking at one makepkg would skip.
 func (p *Package) declaredArches() map[string]bool {
+	p.archesOnce.Do(func() { p.arches = p.computeDeclaredArches() })
+	return p.arches
+}
+
+func (p *Package) computeDeclaredArches() map[string]bool {
 	v := p.Vars["arch"]
 	if v == nil || v.CountUnknown || len(v.Values) == 0 {
 		return nil

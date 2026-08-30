@@ -146,11 +146,30 @@ var invisibleChars = map[rune]string{
 	0xFEFF: "U+FEFF ZERO WIDTH NO-BREAK SPACE", 0x00AD: "U+00AD SOFT HYPHEN",
 }
 
+// hasNonASCII reports whether b contains any byte outside 7-bit ASCII, which
+// is true of every byte of every multi-byte UTF-8 encoding.
+func hasNonASCII(b []byte) bool {
+	for _, c := range b {
+		if c >= 0x80 {
+			return true
+		}
+	}
+	return false
+}
+
 func checkHiddenUnicode(ctx *Context) []Finding {
 	var out []Finding
 	units := ctx.Pkg.Units()
 	for i := range units {
 		u := &units[i]
+		// Every rune in both tables is above U+007F, so it encodes to bytes
+		// that all have the high bit set. A unit with no such byte cannot
+		// contain one, and almost no PKGBUILD does — which makes this scan
+		// worth doing before splitting the file into lines and decoding each
+		// one twice.
+		if !hasNonASCII(u.Raw) {
+			continue
+		}
 		for lineNo, line := range strings.Split(string(u.Raw), "\n") {
 			for _, r := range line {
 				if name, ok := bidiControls[r]; ok {

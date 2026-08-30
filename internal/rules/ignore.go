@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
 	"mvdan.cc/sh/v3/syntax"
@@ -17,20 +18,32 @@ import (
 
 const staleIgnoreID = "PB913"
 
-// allRules is bound to Registry in init rather than called directly: the
-// PB913 check runs every registered rule, and referencing Registry from
-// styleRules' own initializer would be an initialization cycle.
+// allRules is bound to the registry accessor in init rather than called
+// directly: the PB913 check runs every registered rule, and referencing the
+// registry from styleRules' own initializer would be an initialization cycle.
+// The indirection through a variable is what breaks it — the dependency
+// analysis follows function references out of an initializer, but stops at a
+// variable whose own initializer is empty.
 var allRules func() []Rule
 
-func init() { allRules = Registry }
+func init() { allRules = registry }
 
-// knownRuleIDs is the set of registered rule IDs.
+// knownRuleIDs is the set of registered rule IDs. PB913 asks for it once per
+// package, so it is built once and shared read-only; callers must not write to
+// what they get back.
+var (
+	knownIDsOnce sync.Once
+	knownIDs     map[string]bool
+)
+
 func knownRuleIDs() map[string]bool {
-	known := map[string]bool{}
-	for _, r := range allRules() {
-		known[r.ID] = true
-	}
-	return known
+	knownIDsOnce.Do(func() {
+		knownIDs = make(map[string]bool, len(allRules()))
+		for _, r := range allRules() {
+			knownIDs[r.ID] = true
+		}
+	})
+	return knownIDs
 }
 
 // suppKey names one rule ID of one inline-ignore directive.
@@ -42,16 +55,24 @@ type suppKey struct {
 
 // suppressionUsage reports which inline-ignore directives earn their keep: the
 // (path, line, id) of every directive entry that suppresses at least one
-// finding. It runs every other PKGBUILD-scope rule over the package —
-// unsuppressed findings and suppressed ones alike land here — and is cached on
-// the Context because the stale-directive check and its fixer both need it.
+// finding. It re-runs the PKGBUILD-scope rules over the package — unsuppressed
+// findings and suppressed ones alike land here, which is why Run's own results
+// cannot answer the question — and is cached on the Context because the
+// stale-directive check and its fixer both need it.
+//
+// Only the rules some directive actually names are re-run. A finding
+// contributes a key only when the package suppresses that rule ID on that
+// line, so a rule no directive mentions cannot produce one however many
+// findings it reports, and running it is pure cost. That makes this a no-op
+// for the overwhelming majority of packages, which carry no directives at all.
 func (ctx *Context) suppressionUsage() map[suppKey]bool {
 	if ctx.suppUsed != nil {
 		return ctx.suppUsed
 	}
 	ctx.suppUsed = map[suppKey]bool{}
+	named := suppressedIDs(ctx.Pkg)
 	for _, rule := range allRules() {
-		if rule.Scope != ScopePKGBUILD || rule.ID == staleIgnoreID {
+		if rule.Scope != ScopePKGBUILD || rule.ID == staleIgnoreID || !named[rule.ID] {
 			continue
 		}
 		for _, f := range rule.Check(ctx) {
@@ -64,6 +85,20 @@ func (ctx *Context) suppressionUsage() map[suppKey]bool {
 		}
 	}
 	return ctx.suppUsed
+}
+
+// suppressedIDs is every rule ID named by an inline-ignore directive anywhere
+// in the package.
+func suppressedIDs(pkg *pkgbuild.Package) map[string]bool {
+	out := map[string]bool{}
+	for _, perLine := range pkg.Suppressions {
+		for _, ids := range perLine {
+			for id := range ids {
+				out[id] = true
+			}
+		}
+	}
+	return out
 }
 
 // ignoreDirective is one inline-ignore directive backed by a real comment in a

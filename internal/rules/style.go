@@ -572,12 +572,6 @@ var styleRules = []Rule{
 
 // --- PB901: hardcoded host architecture ------------------------------------
 
-// hostArchRe matches the architecture names makepkg can actually set $CARCH
-// to. i386/i486/i586/ppc are deliberately absent: Arch and Arch Linux ARM never
-// use them, so a literal `i386` is a foreign platform name and "use $CARCH" is
-// never the fix for it.
-var hostArchRe = regexp.MustCompile(`\b` + hostArchAlt + `\b`)
-
 // foreignTokenRe matches an architecture name that is part of a longer
 // cross-compilation target triple or a foreign platform identifier —
 // `x86_64-w64-mingw32`, `arm-none-eabi-gcc`, `/usr/lib/x86_64-linux-gnu`,
@@ -594,9 +588,55 @@ var foreignTokenRe = regexp.MustCompile(
 		`|` + hostArchAlt + `-(?:w64-mingw32|none-eabi|esp-elf|elf-|linux-gnu\b` +
 		`|linux-gnueabi|linux-android|apple-darwin|pc-windows|softmmu|unknown-none)`)
 
-// hostArchAlt is the bare alternation of architecture names shared by
-// hostArchRe and foreignTokenRe.
+// hostArchAlt is the bare alternation of architecture names, shared by
+// foreignTokenRe and the specification regexp in hostarch_test.go.
+// TestHostArchRegexpCoversNames keeps it in agreement with hostArchNames.
 const hostArchAlt = `(?:i686|x86_64|aarch64|armv6h|armv7h|arm|riscv64|loong64)`
+
+// hostArchSet is hostArchNames as a set, for the whole-word test below.
+var hostArchSet = func() map[string]bool {
+	m := make(map[string]bool, len(hostArchNames))
+	for _, a := range hostArchNames {
+		m[a] = true
+	}
+	return m
+}()
+
+// hostArchIn returns the leftmost architecture name appearing in s as a whole
+// word, or "" if there is none.
+//
+// This is the regexp `\b` + hostArchAlt + `\b` the rule used to run, scanned
+// by hand. Every alternative is a run of word characters delimited by \b,
+// which is exactly "some maximal word equals one of these", so walking the
+// word runs decides the same thing without the backtracking. It is worth the
+// few lines because the rule tests every literal in the file and almost none
+// of them mention an architecture: the regexp made this the most expensive
+// check in the registry. TestHostArchInMatchesRegexp holds the two in
+// agreement.
+func hostArchIn(s string) string {
+	for i := 0; i < len(s); {
+		if !isWordByte(s[i]) {
+			i++
+			continue
+		}
+		j := i
+		for j < len(s) && isWordByte(s[j]) {
+			j++
+		}
+		if word := s[i:j]; hostArchSet[word] {
+			return word
+		}
+		i = j
+	}
+	return ""
+}
+
+// isWordByte reports whether b is a word character in the ASCII sense Go's
+// regexp \b uses. A multi-byte rune is never one, and each of its bytes has the
+// high bit set, so treating it as a non-word byte splits words the same way.
+func isWordByte(b byte) bool {
+	return b == '_' || ('0' <= b && b <= '9') || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z')
+}
 
 // checkSpecificHostArch mirrors namcap's carch rule on the AST: any literal
 // mentioning a concrete architecture is flagged unless it is (part of) an
@@ -613,24 +653,38 @@ func checkSpecificHostArch(ctx *Context) []Finding {
 			skip[l] = true
 		}
 	}
-	// Walk for arch=() rather than reading ctx.Pkg.Vars: Vars holds only the
-	// last top-level assignment of a name, so an arch=() inside a package_*()
-	// split function — or an earlier one shadowed by a later assignment — would
-	// otherwise be flagged for declaring exactly what it is meant to declare.
-	syntax.Walk(u.File, func(node syntax.Node) bool {
-		if as, ok := node.(*syntax.Assign); ok && as.Name != nil {
-			if strings.HasSuffix(as.Name.Value, "arch") || archSuffixed(as.Name.Value) {
-				markSpan(as.Pos(), as.End())
-			}
-		}
-		return true
-	})
+	// One walk does every job: it marks the exempt spans and collects the
+	// literals that name an architecture. The candidates are filtered after
+	// the walk rather than as they are found, because an exemption can come
+	// later in the file than the literal it covers (a $CARCH later on the same
+	// line), so nothing can be decided until the walk is done.
+	//
+	// Exempt assignments are found by walking rather than reading ctx.Pkg.Vars:
+	// Vars holds only the last top-level assignment of a name, so an arch=()
+	// inside a package_*() split function — or an earlier one shadowed by a
+	// later assignment — would otherwise be flagged for declaring exactly what
+	// it is meant to declare.
+	//
 	// $CARCH anywhere on a line exempts that line, and a `case $CARCH`/`if
 	// [[ $CARCH == … ]]` exempts its whole body: the per-architecture literals
 	// inside such a construct *are* the portable idiom, and they necessarily
 	// sit on lines below the one naming $CARCH.
+	type candidate struct {
+		arch string
+		pos  syntax.Pos
+	}
+	var found []candidate
+	note := func(val string, pos syntax.Pos) {
+		if m := hostArchIn(val); m != "" && !foreignTokenRe.MatchString(val) {
+			found = append(found, candidate{m, pos})
+		}
+	}
 	syntax.Walk(u.File, func(node syntax.Node) bool {
 		switch x := node.(type) {
+		case *syntax.Assign:
+			if x.Name != nil && (strings.HasSuffix(x.Name.Value, "arch") || archSuffixed(x.Name.Value)) {
+				markSpan(x.Pos(), x.End())
+			}
 		case *syntax.ParamExp:
 			if x.Param != nil && x.Param.Value == "CARCH" {
 				skip[x.Pos().Line()] = true
@@ -648,6 +702,10 @@ func checkSpecificHostArch(ctx *Context) []Finding {
 					break
 				}
 			}
+		case *syntax.Lit:
+			note(x.Value, x.Pos())
+		case *syntax.SglQuoted:
+			note(x.Value, x.Pos())
 		}
 		return true
 	})
@@ -658,27 +716,14 @@ func checkSpecificHostArch(ctx *Context) []Finding {
 		arch string
 	}
 	seen := map[key]bool{}
-	report := func(val string, pos syntax.Pos) {
-		m := hostArchRe.FindString(val)
-		if m == "" || skip[pos.Line()] || foreignTokenRe.MatchString(val) {
-			return
+	for _, c := range found {
+		if skip[c.pos.Line()] || seen[key{c.pos.Line(), c.arch}] {
+			continue
 		}
-		if seen[key{pos.Line(), m}] {
-			return
-		}
-		seen[key{pos.Line(), m}] = true
-		out = append(out, findingAt("PB901", Warn, u.Path, pos,
-			"architecture %q is hardcoded; use $CARCH so the PKGBUILD ports to other architectures", m))
+		seen[key{c.pos.Line(), c.arch}] = true
+		out = append(out, findingAt("PB901", Warn, u.Path, c.pos,
+			"architecture %q is hardcoded; use $CARCH so the PKGBUILD ports to other architectures", c.arch))
 	}
-	syntax.Walk(u.File, func(node syntax.Node) bool {
-		switch x := node.(type) {
-		case *syntax.Lit:
-			report(x.Value, x.Pos())
-		case *syntax.SglQuoted:
-			report(x.Value, x.Pos())
-		}
-		return true
-	})
 	return out
 }
 
@@ -704,7 +749,10 @@ func dispatchesOnArch(n syntax.Node) bool {
 	return found
 }
 
-// hostArchNames are the architectures hostArchRe recognizes, for suffix tests.
+// hostArchNames are the architectures PB901 recognizes — the names makepkg can
+// actually set $CARCH to. i386/i486/i586/ppc are deliberately absent: Arch and
+// Arch Linux ARM never use them, so a literal `i386` is a foreign platform
+// name and "use $CARCH" is never the fix for it.
 var hostArchNames = []string{
 	"i686", "x86_64", "aarch64", "armv6h", "armv7h", "arm", "riscv64", "loong64",
 }

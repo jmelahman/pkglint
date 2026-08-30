@@ -91,7 +91,7 @@ func CollectEdits(ctx *Context, ignore map[string]bool, level FixLevel, env *Fix
 		env = &FixEnv{}
 	}
 	var edits []Edit
-	for _, rule := range Registry() {
+	for _, rule := range registry() {
 		if rule.Fix == nil || rule.FixLevel == FixNone || rule.FixLevel > level || ignore[rule.ID] {
 			continue
 		}

@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -125,6 +126,16 @@ type Package struct {
 	// Keying by path keeps a directive in one file from suppressing findings in
 	// another file that happens to share a line number.
 	Suppressions map[string]map[int]map[string]bool
+
+	// Parsing is finished by the time Load returns, so the derived views below
+	// are computed once and shared. Dozens of rules ask for the source list,
+	// and recomputing it — expanding every element's variables and brace groups
+	// again each time — was the linter's second-largest allocation source.
+	// Callers must treat both as read-only.
+	sourcesOnce sync.Once
+	sources     []SourceEntry
+	archesOnce  sync.Once
+	arches      map[string]bool
 }
 
 // newParser returns a fresh parser per parse: syntax.Parser is not safe for

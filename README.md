@@ -66,7 +66,7 @@ pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
   --fix                        # apply safe auto-fixes in place
   --unsafe-fix                 # also apply behavior-changing fixes (implies --fix)
   --diff                       # with --fix/--unsafe-fix/--add-ignores: show changes instead of writing
-  --offline                    # with --fix: skip fixes needing network (e.g. VCS ref resolution)
+  --offline                    # with --fix: skip fixes needing network (VCS ref resolution, https probing)
   --add-ignores                # insert ignore directives suppressing every current finding
   --no-inline-ignores          # disregard ignore directives (audit an untrusted package)
 ```
@@ -99,7 +99,7 @@ writing. Fixes come in two tiers:
 | Tier   | Flag           | Rules                             | What it does                                                                                                                                                                                                                                                               |
 | ------ | -------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Safe   | `--fix`        | PB102, PB103, PB205, PB705, PB708, PB913, PB916 | Add `sha256sums` beside a weak `md5sums`/`sha1sums` (see below); pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`); remove stale ignore directives; insert `-modcacherw` into go commands so the module cache stays removable |
-| Unsafe | `--unsafe-fix` | PB203, PB204, PB206–PB209, PB403, PB914–PB915 | Append `--locked` to `cargo` (fails the build if no Cargo.lock ships); add a `go mod download` prepare() step; insert `-buildmode=pie` and `-trimpath` into `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits |
+| Unsafe | `--unsafe-fix` | PB104, PB112, PB203, PB204, PB206–PB209, PB403, PB914–PB915 | Upgrade an insecure source transport (`http://`/`ftp://` → `https://`, bare `git://` → `git+https://`), signature sources included, and only after a headers-only request (or `git ls-remote`) confirms the https URL answers, so an unserved one keeps the finding — reachable still isn't identical, so rebuild after; append `--locked` to `cargo` (fails the build if no Cargo.lock ships); add a `go mod download` prepare() step; insert `-buildmode=pie` and `-trimpath` into `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits |
 
 Safe fixes preserve behavior or restore a security default; unsafe fixes are
 mechanical but change what the build does, so review them. An inline

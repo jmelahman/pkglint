@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -250,6 +251,310 @@ func mustNotContain(t *testing.T, got, want string) {
 		t.Errorf("expected output NOT to contain %q\n--- got ---\n%s", want, got)
 	}
 }
+
+// transportPKGBUILD is a one-source package whose source array and sums array
+// the caller supplies, so a test can name exactly the transport under test.
+func transportPKGBUILD(source, sums string) string {
+	return `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=(` + source + `)
+` + sums + "\n"
+}
+
+const demoSums = "sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')"
+
+// servedEnv is a FixEnv that answers probes from a fixed list of URLs known to
+// be served, and records every URL it was asked about. Both capabilities the
+// transport fix can use are wired to the same list: ordinary sources go through
+// ProbeHTTPS and git remotes through ResolveRef, and a test should not have to
+// care which one a given source reaches for.
+func servedEnv(urls ...string) (*FixEnv, *[]string) {
+	served := map[string]bool{}
+	for _, u := range urls {
+		served[u] = true
+	}
+	asked := &[]string{}
+	probe := func(u string) error {
+		*asked = append(*asked, u)
+		if !served[u] {
+			return fmt.Errorf("not served: %s", u)
+		}
+		return nil
+	}
+	return &FixEnv{
+		ProbeHTTPS: probe,
+		ResolveRef: func(u, _ string) (string, error) {
+			if err := probe(u); err != nil {
+				return "", err
+			}
+			return "0123456789abcdef0123456789abcdef01234567", nil
+		},
+	}, asked
+}
+
+func TestFixInsecureTransport(t *testing.T) {
+	// Whether the host answers on https is a fact about the server, not about
+	// the PKGBUILD, so this fix stays behind --unsafe-fix even once verified.
+	t.Run("safe level leaves the scheme alone", func(t *testing.T) {
+		env, _ := servedEnv("https://example.com/demo-1.0.0.tar.gz")
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://example.com/demo-$pkgver.tar.gz"`, demoSums),
+		}, FixSafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("FixSafe should not apply the unsafe PB104 fix, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	for _, tc := range []struct {
+		name, source, probed, want string
+	}{
+		{
+			name:   "http",
+			source: `"http://example.com/demo-$pkgver.tar.gz"`,
+			probed: "https://example.com/demo-1.0.0.tar.gz",
+			want:   `"https://example.com/demo-$pkgver.tar.gz"`,
+		},
+		{
+			name:   "ftp",
+			source: `"ftp://ftp.example.com/pub/demo-$pkgver.tar.gz"`,
+			probed: "https://ftp.example.com/pub/demo-1.0.0.tar.gz",
+			want:   `"https://ftp.example.com/pub/demo-$pkgver.tar.gz"`,
+		},
+		{
+			// A git remote is probed as a git remote: an HTTP status says
+			// nothing about whether a repository lives at that path.
+			name:   "git+http",
+			source: `"git+http://example.com/demo.git#commit=` + gitCommit + `"`,
+			probed: "git+https://example.com/demo.git",
+			want:   `"git+https://example.com/demo.git#commit=` + gitCommit + `"`,
+		},
+		{
+			// The bare git wire protocol has no encrypted form; git+https
+			// clones the same path on every forge that offers git://.
+			name:   "bare git",
+			source: `"git://example.com/demo.git#commit=` + gitCommit + `"`,
+			probed: "git+https://example.com/demo.git",
+			want:   `"git+https://example.com/demo.git#commit=` + gitCommit + `"`,
+		},
+		{
+			// A renamed source keeps its filename:: prefix; only the scheme
+			// moves, and the prefix is not part of what gets probed.
+			name:   "renamed source",
+			source: `"demo.tar.gz::http://example.com/d/$pkgver"`,
+			probed: "https://example.com/d/1.0.0",
+			want:   `"demo.tar.gz::https://example.com/d/$pkgver"`,
+		},
+		{
+			// The query string belongs to the server and often decides what it
+			// sends back, so probing without it would ask about a different URL.
+			name:   "query string preserved",
+			source: `"demo.tar.gz::http://example.com/get?file=demo&v=$pkgver"`,
+			probed: "https://example.com/get?file=demo&v=1.0.0",
+			want:   `"demo.tar.gz::https://example.com/get?file=demo&v=$pkgver"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env, asked := servedEnv(tc.probed)
+			got := fixAll(t, map[string]string{
+				"PKGBUILD": transportPKGBUILD(tc.source, demoSums),
+			}, FixUnsafe, env)["PKGBUILD"]
+			mustContain(t, got, "source=("+tc.want+")")
+			// The digest describes the artifact, not the channel it came over,
+			// so an https fetch of the same file still verifies against it.
+			mustContain(t, got, demoSums)
+			if len(*asked) != 1 || (*asked)[0] != tc.probed {
+				t.Errorf("probed %v, want exactly [%s]", *asked, tc.probed)
+			}
+			if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got}))["PB104"]; n != 0 {
+				t.Errorf("fixed PKGBUILD still has %d PB104 finding(s):\n%s", n, got)
+			}
+		})
+	}
+
+	// The whole point of probing: a host that does not answer over https keeps
+	// its finding rather than having the build broken on its behalf.
+	t.Run("an unserved https URL is not rewritten", func(t *testing.T) {
+		env, asked := servedEnv() // nothing is served
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://example.com/demo-$pkgver.tar.gz"`, demoSums),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit when the probe fails, got:\n%s", got["PKGBUILD"])
+		}
+		if len(*asked) != 1 {
+			t.Errorf("probed %v, want exactly one attempt", *asked)
+		}
+	})
+
+	// Offline there is no way to check the claim, and an unchecked rewrite is
+	// the thing this fix exists not to do.
+	t.Run("without a probe nothing is rewritten", func(t *testing.T) {
+		for name, env := range map[string]*FixEnv{"nil env": nil, "no capabilities": {}} {
+			got := fixAll(t, map[string]string{
+				"PKGBUILD": transportPKGBUILD(`"http://example.com/demo-$pkgver.tar.gz"`, demoSums),
+			}, FixUnsafe, env)
+			if _, ok := got["PKGBUILD"]; ok {
+				t.Errorf("%s: expected no edit without a probe, got:\n%s", name, got["PKGBUILD"])
+			}
+		}
+	})
+
+	// A git source needs a git probe specifically: with only ProbeHTTPS wired
+	// up there is no way to ask whether a repository answers, so no edit.
+	t.Run("a git source without ResolveRef is not rewritten", func(t *testing.T) {
+		env, _ := servedEnv("git+https://example.com/demo.git")
+		env.ResolveRef = nil
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"git://example.com/demo.git#commit=`+gitCommit+`"`, "sha256sums=('SKIP')"),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit without ResolveRef, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	// svn:// and rsync:// have no rewrite that is even usually right, so the
+	// finding stands rather than being closed with a guess.
+	for _, src := range []string{`"svn://example.com/demo/trunk"`, `"rsync://example.com/demo.tar.gz"`} {
+		t.Run("unrewritable "+src, func(t *testing.T) {
+			env, asked := servedEnv("https://example.com/demo/trunk", "https://example.com/demo.tar.gz")
+			got := fixAll(t, map[string]string{
+				"PKGBUILD": transportPKGBUILD(src, "sha256sums=('SKIP')"),
+			}, FixUnsafe, env)
+			if _, ok := got["PKGBUILD"]; ok {
+				t.Errorf("expected no edit, got:\n%s", got["PKGBUILD"])
+			}
+			if len(*asked) != 0 {
+				t.Errorf("probed %v for an unrewritable scheme, want none", *asked)
+			}
+		})
+	}
+
+	// The finding is about the expanded URL, but the edit can only address
+	// bytes that are written down. With the scheme inside a variable there are
+	// none, so PB104 keeps reporting it for a human to rewrite.
+	t.Run("a scheme hidden in a variable is left alone", func(t *testing.T) {
+		env, _ := servedEnv("https://example.com/demo.tar.gz")
+		got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+_url=http://example.com/demo.tar.gz
+source=("$_url")
+` + demoSums + "\n"}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit for a variable-spelled scheme, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	// A URL the parser could not finish expanding is not an address anything
+	// can be asked about, so the fix declines before it probes.
+	t.Run("an unresolved variable is never probed", func(t *testing.T) {
+		env, asked := servedEnv()
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://example.com/$_mirror/demo-$pkgver.tar.gz"`, demoSums),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit for an unexpanded URL, got:\n%s", got["PKGBUILD"])
+		}
+		if len(*asked) != 0 {
+			t.Errorf("probed %v for an unexpanded URL, want none", *asked)
+		}
+	})
+
+	// Two occurrences of the scheme in one element leave no way to tell which
+	// one is the transport, so neither is touched.
+	t.Run("a URL carrying another URL is left alone", func(t *testing.T) {
+		env, _ := servedEnv("https://mirror.example.com/get?u=http://example.com/demo.tar.gz")
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://mirror.example.com/get?u=http://example.com/demo.tar.gz"`, demoSums),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit for an ambiguous scheme, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	// A brace group is two sources written as one element sharing one scheme:
+	// one edit, not two overlapping ones. PB104 owns the tarball and PB112 the
+	// signature, and both point at the same bytes.
+	t.Run("a brace group gets a single edit", func(t *testing.T) {
+		env, _ := servedEnv("https://example.com/demo-1.0.0.tar.gz", "https://example.com/demo-1.0.0.tar.gz.sig")
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://example.com/demo-$pkgver.tar.gz"{,.sig}`,
+				demoSums+"\nsha256sums+=('SKIP')\nvalidpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')"),
+		}, FixUnsafe, env)["PKGBUILD"]
+		mustContain(t, got, `source=("https://example.com/demo-$pkgver.tar.gz"{,.sig})`)
+		mustNotContain(t, got, "http://")
+	})
+
+	// The element is the unit of rewriting, so every URL it expands to must
+	// verify before any of it is touched — the signature included, even though
+	// PB104 does not report it: the one edit re-addresses both fetches.
+	t.Run("a brace group with an unserved signature is left alone", func(t *testing.T) {
+		env, _ := servedEnv("https://example.com/demo-1.0.0.tar.gz") // the .sig is not
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://example.com/demo-$pkgver.tar.gz"{,.sig}`,
+				demoSums+"\nsha256sums+=('SKIP')\nvalidpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')"),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit while one of the element's URLs is unserved, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	// Same rule within one tier: an alternate that fails its probe vetoes the
+	// element even when another alternate passed first.
+	t.Run("a brace group with an unserved alternate is left alone", func(t *testing.T) {
+		env, asked := servedEnv("https://example.com/demo-1.0.0.tar.gz") // the .patch is not
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"http://example.com/demo-$pkgver"{.tar.gz,.patch}`,
+				"sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'\n            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')"),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit while one alternate is unserved, got:\n%s", got["PKGBUILD"])
+		}
+		want := []string{"https://example.com/demo-1.0.0.tar.gz", "https://example.com/demo-1.0.0.patch"}
+		if len(*asked) != 2 || (*asked)[0] != want[0] || (*asked)[1] != want[1] {
+			t.Errorf("probed %v, want %v", *asked, want)
+		}
+	})
+
+	// hg+http has an obvious https spelling, but neither FixEnv capability can
+	// vouch for it — ProbeHTTPS speaks plain https, ResolveRef speaks git — so
+	// the fix declines without asking anything.
+	t.Run("hg+http is not rewritten", func(t *testing.T) {
+		env, asked := servedEnv("hg+https://example.com/demo", "https://example.com/demo")
+		got := fixAll(t, map[string]string{
+			"PKGBUILD": transportPKGBUILD(`"hg+http://example.com/demo"`, "sha256sums=('SKIP')"),
+		}, FixUnsafe, env)
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("expected no edit for hg+http, got:\n%s", got["PKGBUILD"])
+		}
+		if len(*asked) != 0 {
+			t.Errorf("probed %v for an unverifiable scheme, want none", *asked)
+		}
+	})
+}
+
+// PB112 fixes the signature sources PB104 deliberately skips, so between them
+// every insecurely fetched source is covered exactly once.
+func TestFixInsecureSignatureTransport(t *testing.T) {
+	env, _ := servedEnv("https://example.com/demo-1.0.0.tar.gz.sig")
+	got := fixAll(t, map[string]string{"PKGBUILD": transportPKGBUILD(
+		`"https://example.com/demo-$pkgver.tar.gz"
+        "http://example.com/demo-$pkgver.tar.gz.sig"`,
+		demoSums+"\nsha256sums+=('SKIP')\nvalidpgpkeys=('ABAF11C65A2970B130ABE3C479BE3E4300411886')"),
+	}, FixUnsafe, env)["PKGBUILD"]
+	mustContain(t, got, `"https://example.com/demo-$pkgver.tar.gz.sig"`)
+	if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got}))["PB112"]; n != 0 {
+		t.Errorf("fixed PKGBUILD still has %d PB112 finding(s):\n%s", n, got)
+	}
+}
+
+const gitCommit = "3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a"
 
 func TestFixCargoLocked(t *testing.T) {
 	body := `

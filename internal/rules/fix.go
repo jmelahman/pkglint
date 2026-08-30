@@ -80,6 +80,24 @@ type FixEnv struct {
 	// makepkg's source cache and nowhere else; the rules package does no file
 	// I/O of its own.
 	LocalDigest func(dir, filename string) (Digests, error)
+
+	// ProbeHTTPS reports whether an https URL is actually served, returning nil
+	// when it is and an error describing the refusal otherwise. It is nil when
+	// probing is unavailable (offline), and a fixer that needs it then emits no
+	// edit and the finding stands.
+	//
+	// It exists so the transport fixes can be checked rather than hoped: only
+	// the server knows whether it answers on https, and PB104's rewrite is a
+	// claim about the server. Implementations issue a headers-only request and
+	// read no body — what comes back is used solely to decide whether the URL
+	// resolves, never as input to anything. That distinction is what keeps this
+	// inside pkglint's "never act on what the file says" line: the PKGBUILD
+	// chooses an address to knock on, and nothing more.
+	//
+	// A successful probe means the URL exists over https, not that it serves
+	// the same bytes. Nothing but the checksum can say that, which is why the
+	// fix stays unsafe even when the probe passes.
+	ProbeHTTPS func(url string) error
 }
 
 // Digests are hashes of one local source file, all computed from a single read
@@ -373,6 +391,217 @@ func sourceElems(u *pkgbuild.Unit) map[string]*syntax.Word {
 		}
 	}
 	return out
+}
+
+// --- PB104/PB112: upgrade an insecure source transport to https ------------
+
+// httpsProto returns the encrypted spelling of an unencrypted source protocol,
+// and reports whether one exists that a probe can actually vouch for.
+//
+// http gains a "s"; ftp becomes https, since a host still publishing over ftp
+// almost always serves the same tree over https (ftp.gnu.org and the kernel
+// mirrors are the common cases) and makepkg has no encrypted ftp agent to
+// switch to. A bare git:// URL — the unauthenticated git wire protocol — is
+// rewritten to git+https://, which every forge that speaks git:// also serves
+// at the same path, and git+http:// likewise moves to git+https://.
+//
+// svn:// and rsync:// are deliberately absent: svn+https:// depends on the
+// server exposing a DAV endpoint that svn:// says nothing about, and rsync has
+// no encrypted spelling of its own at all. There is no rewrite that is even
+// usually right, so those findings stand. hg+http and svn+http are absent for
+// a different reason: the spelling is obvious, but neither capability in
+// FixEnv can check it — ProbeHTTPS speaks plain https and ResolveRef speaks
+// git — and an offer the probe cannot vet would be an unverified rewrite.
+func httpsProto(proto string) (string, bool) {
+	switch proto {
+	case "http", "ftp":
+		return "https", true
+	case "git", "git+http":
+		return "git+https", true
+	}
+	return "", false
+}
+
+func fixInsecureTransport(ctx *Context, env *FixEnv) []Edit {
+	return insecureTransportEdits(ctx, env, false)
+}
+
+func fixInsecureSignatureTransport(ctx *Context, env *FixEnv) []Edit {
+	return insecureTransportEdits(ctx, env, true)
+}
+
+// probeTarget is the URL the rewritten source would be fetched from, and
+// whether it could be determined at all.
+//
+// It is the expanded URL with its scheme replaced, minus the `filename::`
+// prefix makepkg strips before fetching. A VCS source loses the makepkg
+// fragment and query too — `#commit=…` and `?signed` address makepkg, not the
+// remote — while a plain download keeps its query string, which belongs to the
+// server and often decides what it sends back.
+//
+// A URL still holding an unexpanded variable has no determinable target: the
+// bytes on the line are not the address anything would be fetched from, so
+// there is nothing a probe could confirm and the fix declines.
+func probeTarget(e pkgbuild.SourceEntry, proto string) (string, bool) {
+	raw := e.Expanded
+	if e.Filename != "" {
+		if _, rest, ok := strings.Cut(raw, "::"); ok {
+			raw = rest
+		}
+	}
+	if e.VCS != "" {
+		raw = e.URL // fragment and query already stripped
+	}
+	old := e.Proto + "://"
+	if len(raw) < len(old) || !strings.EqualFold(raw[:len(old)], old) {
+		return "", false
+	}
+	rest := raw[len(old):]
+	if rest == "" || strings.ContainsAny(rest, "$\x00") {
+		return "", false
+	}
+	return proto + "://" + rest, true
+}
+
+// httpsServed reports whether the rewritten URL is really served, asking the
+// protocol's own client: a git remote answers `git ls-remote` or it is not a
+// git remote, and everything else is an HTTP endpoint a headers-only request
+// can reach. Without the capability to ask — offline — it answers false, so
+// the fix never fires on an assumption.
+func httpsServed(env *FixEnv, e pkgbuild.SourceEntry, url string) bool {
+	if e.VCS == "git" {
+		if env.ResolveRef == nil {
+			return false
+		}
+		// Any ref would do; HEAD is the one every remote has, so this asks
+		// "does a git repository answer here" and nothing more.
+		_, err := env.ResolveRef(url, "HEAD")
+		return err == nil
+	}
+	if env.ProbeHTTPS == nil {
+		return false
+	}
+	return env.ProbeHTTPS(url) == nil
+}
+
+// insecureTransportEdits rewrites the scheme of every insecurely fetched
+// source. The tier split mirrors the checks': the PB104 fixer claims a written
+// element holding an ordinary source, the PB112 fixer one holding a signature,
+// so each rule fixes what it reports. A brace element carrying both
+// (`foo{,.sig}`) is claimed by each; their identical edits collapse when
+// applied.
+//
+// Every rewrite is checked against the server first: the edit is a claim that
+// the host serves this path over https, which is not a claim a PKGBUILD can
+// settle, and an unverified rewrite trades a compromisable build for a broken
+// one. One written element can expand to several sources sharing the one
+// written scheme, and the single edit re-addresses all of them — so all of
+// them must verify, the other rule's included. A probe that fails, or a probe
+// that cannot be made at all, for any URL the element expands to, leaves the
+// finding standing for a maintainer to resolve.
+//
+// It stays an unsafe fix even so. A reachable URL is not the same URL: the
+// probe establishes that something answers over https, never that it answers
+// with the bytes the http fetch would have returned. For a source pinned to a
+// strong digest, makepkg catches the difference on the next build; for a SKIP
+// or a VCS clone, only a human does. That gap is exactly the review
+// --unsafe-fix asks for.
+//
+// The digests are left alone: https fetches the same artifact, so a sums array
+// that verified the http download verifies the https one. If it does not, the
+// bytes differed, and that is precisely what the checksum is there to catch.
+func insecureTransportEdits(ctx *Context, env *FixEnv, signatures bool) []Edit {
+	if env == nil {
+		return nil
+	}
+	// Group the entries by the written element they expand from: the element
+	// is the unit of rewriting, however many sources it becomes.
+	var order []string
+	groups := map[string][]pkgbuild.SourceEntry{}
+	for _, e := range ctx.Pkg.Sources() {
+		if e.Local {
+			continue
+		}
+		k := elemKey(e.Arch, e.ElemIndex)
+		if _, ok := groups[k]; !ok {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], e)
+	}
+	elems := sourceElems(&ctx.Pkg.PKGBUILD)
+	var edits []Edit
+	seen := map[int]bool{}
+	for _, k := range order {
+		entries := groups[k]
+		claimed := false
+		for _, e := range entries {
+			claimed = claimed || isSignatureSource(e) == signatures
+		}
+		e0 := entries[0]
+		if !claimed {
+			continue
+		}
+		if _, insecure := insecureProto(e0); !insecure {
+			continue
+		}
+		proto, ok := httpsProto(e0.Proto)
+		if !ok {
+			continue
+		}
+		w := elems[k]
+		if w == nil {
+			continue
+		}
+		raw := string(ctx.Pkg.PKGBUILD.Raw[off(w.Pos()):off(w.End())])
+		old := e0.Proto + "://"
+		i := strings.Index(raw, old)
+		// The scheme has to be written out literally and exactly once. Spelled
+		// through a variable ("$_proto://…") there is nothing to rewrite, and
+		// appearing twice — a proxy URL carrying another URL in its query, say
+		// — leaves no way to tell which occurrence is the transport.
+		if i < 0 || strings.Contains(raw[i+1:], old) {
+			continue
+		}
+		at := off(w.Pos()) + i
+		if seen[at] {
+			continue
+		}
+		// Each distinct URL the element expands to is probed once, and one
+		// refusal vetoes the whole element: the rewrite would re-address that
+		// URL too, on nothing but hope.
+		var targets []string
+		probed := map[string]bool{}
+		served := true
+		for _, e := range entries {
+			target, ok := probeTarget(e, proto)
+			if !ok || e.Proto != e0.Proto {
+				served = false
+				break
+			}
+			if probed[target] {
+				continue
+			}
+			probed[target] = true
+			if !httpsServed(env, e, target) {
+				served = false
+				break
+			}
+			targets = append(targets, target)
+		}
+		if !served {
+			continue
+		}
+		seen[at] = true
+		edits = append(edits, Edit{
+			Path:  ctx.Pkg.PKGBUILD.Path,
+			Start: at,
+			End:   at + len(old),
+			New:   proto + "://",
+			Line:  int(e0.Pos.Line()),
+			Desc:  fmt.Sprintf("fetch over %s:// instead of %s:// (%s answers)", proto, e0.Proto, strings.Join(targets, ", ")),
+		})
+	}
+	return edits
 }
 
 // --- PB102: add a strong digest beside a weak one --------------------------

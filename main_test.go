@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"flag"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -620,5 +622,142 @@ build() {
 	buf.Reset()
 	if code := run([]string{dir}, &buf); code != 0 {
 		t.Errorf("annotated package should lint clean, exit %d:\n%s", code, buf.String())
+	}
+}
+
+// TestProbeHTTPS covers the check that stands between PB104's finding and its
+// rewrite. The fix is only as good as this probe: a false "reachable" writes a
+// URL nobody has confirmed, and a false "unreachable" costs nothing but the
+// fix, which is the direction to err in.
+func TestProbeHTTPS(t *testing.T) {
+	// A TLS test server plus its own trusted client, with the production
+	// redirect policy layered back on. The dial guard below rejects loopback,
+	// so the transport is the one part swapped out here — and it is exercised
+	// on its own in TestProbeHTTPSRefusesInternalAddresses.
+	newServer := func(t *testing.T, h http.HandlerFunc) (string, *http.Client) {
+		t.Helper()
+		srv := httptest.NewTLSServer(h)
+		t.Cleanup(srv.Close)
+		client := newProbeClient()
+		client.Transport = srv.Client().Transport
+		return srv.URL, client
+	}
+
+	t.Run("a served URL passes", func(t *testing.T) {
+		url, client := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodHead {
+				t.Errorf("method = %s, want HEAD", r.Method)
+			}
+			w.WriteHeader(http.StatusOK)
+		})
+		if err := probeWith(client, url+"/demo.tar.gz"); err != nil {
+			t.Errorf("probe = %v, want success", err)
+		}
+	})
+
+	// The common real failure: the host speaks https but does not have this
+	// path, which is exactly the build the unverified rewrite would have broken.
+	t.Run("a 404 fails", func(t *testing.T) {
+		url, client := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		})
+		err := probeWith(client, url+"/demo.tar.gz")
+		if err == nil || !strings.Contains(err.Error(), "404") {
+			t.Errorf("probe = %v, want a 404 refusal", err)
+		}
+	})
+
+	// Plenty of servers reject HEAD while serving the file happily. That is a
+	// statement about the method, not the URL, so the probe asks again for a
+	// single byte rather than reporting the source unreachable.
+	for name, status := range map[string]int{
+		"405": http.StatusMethodNotAllowed,
+		"403": http.StatusForbidden,
+		"501": http.StatusNotImplemented,
+	} {
+		t.Run("HEAD "+name+" falls back to a ranged GET", func(t *testing.T) {
+			var gets int
+			url, client := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodHead {
+					w.WriteHeader(status)
+					return
+				}
+				gets++
+				if r.Header.Get("Range") != "bytes=0-0" {
+					t.Errorf("Range = %q, want a single byte", r.Header.Get("Range"))
+				}
+				w.WriteHeader(http.StatusPartialContent)
+			})
+			if err := probeWith(client, url+"/demo.tar.gz"); err != nil {
+				t.Errorf("probe = %v, want success via the GET fallback", err)
+			}
+			if gets != 1 {
+				t.Errorf("issued %d GETs, want 1", gets)
+			}
+		})
+	}
+
+	// A redirect landing on http means the https URL does not actually serve
+	// the file — the opposite of what the fix would be claiming.
+	t.Run("a redirect off https fails", func(t *testing.T) {
+		url, client := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+			http.Redirect(w, &http.Request{}, "http://example.com/demo.tar.gz", http.StatusFound)
+		})
+		err := probeWith(client, url+"/demo.tar.gz")
+		if err == nil || !strings.Contains(err.Error(), "redirected off https") {
+			t.Errorf("probe = %v, want a downgrade refusal", err)
+		}
+	})
+
+	t.Run("a non-https URL is refused outright", func(t *testing.T) {
+		for _, u := range []string{"http://example.com/x", "ftp://example.com/x", "://nonsense"} {
+			if err := probeWith(newProbeClient(), u); err == nil {
+				t.Errorf("probe(%q) = nil, want a refusal", u)
+			}
+		}
+	})
+}
+
+// TestProbeHTTPSRefusesInternalAddresses pins the guard that keeps a probe on
+// the public internet. The URL being probed comes out of a file pkglint is
+// analyzing *because* nobody has vetted it, so a PKGBUILD naming the cloud
+// metadata service or a host resolving to one must not turn linting into a
+// request to it.
+func TestProbeHTTPSRefusesInternalAddresses(t *testing.T) {
+	for _, u := range []string{
+		"https://127.0.0.1/latest/meta-data/",
+		"https://169.254.169.254/latest/meta-data/",
+		"https://10.0.0.1/internal.tar.gz",
+		"https://192.168.1.1/internal.tar.gz",
+		"https://[::1]/internal.tar.gz",
+	} {
+		t.Run(u, func(t *testing.T) {
+			err := probeHTTPS(u)
+			if err == nil || !strings.Contains(err.Error(), "non-public address") {
+				t.Errorf("probeHTTPS(%q) = %v, want a non-public-address refusal", u, err)
+			}
+		})
+	}
+}
+
+func TestRefuseInternalAddr(t *testing.T) {
+	for addr, want := range map[string]bool{
+		"93.184.216.34:443":  true, // public
+		"[2606:2800::1]:443": true,
+		"127.0.0.1:443":      false,
+		"[::1]:443":          false,
+		"10.1.2.3:443":       false,
+		"172.16.0.1:443":     false,
+		"192.168.0.5:443":    false,
+		"169.254.169.254:80": false,
+		"0.0.0.0:443":        false,
+		"224.0.0.1:443":      false,
+		"[fd00::1]:443":      false, // unique-local
+		"not-an-address":     false,
+	} {
+		err := refuseInternalAddr("tcp", addr, nil)
+		if got := err == nil; got != want {
+			t.Errorf("refuseInternalAddr(%q) allowed = %v (err %v), want %v", addr, got, err, want)
+		}
 	}
 }

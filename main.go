@@ -15,10 +15,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -103,7 +107,7 @@ archives (default: .)`,
 	cmd.Flags().BoolVar(&doFix, "fix", false, "apply safe auto-fixes in place")
 	cmd.Flags().BoolVar(&unsafeFix, "unsafe-fix", false, "apply safe and behavior-changing auto-fixes in place (implies --fix)")
 	cmd.Flags().BoolVar(&diff, "diff", false, "with --fix/--unsafe-fix/--add-ignores: show changes instead of writing them")
-	cmd.Flags().BoolVar(&offline, "offline", false, "with --fix: skip fixes needing network access (e.g. resolving VCS refs)")
+	cmd.Flags().BoolVar(&offline, "offline", false, "with --fix: skip fixes needing network access (resolving VCS refs, verifying an https URL answers before rewriting a source's transport)")
 	cmd.Flags().BoolVar(&noInline, "no-inline-ignores", false, "disregard '# pkglint: ignore=' directives, reporting the findings they suppress (audit a package without trusting its annotations)")
 	cmd.Flags().BoolVar(&addIgnores, "add-ignores", false, "insert '# pkglint: ignore=' directives suppressing every current finding")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "text output: list packages with no findings individually instead of only in the summary")
@@ -258,6 +262,7 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 	env := &rules.FixEnv{LocalDigest: localDigest}
 	if !offline {
 		env.ResolveRef = resolveGitRef
+		env.ProbeHTTPS = probeHTTPS
 	}
 	rc := 0
 	for _, path := range paths {
@@ -496,6 +501,120 @@ func resolveGitRef(rawurl, ref string) (string, error) {
 		return "", fmt.Errorf("ref %q not found on %s", ref, url)
 	}
 	return sha, nil
+}
+
+// probeTimeout bounds one https probe end to end, redirects included. A host
+// that has not answered by then is one the fix should not bet a build on.
+const probeTimeout = 15 * time.Second
+
+// probeHTTPS reports whether an https URL is served, by asking for headers and
+// nothing else. It is how PB104's rewrite is checked before it is written: the
+// linter would otherwise be asserting, on a maintainer's behalf, that a host it
+// never contacted offers the same path over TLS.
+//
+// The request is deliberately minimal. HEAD first, a single-byte ranged GET
+// only where a server rejects HEAD outright (405 and 501 are common on older
+// CDNs, and some object stores answer 403 to it), no body is ever read, and
+// nothing that comes back is used for anything but the reachable/not decision.
+// Credentials in the URL are dropped rather than sent, and a redirect is
+// followed only while it stays on https — a hop to http would mean the https
+// URL does not really serve the file, which is the opposite of what the fix
+// claims.
+func probeHTTPS(rawurl string) error { return probeWith(newProbeClient(), rawurl) }
+
+// newProbeClient is the client every probe goes through: no redirect off
+// https, a bounded number of hops, and a dialer that refuses to leave the
+// public internet.
+func newProbeClient() *http.Client {
+	return &http.Client{
+		Timeout:   probeTimeout,
+		Transport: &http.Transport{DialContext: (&net.Dialer{Timeout: 5 * time.Second, Control: refuseInternalAddr}).DialContext},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many redirects")
+			}
+			if !strings.EqualFold(req.URL.Scheme, "https") {
+				return fmt.Errorf("redirected off https to %s", req.URL.Scheme)
+			}
+			return nil
+		},
+	}
+}
+
+func probeWith(client *http.Client, rawurl string) error {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return fmt.Errorf("unparseable URL %q: %w", rawurl, err)
+	}
+	if !strings.EqualFold(u.Scheme, "https") || u.Host == "" {
+		return fmt.Errorf("refusing to probe non-https URL %q", rawurl)
+	}
+	u.User = nil // never replay credentials a PKGBUILD embedded in a URL
+
+	status, err := probeOnce(client, http.MethodHead, u.String(), nil)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusMethodNotAllowed || status == http.StatusNotImplemented || status == http.StatusForbidden {
+		// The server dislikes HEAD, not the URL. Ask for one byte instead.
+		status, err = probeOnce(client, http.MethodGet, u.String(), map[string]string{"Range": "bytes=0-0"})
+		if err != nil {
+			return err
+		}
+	}
+	if status >= 400 {
+		return fmt.Errorf("%s returned HTTP %d", u.Redacted(), status)
+	}
+	return nil
+}
+
+// probeOnce issues one request and returns its status code, discarding the
+// response body unread.
+func probeOnce(client *http.Client, method, url string, headers map[string]string) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("User-Agent", "pkglint/"+version)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// refuseInternalAddr blocks a probe that would leave the public internet. The
+// URL comes out of a file pkglint is analyzing precisely because nobody has
+// vetted it yet, and "linting this PKGBUILD made my machine knock on the cloud
+// metadata service" is not a thing a linter should be able to do. Checking the
+// address at dial time rather than the hostname up front is what makes it hold:
+// the name is resolved by then, so a hostname pointed at 127.0.0.1 or
+// 169.254.169.254 is caught along with the literal.
+//
+// The cost is that a source on an internal mirror cannot be verified and so
+// keeps its finding. That is the right way round: pkglint declining to fix is
+// recoverable, and reaching into a private network on a hostile file's say-so
+// is not.
+func refuseInternalAddr(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("unroutable probe address %q", address)
+	}
+	ip := net.ParseIP(host)
+	switch {
+	case ip == nil:
+		return fmt.Errorf("unresolvable probe address %q", host)
+	case ip.IsLoopback(), ip.IsPrivate(), ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast(),
+		ip.IsInterfaceLocalMulticast(), ip.IsMulticast(), ip.IsUnspecified(), !ip.IsGlobalUnicast():
+		return fmt.Errorf("refusing to probe non-public address %s", ip)
+	}
+	return nil
 }
 
 // writeFixed writes data to path, preserving the file's existing permissions.

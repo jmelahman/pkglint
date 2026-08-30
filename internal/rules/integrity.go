@@ -63,8 +63,15 @@ var integrityRules = []Rule{
 			"build but not change what it produces — a warning. With SKIP, a weak sum, or no sum at " +
 			"all — which includes every git:// clone — nothing checks what arrives, and it is a " +
 			"working man-in-the-middle vector: an error. Use https:// (or git+https://) either way. " +
-			"Signature files fetched insecurely are PB112's concern.",
-		Check: checkInsecureTransport,
+			"Signature files fetched insecurely are PB112's concern. --unsafe-fix rewrites the " +
+			"scheme (http and ftp to https, bare git:// to git+https://), but only after checking that " +
+			"the https URL answers — a headers-only request, or `git ls-remote` for a git remote — so " +
+			"a host that does not serve it keeps the finding instead of getting a broken build. It stays " +
+			"unsafe because reachable is not identical: only the checksum can say the https URL serves " +
+			"the same bytes, so rebuild after applying it. --offline skips it.",
+		Check:    checkInsecureTransport,
+		FixLevel: FixUnsafe,
+		Fix:      fixInsecureTransport,
 	},
 	{
 		ID:       "PB105",
@@ -140,8 +147,12 @@ var integrityRules = []Rule{
 		Doc: "This signature file is fetched over an unencrypted transport. With validpgpkeys pinned " +
 			"the signature still verifies cryptographically — hence a warning where PB104 errors for " +
 			"ordinary sources — but a man-in-the-middle can strip or swap the file to break builds, " +
-			"and combined with an unpinned key (PB111) it is a working bypass. Use https://.",
-		Check: checkSignatureTransport,
+			"and combined with an unpinned key (PB111) it is a working bypass. Use https://. " +
+			"--unsafe-fix rewrites the scheme once it has confirmed the https URL answers, with " +
+			"PB104's caveat: a reachable signature is not necessarily the same signature.",
+		Check:    checkSignatureTransport,
+		FixLevel: FixUnsafe,
+		Fix:      fixInsecureSignatureTransport,
 	},
 	{
 		ID:       "PB113",

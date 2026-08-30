@@ -422,6 +422,150 @@ var styleRules = []Rule{
 			"updates mean.",
 		Check: checkVCSSuffixMismatch,
 	},
+	{
+		ID:       "PB970",
+		Name:     "font-package-arch",
+		Severity: Warn,
+		Doc: "Font files render identically on every machine type, so the Arch font package " +
+			"guidelines require arch=('any') on ttf-/otf- packages. A concrete architecture " +
+			"makes pacman rebuild and re-download the same bytes per architecture for nothing.",
+		Check: checkFontArch,
+	},
+	{
+		ID:       "PB971",
+		Name:     "font-package-depends",
+		Severity: Info,
+		Doc: "Installed fonts are discovered by fontconfig on its own; a font package needs no " +
+			"dependencies, and the historical fontconfig/xorg-font-utils entries only force " +
+			"unrelated software onto minimal systems. The font package guidelines say to declare " +
+			"none.",
+		Check: checkFontDepends,
+	},
+	{
+		ID:       "PB972",
+		Name:     "font-unstable-source",
+		Severity: Warn,
+		Doc: "fonts.google.com and fontspace.com serve archives generated on demand from the " +
+			"font's current revision: the bytes change without the URL changing, so the pinned " +
+			"checksum eventually fails on every user's machine at once. Fetch the versioned " +
+			"release artifact from the font's own repository instead.",
+		Check: checkFontUnstableSource,
+	},
+	{
+		ID:       "PB973",
+		Name:     "dkms-missing-depends",
+		Severity: Warn,
+		Doc: "A -dkms package installs module sources under /usr/src that only dkms can build, " +
+			"register and rebuild across kernel upgrades; without dkms in depends the package " +
+			"installs sources nothing will ever compile.",
+		Check: checkDkmsDepends,
+	},
+	{
+		ID:       "PB974",
+		Name:     "dkms-kernel-headers",
+		Severity: Warn,
+		Doc: "dkms discovers every installed kernel and pulls the matching headers itself, so a " +
+			"-dkms package depending on linux-headers (or any kernel's -headers) pins one kernel " +
+			"flavor: it drags the stock headers onto linux-lts systems and adds nothing on any " +
+			"other. The DKMS package guidelines say to leave headers to dkms.",
+		Check: checkDkmsKernelHeaders,
+	},
+	{
+		ID:       "PB975",
+		Name:     "lib32-pkgdesc-suffix",
+		Severity: Info,
+		Doc: "A lib32- package's one-line description is shown in lists where only it " +
+			"distinguishes the multilib build from its 64-bit sibling; the 32-bit package " +
+			"guidelines end pkgdesc with \"(32-bit)\".",
+		Check: checkLib32Pkgdesc,
+	},
+	{
+		ID:       "PB976",
+		Name:     "lib32-missing-m32",
+		Severity: Warn,
+		Doc: "On x86_64 nothing compiles 32-bit unless the PKGBUILD asks: without -m32 in " +
+			"CFLAGS/CXXFLAGS/LDFLAGS (or an equivalent CC spelling) the build emits 64-bit " +
+			"objects and the lib32- package ships the wrong ABI. Repackaging PKGBUILDs with no " +
+			"build() are exempt — they compile nothing.",
+		Check: checkLib32M32,
+	},
+	{
+		ID:       "PB977",
+		Name:     "mingw-required-options",
+		Severity: Warn,
+		Doc: "Cross-built Windows binaries must escape the host's toolchain defaults: the build " +
+			"host's strip corrupts PE binaries (mingw-strip differs), Windows linking needs the " +
+			"static/import libraries makepkg would delete, and Arch's CFLAGS target the host ABI. " +
+			"The MinGW package guidelines therefore require options=(!strip staticlibs !buildflags).",
+		Check: checkMingwOptions,
+	},
+	{
+		ID:       "PB978",
+		Name:     "mingw-pkgdesc-suffix",
+		Severity: Info,
+		Doc: "A mingw-w64- package's description is shown in lists where only it distinguishes " +
+			"the cross build from the native one; the MinGW package guidelines end pkgdesc with " +
+			"\"(mingw-w64)\".",
+		Check: checkMingwPkgdesc,
+	},
+	{
+		ID:       "PB979",
+		Name:     "npm-missing-makedepends",
+		Severity: Warn,
+		Doc: "npm is not part of the base build environment (and not bundled with the nodejs " +
+			"package): without npm in makedepends the build fails in any clean chroot.",
+		Check: checkNpmMakedepends,
+	},
+	{
+		ID:       "PB980",
+		Name:     "npm-user-cache",
+		Severity: Info,
+		Doc: "npm writes every downloaded tarball into the invoking user's ~/.npm, so a build " +
+			"leaves root-owned droppings in the builder's home directory that no clean step " +
+			"removes. The Node.js package guidelines pass --cache \"$srcdir/npm-cache\" so the " +
+			"cache dies with the build directory.",
+		Check: checkNpmUserCache,
+	},
+	{
+		ID:       "PB981",
+		Name:     "java-runtime-dependency",
+		Severity: Info,
+		Doc: "Shipped .jar files and compiled classes run on nothing without a JVM, and pacman " +
+			"cannot know that from the file list. The Java package guidelines depend on the " +
+			"java-runtime virtual (or java-environment when a full JDK is needed) so any " +
+			"installed JVM satisfies it.",
+		Check: checkJavaRuntimeDependency,
+	},
+	{
+		ID:       "PB982",
+		Name:     "clr-required-metadata",
+		Severity: Info,
+		Doc: "CLR assemblies are CIL bytecode, identical on every architecture and structured in " +
+			"a way binutils strip corrupts. The CLR package guidelines therefore set arch=('any') " +
+			"and options=('!strip') on mono/.NET packages; a package missing either ships " +
+			"per-arch duplicates or broken assemblies.",
+		Check: checkCLRMetadata,
+	},
+	{
+		ID:       "PB983",
+		Name:     "haskell-arch-any",
+		Severity: Warn,
+		Doc: "GHC compiles Haskell libraries to native code with an ABI hash baked into every " +
+			"interface file, so no haskell- package is architecture-independent: arch=('any') " +
+			"ships x86_64 objects to every architecture. The Haskell package guidelines list the " +
+			"real architectures.",
+		Check: checkHaskellArch,
+	},
+	{
+		ID:       "PB984",
+		Name:     "php-arch-any",
+		Severity: Info,
+		Doc: "A pure-PHP package — one whose PKGBUILD compiles nothing — is architecture-" +
+			"independent and should declare arch=('any') so one build serves every machine. " +
+			"php- packages that build a native extension (phpize/configure/make) are " +
+			"architecture-specific and exempt.",
+		Check: checkPhpArch,
+	},
 }
 
 // --- PB901: hardcoded host architecture ------------------------------------

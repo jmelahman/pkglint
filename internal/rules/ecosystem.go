@@ -50,6 +50,61 @@ func nameSuffixed(ctx *Context, suffix string) bool {
 	return false
 }
 
+// namePrefixed reports whether any built package name (pkgname element or
+// pkgbase) starts with one of the prefixes.
+func namePrefixed(ctx *Context, prefixes ...string) bool {
+	for _, n := range allPkgNames(ctx) {
+		if hasPrefixAny(n, prefixes...) {
+			return true
+		}
+	}
+	return false
+}
+
+// archIsAny reports whether the arch array declares "any".
+func archIsAny(ctx *Context) bool {
+	for _, e := range varElems(ctx.Pkg.Vars["arch"]) {
+		if val, ok := staticVal(ctx.Pkg, e.Value); ok && val == "any" {
+			return true
+		}
+	}
+	return false
+}
+
+// optionSet reports whether options=() contains opt (e.g. "!strip"),
+// tolerating the escaped \! spelling as PB706 does.
+func optionSet(ctx *Context, opt string) bool {
+	for _, e := range varElems(ctx.Pkg.Vars["options"]) {
+		if val, ok := staticVal(ctx.Pkg, e.Value); ok && strings.TrimPrefix(val, `\`) == opt {
+			return true
+		}
+	}
+	return false
+}
+
+// pkgdescValue returns the statically-known pkgdesc, mirroring
+// checkPkgnameInDesc's reading of the field.
+func pkgdescValue(ctx *Context) (string, bool) {
+	v := ctx.Pkg.Vars["pkgdesc"]
+	if v == nil || v.Array {
+		return "", false
+	}
+	return staticVal(ctx.Pkg, firstValue(v.Values))
+}
+
+// varFinding reports a finding anchored at the first of fields that is
+// declared, falling back to the top of the PKGBUILD — for rules about a
+// package-wide property rather than one command or array element.
+func varFinding(ctx *Context, id string, sev Severity, fields []string, format string, args ...any) Finding {
+	for _, f := range fields {
+		if v := ctx.Pkg.Vars[f]; v != nil {
+			return findingAt(id, sev, ctx.Pkg.PKGBUILD.Path, v.Pos, format, args...)
+		}
+	}
+	return Finding{RuleID: id, Severity: sev, Path: ctx.Pkg.PKGBUILD.Path, Line: 1, Col: 1,
+		Message: message(format, args...)}
+}
+
 // hasDep reports whether field (or a declared _$arch variant of it) names the
 // package, ignoring version constraints.
 func hasDep(ctx *Context, field, name string) bool {

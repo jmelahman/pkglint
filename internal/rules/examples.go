@@ -733,6 +733,131 @@ pkgver() {
   git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
 }`,
 	},
+	"PB970": {
+		Bad: `pkgname=ttf-demo   # font files are the same bytes on every machine
+# arch=('x86_64') from above stays in effect`,
+		Good: `pkgname=ttf-demo
+arch=('any')`,
+	},
+	"PB971": {
+		Bad: `pkgname=ttf-demo
+arch=('any')
+depends=('fontconfig')   # fontconfig finds installed fonts on its own`,
+		Good: `pkgname=ttf-demo
+arch=('any')`,
+	},
+	"PB972": {
+		Bad: `source=("https://fonts.google.com/download?family=Demo")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+		Good: `source=("https://github.com/example/demo-font/releases/download/v1.0/demo-v1.0.zip")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+	},
+	"PB973": {
+		Bad: `pkgname=demo-dkms
+# depends=(): the module sources ship, but nothing will ever build them`,
+		Good: `pkgname=demo-dkms
+depends=('dkms')`,
+	},
+	"PB974": {
+		Bad: `pkgname=demo-dkms
+depends=('dkms' 'linux-headers')   # pins the stock kernel's headers`,
+		Good: `pkgname=demo-dkms
+depends=('dkms')   # dkms pulls the right headers for every installed kernel`,
+	},
+	"PB975": {
+		Bad: `pkgname=lib32-demo
+pkgdesc='Demonstration library'`,
+		Good: `pkgname=lib32-demo
+pkgdesc='Demonstration library (32-bit)'`,
+	},
+	"PB976": {
+		Bad: `pkgname=lib32-demo
+pkgdesc='Demonstration library (32-bit)'
+build() {
+  ./configure --libdir=/usr/lib32
+  make
+}`,
+		Good: `pkgname=lib32-demo
+pkgdesc='Demonstration library (32-bit)'
+build() {
+  export CFLAGS="$CFLAGS -m32" CXXFLAGS="$CXXFLAGS -m32" LDFLAGS="$LDFLAGS -m32"
+  ./configure --libdir=/usr/lib32
+  make
+}`,
+	},
+	"PB977": {
+		Bad: `pkgname=mingw-w64-demo
+pkgdesc='Demonstration library (mingw-w64)'`,
+		Good: `pkgname=mingw-w64-demo
+pkgdesc='Demonstration library (mingw-w64)'
+options=('!strip' 'staticlibs' '!buildflags')`,
+	},
+	"PB978": {
+		Bad: `pkgname=mingw-w64-demo
+pkgdesc='Demonstration library'
+options=('!strip' 'staticlibs' '!buildflags')`,
+		Good: `pkgname=mingw-w64-demo
+pkgdesc='Demonstration library (mingw-w64)'
+options=('!strip' 'staticlibs' '!buildflags')`,
+	},
+	"PB979": {
+		Bad: `prepare() {
+  npm ci --cache "$srcdir/npm-cache"
+}`,
+		Good: `makedepends=('npm')
+prepare() {
+  npm ci --cache "$srcdir/npm-cache"
+}`,
+	},
+	"PB980": {
+		Bad: `makedepends=('npm')
+prepare() {
+  npm ci   # tarballs land in the build user's ~/.npm
+}`,
+		Good: `makedepends=('npm')
+prepare() {
+  npm ci --cache "$srcdir/npm-cache"
+}`,
+	},
+	"PB981": {
+		Bad: `package() {
+  install -Dm644 demo.jar "$pkgdir/usr/share/java/demo/demo.jar"
+}   # nothing in depends provides a JVM to run it`,
+		Good: `depends=('java-runtime')
+package() {
+  install -Dm644 demo.jar "$pkgdir/usr/share/java/demo/demo.jar"
+}`,
+	},
+	"PB982": {
+		Bad: `depends=('mono')
+build() {
+  xbuild demo.sln   # CIL assemblies, but arch/options say native binary
+}`,
+		Good: `depends=('mono')
+arch=('any')
+options=('!strip')
+build() {
+  xbuild demo.sln
+}`,
+	},
+	"PB983": {
+		Bad: `pkgname=haskell-demo
+arch=('any')   # GHC output is native code with a baked-in ABI hash`,
+		Good: `pkgname=haskell-demo
+arch=('x86_64')`,
+	},
+	"PB984": {
+		Bad: `pkgname=php-demo
+# arch=('x86_64') from above, but nothing here compiles anything
+package() {
+  install -Dm644 demo.php "$pkgdir/usr/share/webapps/demo/demo.php"
+}`,
+		Good: `pkgname=php-demo
+arch=('any')
+package() {
+  install -Dm644 demo.php "$pkgdir/usr/share/webapps/demo/demo.php"
+}`,
+	},
 
 	// PB8xx examples illustrate what in the PKGBUILD produced the offending
 	// package contents; the rules themselves run on built .pkg.tar.* archives,

@@ -127,6 +127,36 @@ sha256sums=('SKIP')
 		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
 		mustContain(t, got, "#commit=0123456789abcdef0123456789abcdef01234567")
 	})
+	t.Run("a ref spelled through a variable is still pinned", func(t *testing.T) {
+		// The template shape: #tag=v$pkgver. The expanded ref resolves like
+		// any other; the whole written fragment value gives way to the commit.
+		vcs := `pkgname=demo
+pkgver=1.15.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com'
+source=("git+https://example.com/demo.git#tag=v$pkgver")
+sha256sums=('SKIP')
+`
+		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+		mustContain(t, got, "git+https://example.com/demo.git#commit=0123456789abcdef0123456789abcdef01234567")
+		mustNotContain(t, got, "#tag=")
+	})
+	t.Run("a fragment hidden inside a variable is left alone", func(t *testing.T) {
+		vcs := `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+url='https://example.com'
+_ref='tag=v1'
+source=("git+https://example.com/demo.git#$_ref")
+sha256sums=('SKIP')
+`
+		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		if out, ok := got["PKGBUILD"]; ok {
+			t.Errorf("a variable-hidden fragment key should not be rewritten, got:\n%s", out)
+		}
+	})
 	t.Run("a brace group sharing one fragment is not rewritten", func(t *testing.T) {
 		// Two repositories, one written #tag: resolving either URL's ref and
 		// editing the shared text would pin both to the same commit.
@@ -247,11 +277,75 @@ sha256sums=('SKIP' 'SKIP')
 }
 
 func TestFixGoDownloads(t *testing.T) {
-	got := fixPKGBUILD(t, `
+	relintClean := func(t *testing.T, got string) {
+		t.Helper()
+		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got}))["PB204"]; n != 0 {
+			t.Errorf("fixed PKGBUILD still has %d PB204 finding(s):\n%s", n, got)
+		}
+	}
+	t.Run("writes a prepare() mirroring build's cd", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+build() {
+  cd "$pkgname" || exit
+  go build -o demo .
+}`, FixUnsafe, nil)
+		mustContain(t, got, "prepare() {\n  cd \"$pkgname\" || exit\n  go mod download\n}\n\nbuild() {")
+		mustContain(t, got, "go build -o demo .") // the build line itself is untouched
+		relintClean(t, got)
+	})
+	t.Run("a build without a cd gets a bare download", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
 build() {
   go build -o demo .
 }`, FixUnsafe, nil)
-	mustContain(t, got, "go build -mod=vendor -o demo .")
+		mustContain(t, got, "prepare() {\n  go mod download\n}\n\nbuild() {")
+		relintClean(t, got)
+	})
+	t.Run("an existing prepare() is extended, not shadowed", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+prepare() {
+  cd "$pkgname" || exit
+  patch -p1 < ../fix.patch
+}
+build() {
+  cd "$pkgname" || exit
+  go build -o demo .
+}`, FixUnsafe, nil)
+		mustContain(t, got, "patch -p1 < ../fix.patch\n  go mod download\n}")
+		mustNotContain(t, got, "prepare() {\n  go mod download") // no second prepare
+		relintClean(t, got)
+	})
+	t.Run("a prepare() without a cd borrows build's", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+prepare() {
+  patch -p1 < ../fix.patch
+}
+build() {
+  cd "$pkgname" || exit
+  go build -o demo .
+}`, FixUnsafe, nil)
+		mustContain(t, got, "patch -p1 < ../fix.patch\n  cd \"$pkgname\" || exit\n  go mod download\n}")
+		relintClean(t, got)
+	})
+	t.Run("a vendored build needs no edit", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go build -mod=vendor -o demo .
+}`)}, FixUnsafe, nil)
+		if out, ok := got["PKGBUILD"]; ok {
+			t.Errorf("vendored build should need no edit, got:\n%s", out)
+		}
+	})
+	t.Run("a cd sharing its line with another command is not copied", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+build() {
+  cd "$pkgname" && make generate
+  go build -o demo .
+}`, FixUnsafe, nil)
+		mustContain(t, got, "prepare() {\n  go mod download\n}")
+		mustNotContain(t, got, "make generate\n  go mod download")
+		relintClean(t, got)
+	})
 }
 
 func TestFixNpmCI(t *testing.T) {
@@ -413,7 +507,7 @@ build() {
 	if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
 		t.Errorf("FixSafe should not apply the unsafe PB204 fix, got:\n%s", got["PKGBUILD"])
 	}
-	if got := fixPKGBUILD(t, body, FixUnsafe, nil); !strings.Contains(got, "-mod=vendor") {
+	if got := fixPKGBUILD(t, body, FixUnsafe, nil); !strings.Contains(got, "go mod download") {
 		t.Errorf("FixUnsafe should apply PB204, got:\n%s", got)
 	}
 }

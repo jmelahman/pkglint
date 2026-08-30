@@ -229,10 +229,23 @@ func fixVCSPins(ctx *Context, env *FixEnv) []Edit {
 		if w == nil {
 			continue
 		}
+		if refVal == "" || strings.ContainsAny(refVal, "\x00$") {
+			continue // the expanded ref is not statically known; nothing to resolve
+		}
 		raw := string(ctx.Pkg.PKGBUILD.Raw[off(w.Pos()):off(w.End())])
-		needle := "#" + fragKey + "=" + refVal
-		if !strings.Contains(raw, needle) {
-			continue // the ref came from a variable; can't rewrite in place
+		// The written value may be the literal ref or spelled through a
+		// variable (#tag=v$pkgver); either way the bytes from the key through
+		// the end of the fragment value are what pin the ref, and the resolved
+		// commit replaces them wholesale. Only a fragment whose *key* is hidden
+		// inside a variable leaves nothing addressable to rewrite.
+		key := "#" + fragKey + "="
+		i := strings.Index(raw, key)
+		if i < 0 {
+			continue
+		}
+		j := i + len(key)
+		for j < len(raw) && !strings.ContainsRune(`#?"'`, rune(raw[j])) {
+			j++
 		}
 		sha, err := env.ResolveRef(e.URL, refVal)
 		if err != nil || !commitHashRe.MatchString(sha) {
@@ -242,7 +255,7 @@ func fixVCSPins(ctx *Context, env *FixEnv) []Edit {
 			Path:  ctx.Pkg.PKGBUILD.Path,
 			Start: off(w.Pos()),
 			End:   off(w.End()),
-			New:   strings.Replace(raw, needle, "#commit="+sha, 1),
+			New:   raw[:i] + "#commit=" + sha + raw[j:],
 			Line:  int(w.Pos().Line()),
 			Desc:  fmt.Sprintf("pin %s %q to commit %s", fragKey, refVal, shortSHA(sha)),
 		})
@@ -361,37 +374,135 @@ func fixCargoLocked(ctx *Context, _ *FixEnv) []Edit {
 
 // --- PB204: implicit go module downloads -----------------------------------
 
+// fixGoDownloads gives the build its modules ahead of time: a prepare() that
+// runs `go mod download`, entered through the same cd the build step uses so
+// it lands in the same module. That is the finding message's first remedy, it
+// works for sources that ship no vendor directory (a git tag rarely does),
+// and goVendored recognizes the download step, so the finding clears for the
+// right reason. The old edit — appending -mod=vendor to the build line —
+// looked cheaper but pointed at a vendor directory that usually does not
+// exist, and a later -mod flag on the same line overrode it silently anyway.
 func fixGoDownloads(ctx *Context, _ *FixEnv) []Edit {
 	if goVendored(ctx) {
 		return nil
 	}
-	var edits []Edit
 	for _, c := range ctx.CommandsNamed("go") {
 		if !c.InBuildPhase() {
 			continue
 		}
-		sub := c.Subcommand()
-		if sub != "build" && sub != "install" && sub != "test" && sub != "run" {
+		switch c.Subcommand() {
+		case "build", "install", "test", "run":
+		default:
 			continue
 		}
-		if c.HasArg("-mod=vendor") {
-			continue
+		// One structural edit fixes every flagged command in the file, so the
+		// first one carries it.
+		if edit, ok := goModDownloadEdit(ctx, c); ok {
+			return []Edit{edit}
 		}
-		w := wordByValue(c, sub)
-		if w == nil {
-			continue
-		}
-		at := off(w.End())
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   " -mod=vendor",
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  fmt.Sprintf("add -mod=vendor to `go %s` (also vendor modules: `go mod vendor` in prepare(), commit vendor/)", sub),
-		})
+		return nil
 	}
-	return edits
+	return nil
+}
+
+// goModDownloadEdit inserts `go mod download` into prepare() — extending the
+// function if the PKGBUILD has one, writing a fresh one directly above c's
+// function otherwise.
+func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
+	u := c.Unit
+	indent := lineIndent(u.Raw, off(c.Stmt.Pos()))
+	line := int(c.Stmt.Pos().Line())
+
+	if fd := u.Functions["prepare"]; fd != nil {
+		block, ok := fd.Body.Cmd.(*syntax.Block)
+		if !ok {
+			return Edit{}, false
+		}
+		at := lineStart(u.Raw, off(block.Rbrace))
+		if at <= off(block.Lbrace) {
+			return Edit{}, false // a one-line prepare(); nowhere to put a new line
+		}
+		var b strings.Builder
+		// prepare() may do its work at $srcdir's root; without a cd of its
+		// own the download must still land in the module the build compiles.
+		if !fnHasCommand(ctx, u, "prepare", "cd") {
+			b.WriteString(cdLine(ctx, u, c.Fn))
+		}
+		b.WriteString(indent + "go mod download\n")
+		return Edit{
+			Path: u.Path, Start: at, End: at, New: b.String(), Line: line,
+			Desc: "add `go mod download` to prepare() so the build needn't fetch",
+		}, true
+	}
+
+	fd := u.Functions[c.Fn]
+	if fd == nil {
+		return Edit{}, false
+	}
+	at := lineStart(u.Raw, off(fd.Pos()))
+	var b strings.Builder
+	b.WriteString("prepare() {\n")
+	b.WriteString(cdLine(ctx, u, c.Fn))
+	b.WriteString(indent + "go mod download\n")
+	b.WriteString("}\n\n")
+	return Edit{
+		Path: u.Path, Start: at, End: at, New: b.String(), Line: line,
+		Desc: "add prepare() with `go mod download` so " + c.Fn + "() needn't fetch",
+	}, true
+}
+
+// cdLine returns fn's opening cd statement as a full source line — indent and
+// any `|| exit` guard included — or "" when fn has none or its cd shares the
+// line with another command. prepare() must land in the directory the build
+// step runs in, and copying the exact line is how it provably does.
+func cdLine(ctx *Context, u *pkgbuild.Unit, fn string) string {
+	for _, c := range ctx.Commands() {
+		if c.Unit != u || c.Fn != fn || c.Name != "cd" {
+			continue
+		}
+		start := lineStart(u.Raw, off(c.Stmt.Pos()))
+		end := off(c.Stmt.End())
+		for end < len(u.Raw) && u.Raw[end] != '\n' {
+			end++
+		}
+		line := string(u.Raw[start:end])
+		rest := line[off(c.Stmt.End())-start:]
+		if rest != "" && !cdGuardRe.MatchString(rest) {
+			return ""
+		}
+		return line + "\n"
+	}
+	return ""
+}
+
+// cdGuardRe matches the failure guard a cd is allowed to share its line with.
+var cdGuardRe = regexp.MustCompile(`^\s*\|\|\s*(exit|return)\b[^|&;]*$`)
+
+func fnHasCommand(ctx *Context, u *pkgbuild.Unit, fn, name string) bool {
+	for _, c := range ctx.Commands() {
+		if c.Unit == u && c.Fn == fn && c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// lineStart returns the offset of the first byte of the line containing o.
+func lineStart(raw []byte, o int) int {
+	for o > 0 && raw[o-1] != '\n' {
+		o--
+	}
+	return o
+}
+
+// lineIndent returns the leading whitespace of the line containing o.
+func lineIndent(raw []byte, o int) string {
+	start := lineStart(raw, o)
+	end := start
+	for end < len(raw) && (raw[end] == ' ' || raw[end] == '\t') {
+		end++
+	}
+	return string(raw[start:end])
 }
 
 // --- PB205: re-enable Go module verification -------------------------------

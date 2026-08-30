@@ -121,10 +121,10 @@ build() {
   go build -o foo .
 }`,
 		Good: `prepare() {
-  go mod vendor
+  go mod download
 }
 build() {
-  go build -mod=vendor -o foo .
+  go build -o foo .
 }`,
 	},
 	"PB205": {

@@ -131,6 +131,12 @@ func TestExitCodes(t *testing.T) {
 	if code := run([]string{"testdata/clean"}, &buf); code != 0 {
 		t.Errorf("clean fixture: got exit %d, want 0", code)
 	}
+	// The default threshold is warn: a package with warn-level findings (and
+	// nothing worse) fails without any --fail-on flag.
+	buf.Reset()
+	if code := run([]string{"testdata/suppressed"}, &buf); code != 1 {
+		t.Errorf("warn findings at the default threshold: got exit %d, want 1", code)
+	}
 }
 
 // TestPackageArchive runs the CLI end-to-end over a synthetic built package:
@@ -429,6 +435,7 @@ url='https://example.com/demo'
 license=('MIT')
 source=("https://example.com/demo-$pkgver.tar.gz")
 sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+makedepends=('rust')
 
 build() {
   cargo build --release

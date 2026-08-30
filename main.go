@@ -91,7 +91,7 @@ archives (default: .)`,
 	}
 	cmd.Flags().StringVar(&format, "format", "text", "output format: text, json, or sarif")
 	cmd.Flags().StringVar(&color, "color", "auto", "colorize text output: auto, always, or never")
-	cmd.Flags().StringVar(&failOn, "fail-on", "error", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
+	cmd.Flags().StringVar(&failOn, "fail-on", "warn", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
 	cmd.Flags().StringVar(&ignore, "ignore", "", "comma-separated rule IDs to disable, e.g. PB105,PB206")
 	cmd.Flags().BoolVar(&listRules, "rules", false, "print all rules and exit")
 	cmd.Flags().BoolVar(&doFix, "fix", false, "apply safe auto-fixes in place")

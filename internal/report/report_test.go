@@ -72,7 +72,7 @@ func TestRenderTextSanitizesUntrustedFields(t *testing.T) {
 		Col:      1,
 	}})
 	var buf bytes.Buffer
-	RenderText(&buf, []PackageReport{r})
+	RenderText(&buf, []PackageReport{r}, false)
 	out := buf.String()
 
 	for _, bad := range []rune{0x1b, 0x0d, 0x07} {
@@ -92,7 +92,7 @@ func TestRenderTextSanitizesUntrustedFields(t *testing.T) {
 func TestRenderTextSanitizesNameAndErr(t *testing.T) {
 	r := NewError("pkg\x1b[2Kname", errors.New("boom\rspoofed: grade A, no findings"))
 	var buf bytes.Buffer
-	RenderText(&buf, []PackageReport{r})
+	RenderText(&buf, []PackageReport{r}, false)
 	out := buf.String()
 
 	for _, bad := range []rune{0x1b, 0x0d} {
@@ -102,6 +102,108 @@ func TestRenderTextSanitizesNameAndErr(t *testing.T) {
 	}
 	if !strings.Contains(out, `\x1b[2K`) || !strings.Contains(out, `boom\x0dspoofed`) {
 		t.Errorf("name/err not escaped as expected:\n%q", out)
+	}
+}
+
+// stripSGR removes ANSI SGR sequences (ESC [ … m), the only escapes the
+// styler emits.
+func stripSGR(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
+			j := i + 2
+			for j < len(s) && (s[j] == ';' || (s[j] >= '0' && s[j] <= '9')) {
+				j++
+			}
+			if j < len(s) && s[j] == 'm' {
+				i = j
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func TestStylerTokens(t *testing.T) {
+	on := styler(true)
+	sevCases := []struct {
+		sev  rules.Severity
+		want string
+	}{
+		{rules.Info, "\x1b[36minfo\x1b[0m"},
+		{rules.Warn, "\x1b[33mwarn\x1b[0m"},
+		{rules.Error, "\x1b[31merror\x1b[0m"},
+		{rules.Critical, "\x1b[1;31mcritical\x1b[0m"},
+	}
+	for _, c := range sevCases {
+		if got := on.severity(c.sev); got != c.want {
+			t.Errorf("severity(%v) = %q, want %q", c.sev, got, c.want)
+		}
+	}
+	gradeCases := []struct{ grade, want string }{
+		{"A", "\x1b[1;32mA\x1b[0m"},
+		{"B", "\x1b[32mB\x1b[0m"},
+		{"C", "\x1b[33mC\x1b[0m"},
+		{"D", "\x1b[31mD\x1b[0m"},
+		{"F", "\x1b[1;31mF\x1b[0m"},
+		{"?", "\x1b[35m?\x1b[0m"},
+	}
+	for _, c := range gradeCases {
+		if got := on.grade(c.grade); got != c.want {
+			t.Errorf("grade(%q) = %q, want %q", c.grade, got, c.want)
+		}
+	}
+
+	off := styler(false)
+	if got := off.severity(rules.Critical); got != "critical" {
+		t.Errorf("styler(false).severity = %q, want plain %q", got, "critical")
+	}
+	if got := off.grade("F"); got != "F" {
+		t.Errorf("styler(false).grade = %q, want plain %q", got, "F")
+	}
+}
+
+// TestRenderTextColor pins that colored output is the plain rendering plus
+// SGR sequences — nothing more — and that untrusted content still cannot
+// smuggle live escapes in (only pkglint's own SGR codes survive stripping).
+func TestRenderTextColor(t *testing.T) {
+	reports := []PackageReport{
+		New("/some/dir/demo", []rules.Finding{
+			{RuleID: "PB204", Severity: rules.Warn, Message: "\x1b[31mred\x1b[0m", Path: "p", Line: 3, Col: 1},
+			{RuleID: "PB821", Severity: rules.Error, Message: "member", Path: "usr/bin/x"}, // Line 0: archive finding
+		}),
+		NewError("broken", errors.New("boom")),
+	}
+	var colored, plain bytes.Buffer
+	RenderText(&colored, reports, true)
+	RenderText(&plain, reports, false)
+
+	out := colored.String()
+	for _, want := range []string{
+		"\x1b[33mwarn\x1b[0m",     // severity with a line
+		"\x1b[31merror\x1b[0m",    // severity without a line (archive path)
+		"\x1b[2m[PB204]\x1b[0m",   // dim rule ID, brackets included
+		"\x1b[31mD\x1b[0m",        // grade
+		"\x1b[1;31merror:\x1b[0m", // load-error marker
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("colored output missing %q:\n%q", want, out)
+		}
+	}
+	if got := stripSGR(out); got != plain.String() {
+		t.Errorf("stripping SGR must yield the plain rendering\n--- stripped ---\n%q\n--- plain ---\n%q", got, plain.String())
+	}
+	// The finding's own escape sequence must still arrive defused: after
+	// removing pkglint's SGR codes, no raw ESC byte may remain.
+	if strings.ContainsRune(stripSGR(out), 0x1b) {
+		t.Errorf("raw ESC survived outside pkglint's own SGR codes:\n%q", out)
+	}
+	if !strings.Contains(out, `\x1b[31mred`) {
+		t.Errorf("untrusted message not escaped in colored output:\n%q", out)
+	}
+	if strings.ContainsRune(plain.String(), 0x1b) {
+		t.Errorf("plain rendering contains escape codes:\n%q", plain.String())
 	}
 }
 

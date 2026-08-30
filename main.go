@@ -35,6 +35,7 @@ func run(args []string, stdout io.Writer) int {
 		format    string
 		failOn    string
 		ignore    string
+		color     string
 		listRules bool
 		doFix     bool
 		unsafeFix bool
@@ -74,11 +75,12 @@ archives (default: .)`,
 				code = runFix(paths, ignoreSet(ignore), level, diff, offline, stdout)
 				return nil
 			}
-			code = lint(paths, format, failOn, ignore, stdout)
+			code = lint(paths, format, failOn, ignore, color, stdout)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "text", "output format: text, json, or sarif")
+	cmd.Flags().StringVar(&color, "color", "auto", "colorize text output: auto, always, or never")
 	cmd.Flags().StringVar(&failOn, "fail-on", "error", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
 	cmd.Flags().StringVar(&ignore, "ignore", "", "comma-separated rule IDs to disable, e.g. PB105,PB206")
 	cmd.Flags().BoolVar(&listRules, "rules", false, "print all rules and exit")
@@ -113,7 +115,7 @@ func ignoreSet(csv string) map[string]bool {
 // lint runs the rules over each path and renders the reports, returning the
 // process exit code. A path may be a package directory / PKGBUILD (static
 // PKGBUILD analysis) or a built .pkg.tar.* archive (package analysis).
-func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
+func lint(paths []string, format, failOn, ignore, color string, stdout io.Writer) int {
 	ignored := ignoreSet(ignore)
 
 	if len(paths) == 0 {
@@ -165,7 +167,12 @@ func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
 			return 2
 		}
 	case "text":
-		report.RenderText(stdout, reports)
+		colorize, err := colorEnabled(color, stdout)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "pkglint:", err)
+			return 2
+		}
+		report.RenderText(stdout, reports, colorize)
 	default:
 		fmt.Fprintf(os.Stderr, "pkglint: unknown format %q\n", format)
 		return 2
@@ -183,6 +190,34 @@ func lint(paths []string, format, failOn, ignore string, stdout io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// colorEnabled decides whether text output gets ANSI colors. "auto" enables
+// them only when writing to a terminal, and defers to the NO_COLOR convention
+// (https://no-color.org) and TERM=dumb; an explicit --color=always overrides
+// both.
+func colorEnabled(mode string, w io.Writer) (bool, error) {
+	switch mode {
+	case "always":
+		return true, nil
+	case "never":
+		return false, nil
+	case "auto":
+		if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
+			return false, nil
+		}
+		f, ok := w.(*os.File)
+		if !ok {
+			return false, nil
+		}
+		// A terminal presents as a character device; a pipe or regular file
+		// does not. This keeps colors out of redirected output without a
+		// platform-specific isatty call.
+		fi, err := f.Stat()
+		return err == nil && fi.Mode()&os.ModeCharDevice != 0, nil
+	default:
+		return false, fmt.Errorf("unknown color mode %q (want auto, always, or never)", mode)
+	}
 }
 
 // runFix applies auto-fixes at the given level, writing files in place (or,

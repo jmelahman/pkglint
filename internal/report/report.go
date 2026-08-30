@@ -104,19 +104,82 @@ func sanitize(s string) string {
 	return b.String()
 }
 
+// ANSI SGR sequences RenderText brackets tokens with when color is on.
+const (
+	ansiReset     = "\x1b[0m"
+	ansiBold      = "\x1b[1m"
+	ansiDim       = "\x1b[2m"
+	ansiRed       = "\x1b[31m"
+	ansiGreen     = "\x1b[32m"
+	ansiYellow    = "\x1b[33m"
+	ansiMagenta   = "\x1b[35m"
+	ansiCyan      = "\x1b[36m"
+	ansiBoldRed   = "\x1b[1;31m"
+	ansiBoldGreen = "\x1b[1;32m"
+)
+
+// styler colorizes trusted report tokens; styler(false) passes text through
+// unchanged, so plain rendering is byte-identical to the pre-color output.
+type styler bool
+
+func (s styler) wrap(code, text string) string {
+	if !s {
+		return text
+	}
+	return code + text + ansiReset
+}
+
+func (s styler) severity(sev rules.Severity) string {
+	var code string
+	switch sev {
+	case rules.Info:
+		code = ansiCyan
+	case rules.Warn:
+		code = ansiYellow
+	case rules.Error:
+		code = ansiRed
+	default: // Critical
+		code = ansiBoldRed
+	}
+	return s.wrap(code, sev.String())
+}
+
+func (s styler) grade(g string) string {
+	var code string
+	switch g {
+	case "A":
+		code = ansiBoldGreen
+	case "B":
+		code = ansiGreen
+	case "C":
+		code = ansiYellow
+	case "D":
+		code = ansiRed
+	case "F":
+		code = ansiBoldRed
+	default: // "?" — failed to load
+		code = ansiMagenta
+	}
+	return s.wrap(code, g)
+}
+
 // RenderText writes the human-readable report. Untrusted, PKGBUILD-derived
 // fields (name, error, path, message) are sanitized; severity, rule ID, and
-// grade are trusted enum/registry values.
-func RenderText(w io.Writer, reports []PackageReport) {
+// grade are trusted enum/registry values. Color is applied only around those
+// trusted tokens (and the already-sanitized name), so untrusted content can
+// neither carry its own escapes nor break out of ours.
+func RenderText(w io.Writer, reports []PackageReport, color bool) {
+	s := styler(color)
 	for i, r := range reports {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
 		if r.Err != "" {
-			fmt.Fprintf(w, "%s: error: %s\n", sanitize(r.Name), sanitize(r.Err))
+			fmt.Fprintf(w, "%s: %s %s\n",
+				s.wrap(ansiBold, sanitize(r.Name)), s.wrap(ansiBoldRed, "error:"), sanitize(r.Err))
 			continue
 		}
-		fmt.Fprintf(w, "%s: grade %s", sanitize(r.Name), r.Grade)
+		fmt.Fprintf(w, "%s: grade %s", s.wrap(ansiBold, sanitize(r.Name)), s.grade(r.Grade))
 		if len(r.Findings) == 0 {
 			fmt.Fprintf(w, ", no findings\n")
 			continue
@@ -125,12 +188,12 @@ func RenderText(w io.Writer, reports []PackageReport) {
 		for _, f := range r.Findings {
 			if f.Line == 0 {
 				// Package-archive findings locate a member, not a line.
-				fmt.Fprintf(w, "  %s: %s [%s] %s\n",
-					sanitize(f.Path), f.Severity, f.RuleID, sanitize(f.Message))
+				fmt.Fprintf(w, "  %s: %s %s %s\n",
+					sanitize(f.Path), s.severity(f.Severity), s.wrap(ansiDim, "["+f.RuleID+"]"), sanitize(f.Message))
 				continue
 			}
-			fmt.Fprintf(w, "  %s:%d:%d: %s [%s] %s\n",
-				sanitize(f.Path), f.Line, f.Col, f.Severity, f.RuleID, sanitize(f.Message))
+			fmt.Fprintf(w, "  %s:%d:%d: %s %s %s\n",
+				sanitize(f.Path), f.Line, f.Col, s.severity(f.Severity), s.wrap(ansiDim, "["+f.RuleID+"]"), sanitize(f.Message))
 		}
 	}
 }

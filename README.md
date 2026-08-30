@@ -55,6 +55,7 @@ pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
   --format text|json|sarif     # output format (sarif = SARIF 2.1.0, for code scanning)
   --fail-on SEVERITY           # exit 1 at or above: info, warn, error (default), critical, never
   --ignore PB105,PB206         # disable rules
+  --color auto|always|never    # colorize text output (auto = only on a terminal; honors NO_COLOR)
   --rules                      # list every rule with its documentation
   --fix                        # apply safe auto-fixes in place
   --unsafe-fix                 # also apply behavior-changing fixes (implies --fix)

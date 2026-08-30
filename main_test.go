@@ -49,6 +49,75 @@ func TestGolden(t *testing.T) {
 	}
 }
 
+// TestColorFlag covers the CLI wiring: always forces SGR codes into a
+// non-terminal writer, the auto default keeps them out of one (which is what
+// keeps the golden files stable), and an unknown mode is a usage error.
+func TestColorFlag(t *testing.T) {
+	var buf bytes.Buffer
+	if code := run([]string{"--fail-on=never", "--color=always", "testdata/malicious"}, &buf); code != 0 {
+		t.Fatalf("--color=always: got exit %d, want 0\n%s", code, buf.String())
+	}
+	if !strings.Contains(buf.String(), "\x1b[") {
+		t.Errorf("--color=always output has no escape codes:\n%q", buf.String())
+	}
+
+	buf.Reset()
+	run([]string{"--fail-on=never", "testdata/malicious"}, &buf)
+	if strings.Contains(buf.String(), "\x1b[") {
+		t.Errorf("default auto mode colored a non-terminal writer:\n%q", buf.String())
+	}
+
+	buf.Reset()
+	if code := run([]string{"--color=banana", "testdata/clean"}, &buf); code != 2 {
+		t.Errorf("--color=banana: got exit %d, want 2", code)
+	}
+}
+
+func TestColorEnabled(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("TERM", "xterm")
+
+	if on, err := colorEnabled("always", &bytes.Buffer{}); err != nil || !on {
+		t.Errorf("always = (%v, %v), want (true, nil)", on, err)
+	}
+	if on, err := colorEnabled("never", &bytes.Buffer{}); err != nil || on {
+		t.Errorf("never = (%v, %v), want (false, nil)", on, err)
+	}
+	if _, err := colorEnabled("banana", &bytes.Buffer{}); err == nil {
+		t.Error("unknown mode should error")
+	}
+
+	// auto: a non-file writer and a regular file are both non-terminals.
+	if on, _ := colorEnabled("auto", &bytes.Buffer{}); on {
+		t.Error("auto colored a non-file writer")
+	}
+	f, err := os.CreateTemp(t.TempDir(), "out")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if on, _ := colorEnabled("auto", f); on {
+		t.Error("auto colored a regular file")
+	}
+
+	// NO_COLOR and TERM=dumb suppress auto (checked before any tty probe,
+	// so the writer's type doesn't matter here).
+	t.Setenv("NO_COLOR", "1")
+	if on, _ := colorEnabled("auto", os.Stdout); on {
+		t.Error("auto ignored NO_COLOR")
+	}
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("TERM", "dumb")
+	if on, _ := colorEnabled("auto", os.Stdout); on {
+		t.Error("auto ignored TERM=dumb")
+	}
+	// An explicit always overrides NO_COLOR (the convention allows it).
+	t.Setenv("NO_COLOR", "1")
+	if on, _ := colorEnabled("always", os.Stdout); !on {
+		t.Error("always should override NO_COLOR")
+	}
+}
+
 func TestExitCodes(t *testing.T) {
 	var buf bytes.Buffer
 	if code := run([]string{"--fail-on=critical", "testdata/malicious"}, &buf); code != 1 {

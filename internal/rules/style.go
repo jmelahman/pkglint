@@ -20,7 +20,9 @@ var styleRules = []Rule{
 		Doc: "Hardcoding an architecture name (x86_64, aarch64, …) in sources, flags or paths " +
 			"ties the PKGBUILD to one machine type; $CARCH expands to the architecture being built " +
 			"for. Assignments to arch=() and to already arch-suffixed fields (source_x86_64=…) are " +
-			"exempt — those are the places an explicit architecture belongs.",
+			"exempt — those are the places an explicit architecture belongs — as are constructs " +
+			"that dispatch on $CARCH and names of foreign cross-compilation targets " +
+			"(x86_64-w64-mingw32, arm-none-eabi-gcc), which are not the host at all.",
 		Check: checkSpecificHostArch,
 	},
 	{
@@ -570,13 +572,37 @@ var styleRules = []Rule{
 
 // --- PB901: hardcoded host architecture ------------------------------------
 
-var hostArchRe = regexp.MustCompile(
-	`\b(i386|i486|i586|i686|x86_64|aarch64|armv6h|armv7h|arm|ppc|riscv64|loong64)\b`)
+// hostArchRe matches the architecture names makepkg can actually set $CARCH
+// to. i386/i486/i586/ppc are deliberately absent: Arch and Arch Linux ARM never
+// use them, so a literal `i386` is a foreign platform name and "use $CARCH" is
+// never the fix for it.
+var hostArchRe = regexp.MustCompile(`\b` + hostArchAlt + `\b`)
+
+// foreignTokenRe matches an architecture name that is part of a longer
+// cross-compilation target triple or a foreign platform identifier —
+// `x86_64-w64-mingw32`, `arm-none-eabi-gcc`, `/usr/lib/x86_64-linux-gnu`,
+// `android-aarch64-qt6-base`. Those name a target the build produces or
+// consumes, not the machine it runs on; substituting $CARCH would break the
+// build outright.
+//
+// The suffixes are anchored directly to the architecture name so that a full
+// native triple is still reported: `x86_64-pc-linux-gnu` and
+// `x86_64-unknown-linux-gnu` name the host and do want $CARCH, while Debian's
+// two-component multiarch directory `x86_64-linux-gnu` does not.
+var foreignTokenRe = regexp.MustCompile(
+	`(?:^|[^a-zA-Z0-9_])(?:android|macos|mac|gcc)-` + hostArchAlt +
+		`|` + hostArchAlt + `-(?:w64-mingw32|none-eabi|esp-elf|elf-|linux-gnu\b` +
+		`|linux-gnueabi|linux-android|apple-darwin|pc-windows|softmmu|unknown-none)`)
+
+// hostArchAlt is the bare alternation of architecture names shared by
+// hostArchRe and foreignTokenRe.
+const hostArchAlt = `(?:i686|x86_64|aarch64|armv6h|armv7h|arm|riscv64|loong64)`
 
 // checkSpecificHostArch mirrors namcap's carch rule on the AST: any literal
 // mentioning a concrete architecture is flagged unless it is (part of) an
-// arch=() assignment, an assignment to an arch-suffixed field, or on a line
-// that also expands $CARCH (the idiom the rule is nudging toward).
+// arch=() assignment, an assignment to an arch-suffixed field, part of a
+// foreign target triple, or inside a construct that already dispatches on
+// $CARCH (the idiom the rule is nudging toward).
 func checkSpecificHostArch(ctx *Context) []Finding {
 	u := ctx.Pkg.PKGBUILD
 
@@ -587,17 +613,41 @@ func checkSpecificHostArch(ctx *Context) []Finding {
 			skip[l] = true
 		}
 	}
-	for name, v := range ctx.Pkg.Vars {
-		if v.Assign == nil {
-			continue
-		}
-		if strings.HasSuffix(name, "arch") || archSuffixed(name) {
-			markSpan(v.Assign.Pos(), v.Assign.End())
-		}
-	}
+	// Walk for arch=() rather than reading ctx.Pkg.Vars: Vars holds only the
+	// last top-level assignment of a name, so an arch=() inside a package_*()
+	// split function — or an earlier one shadowed by a later assignment — would
+	// otherwise be flagged for declaring exactly what it is meant to declare.
 	syntax.Walk(u.File, func(node syntax.Node) bool {
-		if pe, ok := node.(*syntax.ParamExp); ok && pe.Param != nil && pe.Param.Value == "CARCH" {
-			skip[pe.Pos().Line()] = true
+		if as, ok := node.(*syntax.Assign); ok && as.Name != nil {
+			if strings.HasSuffix(as.Name.Value, "arch") || archSuffixed(as.Name.Value) {
+				markSpan(as.Pos(), as.End())
+			}
+		}
+		return true
+	})
+	// $CARCH anywhere on a line exempts that line, and a `case $CARCH`/`if
+	// [[ $CARCH == … ]]` exempts its whole body: the per-architecture literals
+	// inside such a construct *are* the portable idiom, and they necessarily
+	// sit on lines below the one naming $CARCH.
+	syntax.Walk(u.File, func(node syntax.Node) bool {
+		switch x := node.(type) {
+		case *syntax.ParamExp:
+			if x.Param != nil && x.Param.Value == "CARCH" {
+				skip[x.Pos().Line()] = true
+			}
+		case *syntax.CaseClause:
+			// x.Word is nil-checked here: an interface holding a typed nil
+			// would slip past a nil check inside dispatchesOnArch.
+			if x.Word != nil && dispatchesOnArch(x.Word) {
+				markSpan(x.Pos(), x.End())
+			}
+		case *syntax.IfClause:
+			for _, st := range x.Cond {
+				if dispatchesOnArch(st) {
+					markSpan(x.Pos(), x.End())
+					break
+				}
+			}
 		}
 		return true
 	})
@@ -610,7 +660,7 @@ func checkSpecificHostArch(ctx *Context) []Finding {
 	seen := map[key]bool{}
 	report := func(val string, pos syntax.Pos) {
 		m := hostArchRe.FindString(val)
-		if m == "" || skip[pos.Line()] {
+		if m == "" || skip[pos.Line()] || foreignTokenRe.MatchString(val) {
 			return
 		}
 		if seen[key{pos.Line(), m}] {
@@ -632,10 +682,31 @@ func checkSpecificHostArch(ctx *Context) []Finding {
 	return out
 }
 
+// dispatchesOnArch reports whether n selects on the architecture being built
+// for — `case "$CARCH"`, `if [[ $CARCH == … ]]`, `case $(uname -m)`. The
+// per-architecture literals in such a construct are the portable idiom, not a
+// hardcoded host.
+func dispatchesOnArch(n syntax.Node) bool {
+	found := false
+	syntax.Walk(n, func(node syntax.Node) bool {
+		switch x := node.(type) {
+		case *syntax.ParamExp:
+			if x.Param != nil && x.Param.Value == "CARCH" {
+				found = true
+			}
+		case *syntax.Lit:
+			if x.Value == "uname" {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
+}
+
 // hostArchNames are the architectures hostArchRe recognizes, for suffix tests.
 var hostArchNames = []string{
-	"i386", "i486", "i586", "i686", "x86_64", "aarch64", "armv6h", "armv7h", "arm",
-	"ppc", "riscv64", "loong64",
+	"i686", "x86_64", "aarch64", "armv6h", "armv7h", "arm", "riscv64", "loong64",
 }
 
 // archSuffixed reports whether name is a schema field suffixed with an

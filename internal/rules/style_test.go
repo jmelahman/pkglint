@@ -39,6 +39,32 @@ func TestSpecificHostArch(t *testing.T) {
 			`sha256sums_x86_64=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')` + "\n", 0},
 		{"same arch twice on a line reports once", "build() {\n  cp x86_64/demo out/x86_64/demo\n}\n", 1},
 		{"comments are not flagged", "# works only on x86_64 for now\n", 0},
+
+		// A $CARCH dispatch is the portable idiom; its per-architecture arms
+		// necessarily sit below the line naming $CARCH.
+		{"case arms under $CARCH are exempt", "build() {\n  case \"$CARCH\" in\n" +
+			"    x86_64)  _target=amd64 ;;\n    aarch64) _target=arm64 ;;\n  esac\n}\n", 0},
+		{"if branches testing $CARCH are exempt", "build() {\n  if [[ $CARCH == x86_64 ]]; then\n" +
+			"    _target=amd64\n  else\n    _target=arm64\n  fi\n}\n", 0},
+		{"case arms under uname -m are exempt", "build() {\n  case $(uname -m) in\n" +
+			"    x86_64) _target=amd64 ;;\n  esac\n}\n", 0},
+		{"a case on something else still reports", "build() {\n  case \"$_flavor\" in\n" +
+			"    full) _target=x86_64 ;;\n  esac\n}\n", 1},
+
+		// Foreign cross-compilation targets are not the host.
+		{"mingw target triple is exempt", `_architectures='i686-w64-mingw32 x86_64-w64-mingw32'` + "\n", 0},
+		{"bare-metal target triple is exempt", "makedepends=('arm-none-eabi-gcc')\n", 0},
+		{"debian multiarch path is exempt", "build() {\n  cp /usr/lib/x86_64-linux-gnu/libdemo.so .\n}\n", 0},
+		{"android cross package is exempt", "depends=('android-aarch64-qt6-base')\n", 0},
+
+		// Names Arch never sets $CARCH to.
+		{"i386 is not an Arch architecture", "build() {\n  make demo-i386\n}\n", 0},
+		{"ppc is not an Arch architecture", "build() {\n  make demo-ppc\n}\n", 0},
+
+		// arch=() belongs wherever it is written, not just at top level.
+		{"arch=() in a split package function is exempt",
+			"package_demo() {\n  arch=('x86_64' 'aarch64')\n  install -Dm755 demo \"$pkgdir/usr/bin/demo\"\n}\n", 0},
+		{"arch=() shadowed by a later arch=() is exempt", "arch=('aarch64')\n", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := styleLint(t, tc.snippet)["PB901"]; got != tc.want {

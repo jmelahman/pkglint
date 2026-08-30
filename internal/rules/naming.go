@@ -66,6 +66,11 @@ func checkDkmsDepends(ctx *Context) []Finding {
 	if !nameSuffixed(ctx, "-dkms") || hasDep(ctx, "depends", "dkms") {
 		return nil
 	}
+	// Split PKGBUILDs (zfs-dkms) declare the -dkms split's depends inside its
+	// package_*() function, beyond static reading.
+	if fieldSetInPackageFns(ctx, "depends") {
+		return nil
+	}
 	return []Finding{varFinding(ctx, "PB973", Warn, []string{"depends", "pkgname"},
 		"a -dkms package ships module sources that only dkms can build and install; it must depend on dkms")}
 }

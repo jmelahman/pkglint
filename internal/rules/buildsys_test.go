@@ -36,6 +36,25 @@ build() {
   cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/opt/demo
 }`)})
 	})
+	t.Run("PB950 typed define spelling counts", func(t *testing.T) {
+		expectNoRule(t, "PB950", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('cmake')
+build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX:PATH=/usr
+}`)})
+	})
+	t.Run("PB950 a splatted flag array may carry the prefix", func(t *testing.T) {
+		// The octopi shape: the flags live in a local array.
+		expectNoRule(t, "PB950", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('cmake')
+build() {
+  local _cmake_args=(
+    -DCMAKE_INSTALL_PREFIX=/usr
+    -DCMAKE_BUILD_TYPE=None
+  )
+  cmake -B build -S . "${_cmake_args[@]}"
+}`)})
+	})
 	t.Run("PB950 a bundled-deps configure beside a prefixed one is fine", func(t *testing.T) {
 		// The neovim shape: cmake.deps installs nothing, the real tree sets
 		// the prefix.
@@ -54,6 +73,13 @@ build() {
 makedepends=('cmake')
 build() {
   cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+}`)})
+	})
+	t.Run("PB951 typed Release spelling counts", func(t *testing.T) {
+		expectRule(t, "PB951", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('cmake')
+build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE:STRING=Release
 }`)})
 	})
 	t.Run("PB951 None is the guideline", func(t *testing.T) {

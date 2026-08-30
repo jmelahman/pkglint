@@ -31,6 +31,17 @@ func vcsPinnedFragment(e pkgbuild.SourceEntry) string {
 	return ""
 }
 
+// vcsPinned additionally treats a source containing an opaque expansion as
+// possibly pinned: octopi's `${_commit:+#commit=$_commit}` renders to the
+// unresolvable-marker NUL, hiding a pin only bash can see. Claiming such a
+// source follows tip would be a guess.
+func vcsPinned(e pkgbuild.SourceEntry) bool {
+	if vcsPinnedFragment(e) != "" {
+		return true
+	}
+	return strings.ContainsRune(e.Raw, 0) || strings.ContainsRune(e.Expanded, 0)
+}
+
 // --- PB960: VCS source with no pkgver() --------------------------------------
 
 func checkVCSPkgverFn(ctx *Context) []Finding {
@@ -40,8 +51,16 @@ func checkVCSPkgverFn(ctx *Context) []Finding {
 	if ctx.localFuncs[ctx.Pkg.PKGBUILD.Path+"\x00"+"pkgver"] {
 		return nil
 	}
+	// A pinned VCS source anywhere means versions advance by bumping the pin
+	// (megasync's #tag=v$pkgver); an unpinned *helper* checkout beside it is
+	// unreviewed drift, which is PB103's finding, not a versioning one.
 	for _, e := range ctx.Pkg.Sources() {
-		if e.VCS == "" || vcsPinnedFragment(e) != "" {
+		if e.VCS != "" && vcsPinned(e) {
+			return nil
+		}
+	}
+	for _, e := range ctx.Pkg.Sources() {
+		if e.VCS == "" {
 			continue
 		}
 		// One finding per PKGBUILD: one pkgver() covers every source.
@@ -54,6 +73,12 @@ func checkVCSPkgverFn(ctx *Context) []Finding {
 // --- PB961: -git package without provides/conflicts on its counterpart -------
 
 func checkVCSProvidesConflicts(ctx *Context) []Finding {
+	// Split -git packages declare provides/conflicts per package_*()
+	// function, beyond static reading; claiming they are absent would be a
+	// guess against half the data.
+	if fieldSetInPackageFns(ctx, "provides") || fieldSetInPackageFns(ctx, "conflicts") {
+		return nil
+	}
 	provides := depsFor(ctx, "provides")
 	conflicts := depsFor(ctx, "conflicts")
 	var out []Finding

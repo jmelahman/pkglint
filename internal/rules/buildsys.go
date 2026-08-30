@@ -26,19 +26,46 @@ func cmakeConfigures(c Command) bool {
 }
 
 // cmakeDefine returns the value of a -Dname=value cache define, handling the
-// split "-D name=value" spelling too.
+// split "-D name=value" spelling and cmake's typed "-Dname:TYPE=value" form.
 func cmakeDefine(c Command, name string) (string, bool) {
+	tail := func(a, prefix string) (string, bool) {
+		rest, ok := strings.CutPrefix(a, prefix)
+		if !ok {
+			return "", false
+		}
+		if i := strings.IndexByte(rest, '='); i >= 0 && (i == 0 || rest[0] == ':') {
+			return rest[i+1:], true
+		}
+		return "", false
+	}
 	for i, a := range c.Args {
-		if v, ok := strings.CutPrefix(a, "-D"+name+"="); ok {
+		if v, ok := tail(a, "-D"+name); ok {
 			return v, true
 		}
 		if a == "-D" && i+1 < len(c.Args) {
-			if v, ok := strings.CutPrefix(c.Args[i+1], name+"="); ok {
+			if v, ok := tail(c.Args[i+1], name); ok {
 				return v, true
 			}
 		}
 	}
 	return "", false
+}
+
+// hasArraySplat reports whether any argument word expands a whole array
+// ("${_cmake_args[@]}") — the long-invocation idiom whose flags static
+// reading cannot see, so absence claims about them would be guesses.
+func hasArraySplat(c Command) bool {
+	raw := c.Unit.Raw
+	for _, w := range c.Call.Args {
+		start, end := int(w.Pos().Offset()), int(w.End().Offset())
+		if start < 0 || end > len(raw) || start >= end {
+			continue
+		}
+		if strings.Contains(string(raw[start:end]), "[@]") || strings.Contains(string(raw[start:end]), "[*]") {
+			return true
+		}
+	}
+	return false
 }
 
 // mesonNonSetupSubcommands are the meson verbs that are not a project
@@ -104,7 +131,9 @@ func checkCMakePrefix(ctx *Context) []Finding {
 		// self-contained trees) — and one that covers the whole PKGBUILD: a
 		// second configure without it builds bundled deps or a test tree that
 		// installs nothing (neovim's cmake.deps), not the shipped artifacts.
-		if _, ok := cmakeDefine(c, "CMAKE_INSTALL_PREFIX"); ok {
+		// A splatted flag array may carry the prefix invisibly, so it stands
+		// the whole rule down too.
+		if _, ok := cmakeDefine(c, "CMAKE_INSTALL_PREFIX"); ok || hasArraySplat(c) {
 			return nil
 		}
 		configures = append(configures, c)
@@ -169,7 +198,7 @@ func checkMesonMakedepends(ctx *Context) []Finding {
 func checkMesonPrefix(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range buildToolCommands(ctx, "meson") {
-		if !mesonConfigures(c) || mesonSetsPrefix(c) {
+		if !mesonConfigures(c) || mesonSetsPrefix(c) || hasArraySplat(c) {
 			continue
 		}
 		out = append(out, c.finding("PB953", Warn,

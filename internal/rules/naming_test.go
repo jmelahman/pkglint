@@ -55,6 +55,14 @@ func TestDkmsRules(t *testing.T) {
 	t.Run("PB973 dkms declared", func(t *testing.T) {
 		expectNoRule(t, "PB973", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("demo-dkms", "'x86_64'", "depends=('dkms')\n"), "")})
 	})
+	t.Run("PB973 depends declared inside a package function stands down", func(t *testing.T) {
+		// The zfs-dkms shape: the split's depends live in package_*().
+		expectNoRule(t, "PB973", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("demo-dkms", "'x86_64'", ""), `
+package_demo-dkms() {
+  depends=('dkms')
+  install -Dm644 dkms.conf "$pkgdir/usr/src/demo-1.0.0/dkms.conf"
+}`)})
+	})
 	t.Run("PB974 kernel headers pinned", func(t *testing.T) {
 		expectRule(t, "PB974", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("demo-dkms", "'x86_64'", "depends=('dkms' 'linux-headers')\n"), "")})
 		expectRule(t, "PB974", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("demo-dkms", "'x86_64'", "depends=('dkms' 'linux-lts-headers')\n"), "")})

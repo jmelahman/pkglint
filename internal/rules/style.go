@@ -136,6 +136,55 @@ var styleRules = []Rule{
 		FixLevel: FixSafe,
 		Fix:      fixStaleIgnores,
 	},
+	{
+		ID:       "PB914",
+		Name:     "go-no-pie",
+		Severity: Warn,
+		Doc: "The Arch Go packaging guidelines build with -buildmode=pie: without it the Go " +
+			"toolchain links a position-dependent executable that ASLR cannot relocate, which " +
+			"PB806 flags on the built package. Set it in GOFLAGS or on the go build command; a " +
+			"PKGBUILD that chooses another -buildmode explicitly is left alone.",
+		Check: checkGoPIE,
+		// Changing the link layout of the shipped binary is behavior a human
+		// should sign off on, like the other build-command rewrites.
+		FixLevel: FixUnsafe,
+		Fix:      fixGoPIE,
+	},
+	{
+		ID:       "PB915",
+		Name:     "go-no-trimpath",
+		Severity: Warn,
+		Doc: "Without -trimpath, go embeds absolute $srcdir paths in the binary, so two builders " +
+			"never produce the same bytes and the package leaks its build layout. The Arch Go " +
+			"packaging guidelines put -trimpath in GOFLAGS on every build.",
+		Check:    checkGoTrimpath,
+		FixLevel: FixUnsafe,
+		Fix:      fixGoTrimpath,
+	},
+	{
+		ID:       "PB916",
+		Name:     "go-readonly-modcache",
+		Severity: Info,
+		Doc: "go writes its module cache read-only, so after a build that fetched modules, " +
+			"cleaning $srcdir (or $GOPATH under it) fails until someone chmods the tree. The Arch " +
+			"Go packaging guidelines pass -modcacherw on every module-aware command to keep the " +
+			"cache removable.",
+		Check: checkGoModcacheRW,
+		// -modcacherw only loosens permissions on cache files; it cannot
+		// change what gets built, so the rewrite is safe.
+		FixLevel: FixSafe,
+		Fix:      fixGoModcacheRW,
+	},
+	{
+		ID:       "PB917",
+		Name:     "go-cgo-flags-dropped",
+		Severity: Info,
+		Doc: "cgo compiles C with CGO_CFLAGS/CGO_LDFLAGS, not the CFLAGS/LDFLAGS makepkg exports, " +
+			"so unless the PKGBUILD forwards them (export CGO_CFLAGS=\"$CFLAGS\", …) Arch's " +
+			"fortify/RELRO hardening never reaches the C parts of a Go build. Pure-Go packages " +
+			"can set CGO_ENABLED=0 instead, which also silences this rule.",
+		Check: checkGoCgoFlags,
+	},
 }
 
 // --- PB901: hardcoded host architecture ------------------------------------

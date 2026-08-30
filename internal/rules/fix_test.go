@@ -88,7 +88,7 @@ build() {
   GOFLAGS=-insecure go build -o demo .
 }`, FixSafe, nil)
 		mustNotContain(t, got, "-insecure")
-		mustContain(t, got, "go build -o demo .")
+		mustContain(t, got, "go build -modcacherw -o demo .") // prefix gone, command kept (PB916 adds its flag)
 	})
 }
 
@@ -295,8 +295,8 @@ build() {
   cd "$pkgname" || exit
   go build -o demo .
 }`, FixUnsafe, nil)
-		mustContain(t, got, "prepare() {\n  cd \"$pkgname\" || exit\n  go mod download\n}\n\nbuild() {")
-		mustContain(t, got, "go build -o demo .") // the build line itself is untouched
+		mustContain(t, got, "prepare() {\n  cd \"$pkgname\" || exit\n  go mod download -modcacherw\n}\n\nbuild() {")
+		mustContain(t, got, "go build -buildmode=pie -trimpath -modcacherw -o demo .") // PB204 adds no -mod flag here
 		relintClean(t, got)
 	})
 	t.Run("a build without a cd gets a bare download", func(t *testing.T) {
@@ -304,7 +304,7 @@ build() {
 build() {
   go build -o demo .
 }`, FixUnsafe, nil)
-		mustContain(t, got, "prepare() {\n  go mod download\n}\n\nbuild() {")
+		mustContain(t, got, "prepare() {\n  go mod download -modcacherw\n}\n\nbuild() {")
 		relintClean(t, got)
 	})
 	t.Run("an existing prepare() is extended, not shadowed", func(t *testing.T) {
@@ -317,7 +317,7 @@ build() {
   cd "$pkgname" || exit
   go build -o demo .
 }`, FixUnsafe, nil)
-		mustContain(t, got, "patch -p1 < ../fix.patch\n  go mod download\n}")
+		mustContain(t, got, "patch -p1 < ../fix.patch\n  go mod download -modcacherw\n}")
 		mustNotContain(t, got, "prepare() {\n  go mod download") // no second prepare
 		relintClean(t, got)
 	})
@@ -330,17 +330,15 @@ build() {
   cd "$pkgname" || exit
   go build -o demo .
 }`, FixUnsafe, nil)
-		mustContain(t, got, "patch -p1 < ../fix.patch\n  cd \"$pkgname\" || exit\n  go mod download\n}")
+		mustContain(t, got, "patch -p1 < ../fix.patch\n  cd \"$pkgname\" || exit\n  go mod download -modcacherw\n}")
 		relintClean(t, got)
 	})
 	t.Run("a vendored build needs no edit", func(t *testing.T) {
-		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+		got := fixPKGBUILD(t, `
 build() {
   go build -mod=vendor -o demo .
-}`)}, FixUnsafe, nil)
-		if out, ok := got["PKGBUILD"]; ok {
-			t.Errorf("vendored build should need no edit, got:\n%s", out)
-		}
+}`, FixUnsafe, nil)
+		mustNotContain(t, got, "go mod download") // vendored: PB204 stays out
 	})
 	t.Run("a cd sharing its line with another command is not copied", func(t *testing.T) {
 		got := fixPKGBUILD(t, `
@@ -348,7 +346,7 @@ build() {
   cd "$pkgname" && make generate
   go build -o demo .
 }`, FixUnsafe, nil)
-		mustContain(t, got, "prepare() {\n  go mod download\n}")
+		mustContain(t, got, "prepare() {\n  go mod download -modcacherw\n}")
 		mustNotContain(t, got, "make generate\n  go mod download")
 		relintClean(t, got)
 	})
@@ -504,14 +502,16 @@ sha512sums[6]='SKIP'
 	})
 }
 
-// Unsafe fixes must not run under the safe level.
+// Unsafe fixes must not run under the safe level. (The safe PB916 fix may
+// still touch the same line, so the assertion is about PB204's edit, not
+// about the file being untouched.)
 func TestFixLevelGating(t *testing.T) {
 	body := `
 build() {
   go build -o demo .
 }`
-	if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
-		t.Errorf("FixSafe should not apply the unsafe PB204 fix, got:\n%s", got["PKGBUILD"])
+	if got := fixPKGBUILD(t, body, FixSafe, nil); strings.Contains(got, "go mod download") {
+		t.Errorf("FixSafe should not apply the unsafe PB204 fix, got:\n%s", got)
 	}
 	if got := fixPKGBUILD(t, body, FixUnsafe, nil); !strings.Contains(got, "go mod download") {
 		t.Errorf("FixUnsafe should apply PB204, got:\n%s", got)

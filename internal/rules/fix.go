@@ -412,11 +412,19 @@ func fixGoDownloads(ctx *Context, _ *FixEnv) []Edit {
 
 // goModDownloadEdit inserts `go mod download` into prepare() — extending the
 // function if the PKGBUILD has one, writing a fresh one directly above c's
-// function otherwise.
+// function otherwise. The download gets -modcacherw (unless GOFLAGS already
+// carries it) so the cache the fix creates stays removable, as PB916 asks.
 func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
 	u := c.Unit
 	indent := lineIndent(u.Raw, off(c.Stmt.Pos()))
 	line := int(c.Stmt.Pos().Line())
+	download := "go mod download -modcacherw\n"
+	for _, v := range assignmentsTo(ctx, "GOFLAGS") {
+		if strings.Contains(v, "-modcacherw") {
+			download = "go mod download\n"
+			break
+		}
+	}
 
 	if fd := u.Functions["prepare"]; fd != nil {
 		block, ok := fd.Body.Cmd.(*syntax.Block)
@@ -433,7 +441,7 @@ func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
 		if !fnHasCommand(ctx, u, "prepare", "cd") {
 			b.WriteString(cdLine(ctx, u, c.Fn))
 		}
-		b.WriteString(indent + "go mod download\n")
+		b.WriteString(indent + download)
 		return Edit{
 			Path: u.Path, Start: at, End: at, New: b.String(), Line: line,
 			Desc: "add `go mod download` to prepare() so the build needn't fetch",
@@ -448,7 +456,7 @@ func goModDownloadEdit(ctx *Context, c Command) (Edit, bool) {
 	var b strings.Builder
 	b.WriteString("prepare() {\n")
 	b.WriteString(cdLine(ctx, u, c.Fn))
-	b.WriteString(indent + "go mod download\n")
+	b.WriteString(indent + download)
 	b.WriteString("}\n\n")
 	return Edit{
 		Path: u.Path, Start: at, End: at, New: b.String(), Line: line,
@@ -508,6 +516,64 @@ func lineIndent(raw []byte, o int) string {
 		end++
 	}
 	return string(raw[start:end])
+}
+
+// --- PB914/PB915/PB916: Arch Go guideline build flags ------------------------
+
+// goFlagInsertion returns the offset just after the go subcommand's verb word
+// ("build", "install", or the verb after "mod"), where an inserted flag is
+// still parsed as a flag: go's flag parsing stops at the first non-flag
+// argument, so appending at the end of the call — what the cargo fix does —
+// would hand the flag to the package loader instead.
+func goFlagInsertion(c Command) (int, bool) {
+	verb := c.Subcommand()
+	if verb == "mod" {
+		if verb = secondSubcommand(c); verb == "" {
+			return 0, false
+		}
+	}
+	w := wordByValue(c, verb)
+	if w == nil {
+		return 0, false
+	}
+	return off(w.End()), true
+}
+
+// goFlagEdits inserts flag into every command in cmds that neither passes it
+// nor inherits it from a GOFLAGS assignment.
+func goFlagEdits(ctx *Context, cmds []Command, flagPrefix, flag string) []Edit {
+	goflags := assignmentsTo(ctx, "GOFLAGS")
+	var edits []Edit
+	for _, c := range cmds {
+		if goFlagAddressed(goflags, c, flagPrefix) {
+			continue
+		}
+		at, ok := goFlagInsertion(c)
+		if !ok {
+			continue
+		}
+		edits = append(edits, Edit{
+			Path:  c.Unit.Path,
+			Start: at,
+			End:   at,
+			New:   " " + flag,
+			Line:  int(c.Stmt.Pos().Line()),
+			Desc:  fmt.Sprintf("insert %s into `go %s`", flag, c.Subcommand()),
+		})
+	}
+	return edits
+}
+
+func fixGoPIE(ctx *Context, _ *FixEnv) []Edit {
+	return goFlagEdits(ctx, goBuildCommands(ctx), "-buildmode", "-buildmode=pie")
+}
+
+func fixGoTrimpath(ctx *Context, _ *FixEnv) []Edit {
+	return goFlagEdits(ctx, goBuildCommands(ctx), "-trimpath", "-trimpath")
+}
+
+func fixGoModcacheRW(ctx *Context, _ *FixEnv) []Edit {
+	return goFlagEdits(ctx, goModuleCommands(ctx), "-modcacherw", "-modcacherw")
 }
 
 // --- PB205: re-enable Go module verification -------------------------------

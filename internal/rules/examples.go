@@ -472,6 +472,42 @@ optdepends=('ffmpeg: video export')   # already a hard dependency`,
   cargo build --locked --release
 }`,
 	},
+	"PB914": {
+		Bad: `build() {
+  go build -o demo .
+}`,
+		Good: `build() {
+  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+  go build -o demo .
+}`,
+	},
+	"PB915": {
+		Bad: `build() {
+  go build -buildmode=pie -o demo .   # $srcdir paths end up inside the binary
+}`,
+		Good: `build() {
+  go build -buildmode=pie -trimpath -o demo .
+}`,
+	},
+	"PB916": {
+		Bad: `prepare() {
+  go mod download
+}`,
+		Good: `prepare() {
+  go mod download -modcacherw
+}`,
+	},
+	"PB917": {
+		Bad: `build() {
+  export GOFLAGS="-buildmode=pie -trimpath -modcacherw"
+  go build -o demo .
+}`,
+		Good: `build() {
+  export CGO_CFLAGS="$CFLAGS" CGO_LDFLAGS="$LDFLAGS"
+  export GOFLAGS="-buildmode=pie -trimpath -modcacherw"
+  go build -o demo .
+}`,
+	},
 
 	// PB8xx examples illustrate what in the PKGBUILD produced the offending
 	// package contents; the rules themselves run on built .pkg.tar.* archives,

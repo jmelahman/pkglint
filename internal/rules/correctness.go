@@ -200,24 +200,37 @@ type varElem struct {
 
 // varElems yields the elements of v: each array element, or the single scalar
 // value. Returns nil for empty assignments.
+//
+// The values come from v.Values rather than v.Assign, which is only the *first*
+// assignment: bash keeps appending, so `arch=(); arch+=('x86_64')` is a
+// one-element array and reading the literal alone would call it empty. Values a
+// later assignment or an indexed write contributed have no source text of their
+// own and carry a nil Word with the array's position; callers that rewrite text
+// must skip those, and every caller here reports rather than rewrites.
+//
+// Array elements are brace-expanded, because that is what makepkg's bash does
+// before any rule gets to see them: `pkgname=({,python-}open3d)` really is two
+// packages, and `sha256sums=(SKIP{,,,})` really is four checksums. An element
+// that expands to several values yields one varElem per value, all sharing the
+// written element's Word and Pos — so callers that edit source text must
+// deduplicate by Word. Scalar assignments are left alone: bash does not
+// brace-expand those.
 func varElems(v *pkgbuild.Var) []varElem {
-	if v == nil || v.Assign == nil {
+	if v == nil {
 		return nil
 	}
-	as := v.Assign
-	if as.Array != nil {
-		out := make([]varElem, 0, len(as.Array.Elems))
-		for _, el := range as.Array.Elems {
-			s, _ := pkgbuild.RenderWord(el.Value, nil)
-			out = append(out, varElem{Value: s, Word: el.Value, Pos: el.Value.Pos()})
+	out := make([]varElem, 0, len(v.Values))
+	for i, s := range v.Values {
+		word, pos := v.ElemWord(i)
+		if !v.Array {
+			out = append(out, varElem{Value: s, Word: word, Pos: pos})
+			continue
 		}
-		return out
+		for _, exp := range pkgbuild.ExpandBraces(s) {
+			out = append(out, varElem{Value: exp, Word: word, Pos: pos})
+		}
 	}
-	if as.Value != nil {
-		s, _ := pkgbuild.RenderWord(as.Value, nil)
-		return []varElem{{Value: s, Word: as.Value, Pos: as.Value.Pos()}}
-	}
-	return nil
+	return out
 }
 
 // --- PB701: pkgname / pkgbase characters -----------------------------------
@@ -366,9 +379,19 @@ func fixBackupSlash(ctx *Context, _ *FixEnv) []Edit {
 	raw := ctx.Pkg.PKGBUILD.Raw
 	path := ctx.Pkg.PKGBUILD.Path
 	var edits []Edit
+	// A brace group yields one varElem per expansion sharing a single Word, and
+	// the edit below is computed from that Word's text — so emit at most one
+	// edit per written element or the same byte range would be patched twice.
+	patched := map[*syntax.Word]bool{}
 	for _, e := range varElems(v) {
 		// Only fix var-free literals, so the leading '/' is literally present in Raw.
 		if strings.ContainsRune(e.Value, 0) || strings.Contains(e.Value, "$") || !strings.HasPrefix(e.Value, "/") {
+			continue
+		}
+		// A value merged in from a later `+=` or an indexed write has no word
+		// of its own here, so there is no byte range to rewrite. The finding
+		// still stands; only the fix stands down.
+		if e.Word == nil || patched[e.Word] {
 			continue
 		}
 		start, end := off(e.Word.Pos()), off(e.Word.End())
@@ -384,6 +407,7 @@ func fixBackupSlash(ctx *Context, _ *FixEnv) []Edit {
 		for j < len(sub) && sub[j] == '/' {
 			j++
 		}
+		patched[e.Word] = true
 		edits = append(edits, Edit{
 			Path: path, Start: start + i, End: start + j, New: "",
 			Line: int(e.Pos.Line()),
@@ -406,7 +430,12 @@ func checkUnknownOptions(ctx *Context) []Finding {
 		if !ok || val == "" {
 			continue
 		}
-		if !validOptions[strings.TrimPrefix(val, "!")] {
+		// `\!strip` is a common way to write the negation, and outside an
+		// interactive shell the backslash is dropped: bash has no history
+		// expansion to escape there, so `\!` is just `!` by the time makepkg
+		// reads the array.
+		name := strings.TrimPrefix(strings.TrimPrefix(val, `\`), "!")
+		if !validOptions[name] {
 			out = append(out, findingAt("PB706", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
 				"options array contains unknown option %q", val))
 		}
@@ -567,6 +596,12 @@ func checkArch(ctx *Context) []Finding {
 	path := ctx.Pkg.PKGBUILD.Path
 	v := ctx.Pkg.Vars["arch"]
 	if v == nil {
+		// `if [[ $CARCH == x86_64 ]]; then arch=('x86_64'); else arch=('any'); fi`
+		// sets arch as far as makepkg is concerned; the parser just cannot say
+		// to what. Reporting it unset would be wrong in every branch.
+		if ctx.Pkg.ConditionalVars["arch"] {
+			return nil
+		}
 		return []Finding{{RuleID: "PB710", Severity: Error, Path: path, Line: 1, Col: 1,
 			Message: "arch is not set; makepkg requires it (e.g. arch=('x86_64') or arch=('any'))"}}
 	}
@@ -590,7 +625,9 @@ func checkArch(ctx *Context) []Finding {
 			out = append(out, findingAt("PB710", Error, path, e.Pos, "arch value %q contains invalid characters", val))
 		}
 	}
-	if len(elems) == 0 {
+	// An `arch=()` a top-level conditional later appends to is only empty in
+	// the text; CountUnknown is how the parser says it could not follow.
+	if len(elems) == 0 && !v.CountUnknown {
 		out = append(out, findingAt("PB710", Error, path, v.Pos, "arch is not allowed to be empty"))
 	}
 	if anyCount > 0 && len(elems) > 1 {

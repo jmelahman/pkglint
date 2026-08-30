@@ -127,6 +127,22 @@ sha256sums=('SKIP')
 		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
 		mustContain(t, got, "#commit=0123456789abcdef0123456789abcdef01234567")
 	})
+	t.Run("a brace group sharing one fragment is not rewritten", func(t *testing.T) {
+		// Two repositories, one written #tag: resolving either URL's ref and
+		// editing the shared text would pin both to the same commit.
+		vcs := `pkgname=demo
+pkgver=1
+pkgrel=1
+arch=('x86_64')
+url='https://example.com'
+source=("git+https://example.com/{demo,extra}.git#tag=v1")
+sha256sums=('SKIP' 'SKIP')
+`
+		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		if _, ok := got["PKGBUILD"]; ok {
+			t.Errorf("a shared fragment should not be rewritten, got:\n%s", got["PKGBUILD"])
+		}
+	})
 	t.Run("signed tag is not rewritten", func(t *testing.T) {
 		signed := strings.Replace(body,
 			`source=("git+https://example.com/demo.git#tag=v1")`,

@@ -453,6 +453,9 @@ func checkMissingMetadata(ctx *Context) []Finding {
 		if fieldSetInPackageFns(ctx, field) {
 			continue // split packages may declare it per package function
 		}
+		if ctx.Pkg.ConditionalVars[field] {
+			continue // set by a top-level branch the parser cannot resolve
+		}
 		out = append(out, Finding{RuleID: "PB910", Severity: Warn, Path: ctx.Pkg.PKGBUILD.Path,
 			Line: 1, Col: 1,
 			Message: field + " is not set; Arch packaging standards require it on every package"})

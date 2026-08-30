@@ -208,6 +208,13 @@ func TestMissingMetadata(t *testing.T) {
 	if got := styleLint(t, "pkgdesc=''\n")["PB910"]; got != 1 {
 		t.Errorf("got %d PB910 findings for an empty pkgdesc, want 1", got)
 	}
+	// makepkg sources the file top to bottom before reading any metadata, so a
+	// field set in a top-level branch is set — the parser just cannot say to
+	// what, since which branch runs depends on the build host.
+	condURL := noURL + "if [[ $CARCH == x86_64 ]]; then\n  url='https://example.com/x86'\nelse\n  url='https://example.com'\nfi\n"
+	if got := ruleIDs(lint(t, map[string]string{"PKGBUILD": condURL}))["PB910"]; got != 0 {
+		t.Errorf("got %d PB910 findings when a top-level conditional sets url, want 0", got)
+	}
 }
 
 func TestNonUniqueSourceName(t *testing.T) {

@@ -154,6 +154,36 @@ func TestFindingJSONRoundTrip(t *testing.T) {
 	})
 }
 
+// The renderer marks anything it cannot resolve with a NUL, which rules test
+// for internally. That sentinel must not survive into a message: a terminal, a
+// JSON report and a SARIF file all render it as garbage, and %q turns it into a
+// literal \x00 that reads like the PKGBUILD contains a corrupt filename.
+func TestFindingMessagesCarryNoSentinel(t *testing.T) {
+	files := map[string]string{
+		"PKGBUILD": pkgbuildWith("", strings.Join([]string{
+			`source=("http://example.com/${pkgver%%.*}/f.tar.gz")`,
+			`sha256sums=('SKIP')`,
+			`package() {`,
+			`  install -Dm644 f.txt "/etc/$(id -un)/f.conf"`,
+			`}`,
+		}, "\n")),
+	}
+	var checked int
+	for _, f := range lint(t, files) {
+		if strings.ContainsAny(f.Message, "\x00") || strings.Contains(f.Message, `\x00`) {
+			t.Errorf("[%s] message leaks the unresolvable sentinel: %q", f.RuleID, f.Message)
+		}
+		if strings.Contains(f.Message, "…") {
+			checked++
+		}
+	}
+	// Guards against the fixture quietly ceasing to produce an unresolvable
+	// word, which would leave the assertion above passing vacuously.
+	if checked == 0 {
+		t.Error("no finding quoted an unresolvable expansion; the fixture no longer exercises the sanitizer")
+	}
+}
+
 // TestEscalatingRulesReachBothEnds pins the rules that report more than one
 // severity. Containment alone cannot catch a range that is too wide: a rule
 // declared warn..critical that in fact only ever reports warn passes every
@@ -168,6 +198,20 @@ func TestEscalatingRulesReachBothEnds(t *testing.T) {
 		"PB108": {
 			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "PACKAGER='Someone <a@b.c>'")},
 			high: map[string]string{"PKGBUILD": pkgbuildWith("", "VCSCLIENTS=('git::/bin/sh')")},
+		},
+		"PB104": {
+			low: map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('http://example.com/demo.tar.gz')
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('http://example.com/demo.tar.gz')
+sha256sums=('SKIP')`, "")},
 		},
 		"PB208": {
 			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  bundle install\n}")},
@@ -456,6 +500,43 @@ source=("${_files[@]/#/$_dlpath/}")
 sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
             'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
 	})
+	t.Run("PB110 counts brace-expanded checksums", func(t *testing.T) {
+		// The shadps4-git shape: one written sums element covering every VCS
+		// source. `SKIP{,,,}` is four checksums to makepkg, not one.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/a.git" "git+https://example.com/b.git"
+        "git+https://example.com/c.git" "git+https://example.com/d.git")
+sha256sums=(SKIP{,,,})`, "")})
+	})
+	t.Run("PB110 brace-expanded checksums still short is flagged", func(t *testing.T) {
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/a.git" "git+https://example.com/b.git"
+        "git+https://example.com/c.git" "git+https://example.com/d.git")
+sha256sums=(SKIP{,})`, "")})
+	})
+	t.Run("PB114 brace-expanded SKIP is not a malformed digest", func(t *testing.T) {
+		expectNoRule(t, "PB114", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("git+https://example.com/a.git" "git+https://example.com/b.git"
+        "git+https://example.com/c.git" "git+https://example.com/d.git")
+sha256sums=(SKIP{,,,})`, "")})
+	})
+	t.Run("PB114 brace expansion still catches a short digest", func(t *testing.T) {
+		expectRule(t, "PB114", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("https://example.com/a.tar.gz" "https://example.com/b.tar.gz")
+sha256sums=(dead{beef,f00d})`, "")})
+	})
 	t.Run("PB110 skips a source array it cannot size", func(t *testing.T) {
 		// _files is only built inside prepare(), so the top-level reference has
 		// no statically known length; a mismatch claim would be a guess.
@@ -465,6 +546,146 @@ pkgrel=1
 url='https://example.com'
 source=("${_files[@]}")
 sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 skips arrays a top-level conditional extends", func(t *testing.T) {
+		// makepkg runs the `if` before it reads the metadata, so the arrays it
+		// sees are three long; only the unconditional halves are visible here.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('https://example.com/a.tar.gz' 'https://example.com/b.tar.gz')
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+if [ "$CARCH" = 'x86_64' ]; then
+  source+=('https://example.com/c.tar.gz')
+  sha256sums+=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+fi`, "")})
+	})
+	t.Run("PB110 still counts when only a function assigns", func(t *testing.T) {
+		// A function body runs long after makepkg has read the metadata, so it
+		// cannot be the reason the counts disagree.
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('https://example.com/a.tar.gz' 'https://example.com/b.tar.gz')
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, `
+prepare() {
+  source+=('https://example.com/c.tar.gz')
+}`)})
+	})
+	t.Run("PB110 empty sums array beside a covering one is fine", func(t *testing.T) {
+		// An empty array retires an algorithm; makepkg only needs one that
+		// matches, and only raises "differ in size" for a non-empty one.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('https://example.com/a.tar.gz')
+md5sums=()
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 empty sums array with nothing covering is flagged", func(t *testing.T) {
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('git+https://example.com/demo.git#tag=v1')
+sha256sums=()`, "")})
+	})
+	t.Run("PB110 skips an array built by an unquoted command substitution", func(t *testing.T) {
+		// bash word-splits what _urls() prints, so that one written element is
+		// however many sources the function emits — three here, not one.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=($(_urls))
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, `
+_urls() {
+  echo https://example.com/a.tar.gz
+  echo https://example.com/b.tar.gz
+  echo https://example.com/c.tar.gz
+}`)})
+	})
+	t.Run("PB110 still counts a quoted command substitution", func(t *testing.T) {
+		// In quotes it cannot split, so it really is the one source it looks like.
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("$(_url)")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 skips an array holding an unquoted glob", func(t *testing.T) {
+		// bash expands *.md against the build directory, so how many sources
+		// that element is depends on what is sitting next to the PKGBUILD.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('https://example.com/a.tar.gz' *.md)
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 still counts an unquoted URL with a query string", func(t *testing.T) {
+		// bash leaves an unmatched glob literal, and a URL can never match a
+		// pathname, so the `?` here is a query string and the count holds.
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=(https://example.com/download.php?file=demo.tar.gz)
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 still counts a quoted asterisk", func(t *testing.T) {
+		// Quoted it is a literal filename, however odd, and pairs one-to-one.
+		expectRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=('https://example.com/a.tar.gz' '*.md')
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB110 counts a source naming a brace-expanded pkgname", func(t *testing.T) {
+		// "$pkgname" is "${pkgname[0]}", and bash brace-expands the assignment
+		// before indexing it: element zero is "demo", not "demo{,-extra}".
+		// Splicing the written form would leave braces for a later pass to
+		// re-expand, turning this one source into two.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgbase=demo
+pkgname=(demo{,-extra})
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("$pkgname-$pkgver-LICENSE.txt::https://example.com/LICENSE")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, `
+package_demo() { :; }
+package_demo-extra() { :; }`)})
+	})
+	t.Run("PB110 skips an array a top-level conditional assigns as a scalar", func(t *testing.T) {
+		// `source="x"` then `source+=(a b c)` is four elements to bash: the
+		// append folds the scalar in as element zero.
+		expectNoRule(t, "PB110", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+if [ -n "$SOMETHING" ]; then
+  source='https://example.com/a.tar.gz'
+else
+  source='https://example.com/b.tar.gz'
+fi
+source+=('local.conf' 'other.conf')
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
             'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
 	})
 
@@ -999,11 +1220,115 @@ package() {
 	t.Run("PB401 install into pkgdir fine", func(t *testing.T) {
 		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": cleanPKGBUILD})
 	})
+	t.Run("PB401 scriptlet writes to the live system fine", func(t *testing.T) {
+		// A scriptlet runs after pacman has unpacked the package; writing to
+		// absolute paths is what it is for. $pkgdir does not even exist there.
+		expectNoRule(t, "PB401", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=demo.install"),
+			"demo.install": `post_install() {
+  cp /usr/share/demo/demo.conf /etc/demo.conf
+  echo restored >>/var/lib/demo/state
+}`,
+		})
+	})
+	t.Run("PB401 scriptlet hook in PKGBUILD is not a build write", func(t *testing.T) {
+		// pacman only calls hooks out of the install= file, so a post_install
+		// defined in the PKGBUILD is dead code — never a build-time write.
+		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+post_install() {
+  cp demo.conf /etc/demo.conf
+}`)})
+	})
+	t.Run("PB401 redirect in a PKGBUILD scriptlet hook is dead code too", func(t *testing.T) {
+		// The redirect walk has to make the same call the command path does.
+		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+post_install() {
+  echo done >/etc/demo.conf
+}`)})
+	})
+	t.Run("PB401 tty and shm writes fine", func(t *testing.T) {
+		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  echo building >/dev/tty
+  make >/dev/shm/demo.log
+}`)})
+	})
+	t.Run("PB401 a path the function restaged is not the live one", func(t *testing.T) {
+		// The dm-fotowelt shape: a top-level install prefix that package()
+		// rebinds under $pkgdir before using it. Rendering the later uses
+		// against the top-level value reports writes to /usr/share that the
+		// build never performs.
+		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_installDir=/usr/share/demo
+package() {
+  _installDir=$pkgdir$_installDir
+  mkdir -p $_installDir
+  rm -rf $_installDir/.log
+}`)})
+	})
+	t.Run("PB401 a redirect through a restaged path is not the live one", func(t *testing.T) {
+		// The same shape through a redirect instead of a command: the target
+		// must render against the function's view, not the file-level value.
+		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_installDir=/usr/share/demo
+package() {
+  _installDir=$pkgdir$_installDir
+  echo installed >"$_installDir/log"
+}`)})
+	})
+	t.Run("PB401 a path an earlier phase restaged is not the live one", func(t *testing.T) {
+		// makepkg runs prepare, build, check and package in one shell, so a
+		// name build() rewrote is still rewritten by the time package() runs.
+		expectNoRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_out=/opt/demo
+build() {
+  _out=$srcdir/out
+}
+package() {
+  mkdir -p $_out
+}`)})
+	})
+	t.Run("PB401 a local in an earlier phase dies with it", func(t *testing.T) {
+		// prepare()'s `local _dir` shadows the file-level value only inside
+		// prepare; by the time package() runs, $_dir is /opt/demo again, and
+		// the write it names is real.
+		expectRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_dir=/opt/demo
+prepare() {
+  local _dir="$srcdir/tmp"
+  mkdir -p "$_dir"
+}
+package() {
+  mkdir -p "$_dir"
+}`)})
+	})
+	t.Run("PB401 a path a later phase rebinds is still checked", func(t *testing.T) {
+		// package() runs last: nothing it does reaches back into build().
+		expectRule(t, "PB401", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_out=/opt/demo
+build() {
+  mkdir -p $_out
+}
+package() {
+  _out=$pkgdir/opt/demo
+  mkdir -p $_out
+}`)})
+	})
 	t.Run("PB402 sudo", func(t *testing.T) {
 		expectRule(t, "PB402", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   sudo make install
 }`)})
+	})
+	t.Run("PB402 sudo in scriptlet fine", func(t *testing.T) {
+		// Scriptlets already run as root, so there is nothing to escalate; the
+		// common use is `sudo -u` dropping *down* to an ordinary user.
+		expectNoRule(t, "PB402", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=demo.install"),
+			"demo.install": `post_install() {
+  sudo -u demo /usr/bin/demo --migrate
+}`,
+		})
 	})
 	t.Run("PB403 setuid chmod", func(t *testing.T) {
 		expectRule(t, "PB403", map[string]string{"PKGBUILD": pkgbuildWith("", `
@@ -1069,6 +1394,59 @@ package() {
 		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   make install
+}`)})
+	})
+	t.Run("PB404 prefix bound at configure time is fine", func(t *testing.T) {
+		// The build tree already stages into $pkgdir, so the bare install in
+		// package() never touches the live system.
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  cmake -B build -DCMAKE_INSTALL_PREFIX="$pkgdir/usr"
+  cmake --build build
+}
+package() {
+  cmake --install build
+}`)})
+	})
+	t.Run("PB404 configure prefix without pkgdir is still flagged", func(t *testing.T) {
+		expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  cmake -B build -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+package() {
+  cmake --install build
+}`)})
+	})
+	t.Run("PB404 destdir bound by a called helper is fine", func(t *testing.T) {
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_setup() {
+  export PERL_MM_OPT="INSTALLDIRS=vendor DESTDIR='$pkgdir'"
+}
+package() {
+  _setup
+  make install
+}`)})
+	})
+	t.Run("PB404 install into a pkgdir virtualenv is fine", func(t *testing.T) {
+		// The activated venv lives in the staging tree, so pip writes there.
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  python -m venv "$pkgdir/usr/lib/demo"
+  source "$pkgdir/usr/lib/demo/bin/activate"
+  pip install -r requirements.txt
+}`)})
+	})
+	t.Run("PB404 pip install with no venv is still flagged", func(t *testing.T) {
+		expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  pip install --break-system-packages installer
+}`)})
+	})
+	t.Run("PB404 staging bound by a non-standard variable is fine", func(t *testing.T) {
+		expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  make INSTALL_ROOT="$pkgdir" install
 }`)})
 	})
 	t.Run("PB405 write to pacman.conf", func(t *testing.T) {
@@ -1216,6 +1594,25 @@ arch=('x86_64')`
 	t.Run("PB701 array pkgname (split package) validated per element", func(t *testing.T) {
 		expectRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=('good' 'Bad:Name')\npkgver=1\npkgrel=1\narch=('any')\n"})
 	})
+	// Bash brace-expands array assignments before makepkg ever sees them, so
+	// the braces are not part of any package's name. Both of these declare a
+	// perfectly ordinary split package.
+	t.Run("PB701 brace-expanded pkgname is fine", func(t *testing.T) {
+		expectNoRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=({,python-}open3d)\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+	t.Run("PB701 brace-expanded pkgname with a suffix is fine", func(t *testing.T) {
+		expectNoRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=(openscq30-{cli,gui})\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+	// Expansion must not launder a genuinely bad name: every expanded element
+	// is still validated on its own.
+	t.Run("PB701 brace expansion still catches a bad element", func(t *testing.T) {
+		expectRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname=(demo-{cli,Bad:Gui})\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
+	// A scalar assignment is not brace-expanded by bash, so the braces really
+	// are literal characters in the name.
+	t.Run("PB701 braces in a scalar pkgname are literal", func(t *testing.T) {
+		expectRule(t, "PB701", map[string]string{"PKGBUILD": "pkgname={,python-}open3d\npkgver=1\npkgrel=1\narch=('any')\n"})
+	})
 
 	t.Run("PB702 pkgver with hyphen", func(t *testing.T) {
 		expectRule(t, "PB702", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1.2.3-beta\npkgrel=1\narch=('any')\n"})
@@ -1253,6 +1650,11 @@ arch=('x86_64')`
 
 	t.Run("PB706 unknown option", func(t *testing.T) {
 		expectRule(t, "PB706", map[string]string{"PKGBUILD": valid + "\noptions=('!striped')\n"})
+	})
+	t.Run("PB706 backslash-escaped negation is fine", func(t *testing.T) {
+		// Outside an interactive shell there is no history expansion to escape,
+		// so bash hands makepkg a plain "!strip".
+		expectNoRule(t, "PB706", map[string]string{"PKGBUILD": valid + "\noptions=(\\!strip \\!debug)\n"})
 	})
 	t.Run("PB706 known options are fine", func(t *testing.T) {
 		expectNoRule(t, "PB706", map[string]string{"PKGBUILD": valid + "\noptions=('!strip' 'lto' '!debug')\n"})
@@ -1332,6 +1734,57 @@ sha256sums[1]='SKIP'
 	})
 	t.Run("PB710 valid arch is fine", func(t *testing.T) {
 		expectNoRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('x86_64' 'aarch64')\n"})
+	})
+	// `arch=()` followed by appends is how a PKGBUILD builds the list up one
+	// architecture at a time. bash appends; only the literal is empty.
+	t.Run("PB710 an array filled by appends is not empty", func(t *testing.T) {
+		expectNoRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=()\narch+=('x86_64')\narch+=('aarch64')\n",
+		})
+	})
+	t.Run("PB710 an array left empty is still flagged", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=()\n"})
+	})
+	// Appended values are validated like any other, even though the merge kept
+	// no source text for them.
+	t.Run("PB710 an appended value is still validated", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=('x86_64')\narch+=('x86-64')\n",
+		})
+	})
+	// makepkg sources the whole file before reading metadata, so a branch that
+	// sets arch has set it; which branch runs is not statically knowable.
+	t.Run("PB710 arch set in a top-level conditional is set", func(t *testing.T) {
+		expectNoRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\n" +
+				"if [[ $CARCH == x86_64 ]]; then\n  arch=('x86_64')\nelse\n  arch=('any')\nfi\n",
+		})
+	})
+	t.Run("PB710 an emptied array a conditional refills is not empty", func(t *testing.T) {
+		expectNoRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\narch=()\n" +
+				"if [[ -n $SOMETHING ]]; then\n  arch+=('x86_64')\nfi\n",
+		})
+	})
+	// A function body runs long after makepkg has read the metadata, so an
+	// assignment there does not count as setting the field.
+	t.Run("PB710 arch set only in a build function is not set", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\nbuild() {\n  arch=('x86_64')\n}\n",
+		})
+	})
+	// A subshell's assignment dies with the subshell; makepkg's own shell
+	// never sees it, so it does not count as setting the field.
+	t.Run("PB710 arch set only in a subshell is not set", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\n( arch=('x86_64') )\n",
+		})
+	})
+	// `arch=x86_64 true` scopes the assignment to that one command.
+	t.Run("PB710 arch as a command's env prefix is not set", func(t *testing.T) {
+		expectRule(t, "PB710", map[string]string{
+			"PKGBUILD": "pkgname=demo\npkgver=1\npkgrel=1\nif [[ -n $X ]]; then\n  arch=x86_64 true\nfi\n",
+		})
 	})
 }
 

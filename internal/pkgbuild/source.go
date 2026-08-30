@@ -41,12 +41,27 @@ var vcsProtos = map[string]bool{"git": true, "hg": true, "svn": true, "bzr": tru
 // two sources to makepkg — and Index counts expanded entries, matching how
 // makepkg pairs sources with checksums.
 func (p *Package) Sources() []SourceEntry {
+	arches := p.declaredArches()
 	var out []SourceEntry
 	for name, v := range p.Vars {
-		if name != "source" && !strings.HasPrefix(name, "source_") {
+		var arch string
+		switch {
+		case name == "source":
+		case strings.HasPrefix(name, "source_"):
+			// makepkg fetches source_$CARCH only for an architecture the
+			// package declares. A suffix that names none of them is an
+			// ordinary variable that happens to collide with the namespace —
+			// `source_prefix` holding a URL stem, or a `source_linux_386`
+			// written beside arch=('i686') — and nothing in it is ever
+			// downloaded. PB902 is what flags the collision; treating it as a
+			// source array here would report on a fetch that never happens.
+			arch = strings.TrimPrefix(name, "source_")
+			if arches != nil && !arches[arch] {
+				continue
+			}
+		default:
 			continue
 		}
-		arch := strings.TrimPrefix(strings.TrimPrefix(name, "source"), "_")
 		idx := 0
 		for rawIdx, raw := range v.Values {
 			// Each entry reports its own written element's position, via the
@@ -61,7 +76,7 @@ func (p *Package) Sources() []SourceEntry {
 					pos = el.Value.Pos()
 				}
 			}
-			for _, expanded := range expandBraces(p.Expand(raw)) {
+			for _, expanded := range ExpandBraces(p.Expand(raw)) {
 				e := parseSourceEntry(raw, expanded)
 				e.Index = idx
 				e.ElemIndex = elemIdx
@@ -75,11 +90,55 @@ func (p *Package) Sources() []SourceEntry {
 	return out
 }
 
-// expandBraces performs bash-style brace expansion for the simple {a,b,c}
-// groups that appear in source arrays. ${var} parameter braces and groups
-// without a comma (which bash leaves literal too) are skipped; nested groups
-// are rare enough to leave as-is.
-func expandBraces(s string) []string {
+// declaredArches returns the architectures arch=() names, or nil when the
+// parser could not pin them down — no arch at all, a value built from a
+// variable, or a length a top-level conditional makes unknowable. nil means
+// "do not filter": losing a whole source array from the analysis is worse than
+// looking at one makepkg would skip.
+func (p *Package) declaredArches() map[string]bool {
+	v := p.Vars["arch"]
+	if v == nil || v.CountUnknown || len(v.Values) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(v.Values))
+	for _, s := range v.Values {
+		for _, exp := range ExpandBraces(s) {
+			if exp == "" || strings.ContainsAny(exp, "$\x00") {
+				return nil
+			}
+			out[exp] = true
+		}
+	}
+	return out
+}
+
+// braceExpandMax caps how many values one element may expand to. Brace groups
+// multiply — `{a,b}{a,b}{a,b}…` doubles per group — so a hostile PKGBUILD could
+// otherwise turn a short line into an unbounded allocation. Past the cap the
+// element is left unexpanded, which no real source array comes close to needing.
+const braceExpandMax = 4096
+
+// ExpandBraces performs bash-style brace expansion for the {a,b,c} groups that
+// appear in array literals, including nested ones: `{a{b,c},d}` is three values
+// to bash and three here. ${var} parameter braces and groups without a
+// top-level comma are left alone, which is what bash does with them too.
+//
+// Bash expands braces in array assignments but not in scalar ones — `a=({x,y}z)`
+// is two elements, `a={x,y}z` is the literal string — so callers must only
+// apply this to array elements.
+func ExpandBraces(s string) []string {
+	if out, ok := expandBraces(s, braceExpandMax); ok {
+		return out
+	}
+	return []string{s}
+}
+
+// expandBraces expands s, abandoning the attempt as soon as the result would
+// exceed budget; the bool reports whether it stayed within it. The budget has
+// to travel down the recursion rather than being checked on the way back up:
+// the blowup happens inside the nested call, so a check after it returns is a
+// check that never runs.
+func expandBraces(s string, budget int) ([]string, bool) {
 	for i := 0; i < len(s); i++ {
 		if s[i] != '{' {
 			continue
@@ -90,22 +149,54 @@ func expandBraces(s string) []string {
 			}
 			continue
 		}
-		j := strings.IndexByte(s[i:], '}')
-		if j < 0 {
-			return []string{s}
-		}
-		j += i
-		inner := s[i+1 : j]
-		if strings.Contains(inner, "{") || !strings.Contains(inner, ",") {
+		end, alts := braceGroup(s[i:])
+		// An unbalanced group, or one with no top-level comma, is literal text.
+		if end < 0 || len(alts) < 2 {
 			continue
 		}
 		var out []string
-		for alt := range strings.SplitSeq(inner, ",") {
-			out = append(out, expandBraces(s[:i]+alt+s[j+1:])...)
+		for _, alt := range alts {
+			vals, ok := expandBraces(s[:i]+alt+s[i+end+1:], budget-len(out))
+			if !ok {
+				return nil, false
+			}
+			if out = append(out, vals...); len(out) > budget {
+				return nil, false
+			}
 		}
-		return out
+		return out, true
 	}
-	return []string{s}
+	return []string{s}, true
+}
+
+// braceGroup splits the brace group starting at s[0] into its top-level
+// alternatives and returns the offset of the matching '}'. Nested groups count
+// toward the depth but are not split here: `{a{b,c},d}` has the two
+// alternatives "a{b,c}" and "d", and the inner group expands on the next pass
+// over the substituted string. That ordering is what makes the result match
+// bash — splitting on every comma instead yields `.tar.gz` twice from
+// `.tar.gz{,.sha256sum{,.asc}}` and drops a value.
+//
+// A group with no top-level comma comes back as a single alternative, which the
+// caller reads as "not an expansion".
+func braceGroup(s string) (end int, alts []string) {
+	depth, start := 0, 1
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			depth++
+		case '}':
+			if depth--; depth == 0 {
+				return i, append(alts, s[start:i])
+			}
+		case ',':
+			if depth == 1 {
+				alts = append(alts, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return -1, nil
 }
 
 func parseSourceEntry(raw, expanded string) SourceEntry {
@@ -176,7 +267,9 @@ func (e SourceEntry) Host() string {
 var sumAlgos = []string{"ck", "md5", "sha1", "sha224", "sha256", "sha384", "sha512", "b2"}
 
 // Checksums returns algo -> values for the sums arrays matching arch
-// ("" for the base arrays).
+// ("" for the base arrays). Brace groups expand to one value each, matching
+// Sources: `sha256sums=(SKIP{,,,})` is four checksums to makepkg, so both
+// sides have to count expanded entries or the index pairing slips.
 func (p *Package) Checksums(arch string) map[string][]string {
 	out := map[string][]string{}
 	for _, algo := range sumAlgos {
@@ -184,9 +277,15 @@ func (p *Package) Checksums(arch string) map[string][]string {
 		if arch != "" {
 			name += "_" + arch
 		}
-		if v, ok := p.Vars[name]; ok {
-			out[algo] = v.Values
+		v, ok := p.Vars[name]
+		if !ok {
+			continue
 		}
+		vals := make([]string, 0, len(v.Values))
+		for _, raw := range v.Values {
+			vals = append(vals, ExpandBraces(raw)...)
+		}
+		out[algo] = vals
 	}
 	return out
 }

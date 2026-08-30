@@ -143,9 +143,11 @@ type Context struct {
 	DB   *alpmdb.DB       // pacman local database; nil when unavailable
 	cmds []Command
 	vars map[string]string
-	// splitVars caches per-split-package variants of vars where pkgname is
-	// bound to that split's name, matching how makepkg runs package_<name>().
-	splitVars map[string]map[string]string
+	// fnVars caches the per-function variants of vars, keyed by unit path and
+	// function name. Two things make a function's view differ from the file's:
+	// makepkg rebinds pkgname inside package_<name>(), and a function that
+	// assigns a name of its own leaves the top-level value stale.
+	fnVars map[string]map[string]string
 
 	pkgFacts *packageFacts // lazily computed facts shared by package rules
 }
@@ -166,7 +168,7 @@ type Command struct {
 
 // NewContext precomputes shared state for rules.
 func NewContext(pkg *pkgbuild.Package) *Context {
-	ctx := &Context{Pkg: pkg, vars: map[string]string{}, splitVars: map[string]map[string]string{}}
+	ctx := &Context{Pkg: pkg, vars: map[string]string{}, fnVars: map[string]map[string]string{}}
 	for name, v := range pkg.Vars {
 		// Scalars render to exactly one value; for arrays, bash expands an
 		// unsubscripted $name to the first element (and an empty array to "").
@@ -216,42 +218,139 @@ var wrappers = map[string]bool{
 	"exec": true, "builtin": true, "sudo": true, "doas": true,
 }
 
-// varsFor returns the variable map for rendering words inside fn. makepkg
-// runs each split's package_<name>() with pkgname rebound to that split, so
-// inside those functions $pkgname is the split's own name rather than the
-// pkgname array's first element.
-func (ctx *Context) varsFor(fn string) map[string]string {
-	split, ok := strings.CutPrefix(fn, "package_")
-	if !ok {
-		return ctx.vars
+// varsFor returns the variable map for rendering words inside fn, which differs
+// from the file-level map in two ways.
+//
+// makepkg runs each split's package_<name>() with pkgname rebound to that
+// split, so inside those functions $pkgname is the split's own name rather than
+// the pkgname array's first element.
+//
+// And a function that assigns a name the file also assigns makes the
+// file-level value stale: `_installDir=/usr/share/$pkgname` at the top,
+// `_installDir=$pkgdir$_installDir` in package(), and every later use means the
+// staged path, not the live one. Rendering those uses against the top-level
+// value does not produce an approximation — it produces a string that never
+// exists during the build, which is how a rule ends up reporting a write to
+// /usr/share that only ever lands under $pkgdir. Dropping the name renders the
+// use as `$_installDir`, which is what it honestly is: a value only running the
+// PKGBUILD would know.
+func (ctx *Context) varsFor(u *pkgbuild.Unit, fn string) map[string]string {
+	if fn == "" {
+		return ctx.vars // top-level code: the file-level values are the live ones
 	}
-	if m, ok := ctx.splitVars[split]; ok {
+	key := u.Path + "\x00" + fn
+	if m, ok := ctx.fnVars[key]; ok {
 		return m
 	}
-	v, ok := ctx.Pkg.Vars["pkgname"]
-	if !ok || !v.Array {
-		return ctx.vars
-	}
-	declared := false
-	for _, val := range v.Values {
-		if ctx.Pkg.Expand(val) == split {
-			declared = true
-			break
+	m := ctx.buildFnVars(u, fn)
+	ctx.fnVars[key] = m
+	return m
+}
+
+func (ctx *Context) buildFnVars(u *pkgbuild.Unit, fn string) map[string]string {
+	stale := map[string]bool{}
+	mark := func(names map[string]bool) {
+		for n := range names {
+			if _, ok := ctx.vars[n]; ok {
+				stale[n] = true
+			}
 		}
 	}
-	if !declared {
+	// The function's own `local`s count — they shadow the file-level value for
+	// the rest of its body — but an earlier phase's died with that function,
+	// so by the time fn runs the file-level value is live again.
+	mark(assignedIn(u, fn, true))
+	for _, name := range precedingPhases(fn) {
+		mark(assignedIn(u, name, false))
+	}
+	split := ctx.splitName(fn)
+	if len(stale) == 0 && split == "" {
 		return ctx.vars
 	}
 	m := make(map[string]string, len(ctx.vars))
 	maps.Copy(m, ctx.vars)
-	m["pkgname"] = split
-	ctx.splitVars[split] = m
+	for n := range stale {
+		delete(m, n)
+	}
+	if split != "" {
+		// makepkg binds pkgname immediately before calling the function, so this
+		// holds however the file wrote the array.
+		m["pkgname"] = split
+	}
 	return m
+}
+
+// splitName returns the split package fn builds, or "" if fn is not a
+// package_<name>() for a name the pkgname array declares.
+func (ctx *Context) splitName(fn string) string {
+	split, ok := strings.CutPrefix(fn, "package_")
+	if !ok {
+		return ""
+	}
+	v, ok := ctx.Pkg.Vars["pkgname"]
+	if !ok || !v.Array {
+		return ""
+	}
+	for _, val := range v.Values {
+		if ctx.Pkg.Expand(val) == split {
+			return split
+		}
+	}
+	return ""
+}
+
+// buildPhases are the functions makepkg runs, in order, in one shell before it
+// reaches package(). An assignment in an earlier one is still in effect in a
+// later one — which is why a name build() rewrote is no longer the file's.
+var buildPhases = []string{"prepare", "build", "check"}
+
+// precedingPhases returns the phases makepkg has already run by the time it
+// calls fn. A helper function the PKGBUILD calls itself has no fixed place in
+// that order, so only its own assignments count for it.
+func precedingPhases(fn string) []string {
+	switch {
+	case fn == "package" || strings.HasPrefix(fn, "package_"):
+		return buildPhases
+	case fn == "check":
+		return buildPhases[:2]
+	case fn == "build":
+		return buildPhases[:1]
+	}
+	return nil
+}
+
+// assignedIn returns the names assigned anywhere inside fn's body, including
+// inside conditionals and loops: what matters is that the value can change, not
+// whether this particular run changes it. With includeLocals false, `local`
+// declarations are skipped — those bindings do not outlive the function, so
+// they cannot make its value stale for anyone called later.
+func assignedIn(u *pkgbuild.Unit, fn string, includeLocals bool) map[string]bool {
+	fd := u.Functions[fn]
+	if fd == nil {
+		return nil
+	}
+	var out map[string]bool
+	syntax.Walk(fd.Body, func(n syntax.Node) bool {
+		if d, ok := n.(*syntax.DeclClause); ok && !includeLocals &&
+			d.Variant != nil && d.Variant.Value == "local" {
+			return false
+		}
+		a, ok := n.(*syntax.Assign)
+		if !ok || a.Name == nil {
+			return true
+		}
+		if out == nil {
+			out = map[string]bool{}
+		}
+		out[a.Name.Value] = true
+		return true
+	})
+	return out
 }
 
 func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, call *syntax.CallExpr) Command {
 	cmd := Command{Unit: u, Fn: fn, Stmt: stmt, Call: call}
-	vars := ctx.varsFor(fn)
+	vars := ctx.varsFor(u, fn)
 	args := call.Args
 	for len(args) > 0 {
 		name, dyn := pkgbuild.RenderWord(args[0], vars)
@@ -342,7 +441,7 @@ func (c Command) finding(id string, sev Severity, format string, args ...any) Fi
 	return Finding{
 		RuleID:   id,
 		Severity: sev,
-		Message:  fmt.Sprintf(format, args...),
+		Message:  message(format, args...),
 		Path:     c.Unit.Path,
 		Line:     int(pos.Line()),
 		Col:      int(pos.Col()),
@@ -353,11 +452,55 @@ func findingAt(id string, sev Severity, path string, pos syntax.Pos, format stri
 	return Finding{
 		RuleID:   id,
 		Severity: sev,
-		Message:  fmt.Sprintf(format, args...),
+		Message:  message(format, args...),
 		Path:     path,
 		Line:     int(pos.Line()),
 		Col:      int(pos.Col()),
 	}
+}
+
+// message formats a finding. Rendered words carry a NUL wherever the renderer
+// hit something it could not resolve — a slice, a replacement, a command
+// substitution — which rules test for but which has no business reaching a
+// terminal, a JSON report, or a SARIF file. Reporting a source as
+// "BaseX\x00.zip" reads like a corrupt filename rather than what it is: an
+// expansion whose value is not knowable without running the PKGBUILD, so it
+// gets shown as the ellipsis it means.
+//
+// Substitution happens on the arguments rather than the formatted result
+// because %q escapes the NUL into a literal backslash-x-0-0 first, which no
+// amount of scanning the output would then recognize.
+func message(format string, args ...any) string {
+	for i, a := range args {
+		s, ok := a.(string)
+		if !ok || !strings.Contains(s, "\x00") {
+			continue
+		}
+		args[i] = ellipsize(s)
+	}
+	return ellipsize(fmt.Sprintf(format, args...))
+}
+
+// ellipsize replaces each run of unresolvable-expansion sentinels with one
+// ellipsis. A run means adjacent expansions — `$a$b$c` renders as three — and
+// "…" says everything "………" does about a stretch of text nothing can pin down.
+func ellipsize(s string) string {
+	if !strings.Contains(s, "\x00") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] != 0 {
+			b.WriteByte(s[i])
+			continue
+		}
+		b.WriteString("…")
+		for i+1 < len(s) && s[i+1] == 0 {
+			i++
+		}
+	}
+	return b.String()
 }
 
 // Registry is every rule, in ID order.

@@ -68,7 +68,17 @@ var fsRules = []Rule{
 var allowedWritePrefixes = []string{
 	"$pkgdir", "${pkgdir", "$srcdir", "${srcdir", "$startdir", "${startdir",
 	"/dev/null", "/dev/stdout", "/dev/stderr", "/dev/fd/",
+	"/dev/tty", "/dev/console", "/dev/pts/", "/dev/shm/",
 	"/tmp/", "$TMPDIR", "${TMPDIR",
+}
+
+// scriptletHooks are the function names pacman invokes from the file named by
+// install=. Nothing else in a scriptlet runs, and pacman never calls these from
+// the PKGBUILD itself.
+var scriptletHooks = map[string]bool{
+	"pre_install": true, "post_install": true,
+	"pre_upgrade": true, "post_upgrade": true,
+	"pre_remove": true, "post_remove": true,
 }
 
 // fileWriters are commands whose arguments name files they create or modify.
@@ -99,32 +109,61 @@ func writeTargetViolation(target string) string {
 	return ""
 }
 
+// buildWriteScope reports whether code at this location is part of the build,
+// and so bound by the $srcdir/$pkgdir rule. Scriptlets are not: they run on the
+// live system after pacman has unpacked the package, where touching absolute
+// paths is the entire point. A scriptlet hook defined in the PKGBUILD instead of
+// an install file is dead code pacman never calls, so it is out of scope too.
+func buildWriteScope(u *pkgbuild.Unit, fn string) bool {
+	return !u.Scriptlet && !scriptletHooks[fn]
+}
+
 func checkWritesOutside(ctx *Context) []Finding {
 	var out []Finding
 	units := ctx.Pkg.Units()
 	for i := range units {
 		u := &units[i]
-		syntax.Walk(u.File, func(node syntax.Node) bool {
-			r, ok := node.(*syntax.Redirect)
-			if !ok || r.Word == nil {
+		if u.Scriptlet {
+			continue
+		}
+		// Redirects are walked per function rather than per file so they get
+		// the same treatment commands do: a scriptlet hook defined in the
+		// PKGBUILD is out of scope, and a name the function (or an earlier
+		// phase) rebound renders against that function's view — not the
+		// file-level value, which by then names a path the build never touches.
+		walkRedirects := func(fn string, root syntax.Node) {
+			if !buildWriteScope(u, fn) {
+				return
+			}
+			vars := ctx.varsFor(u, fn)
+			syntax.Walk(root, func(node syntax.Node) bool {
+				r, ok := node.(*syntax.Redirect)
+				if !ok || r.Word == nil {
+					return true
+				}
+				switch r.Op {
+				case syntax.RdrOut, syntax.AppOut, syntax.RdrAll, syntax.AppAll:
+				default:
+					return true
+				}
+				target, _ := pkgbuild.RenderWord(r.Word, vars)
+				if why := writeTargetViolation(target); why != "" {
+					out = append(out, findingAt("PB401", Error, u.Path, r.Pos(),
+						"redirection to %q %s", target, why))
+				}
 				return true
-			}
-			switch r.Op {
-			case syntax.RdrOut, syntax.AppOut, syntax.RdrAll, syntax.AppAll:
-			default:
-				return true
-			}
-			target, _ := pkgbuild.RenderWord(r.Word, ctx.vars)
-			if why := writeTargetViolation(target); why != "" {
-				out = append(out, findingAt("PB401", Error, u.Path, r.Pos(),
-					"redirection to %q %s", target, why))
-			}
-			return true
-		})
+			})
+		}
+		for name, fd := range u.Functions {
+			walkRedirects(name, fd.Body)
+		}
+		for _, stmt := range u.TopLevel {
+			walkRedirects("", stmt)
+		}
 	}
 
 	for _, c := range ctx.Commands() {
-		if !fileWriters[c.Name] {
+		if !fileWriters[c.Name] || !buildWriteScope(c.Unit, c.Fn) {
 			continue
 		}
 		for _, target := range writeDests(c) {
@@ -174,6 +213,13 @@ func checkPrivilegeEscalation(ctx *Context) []Finding {
 	var out []Finding
 	esc := map[string]bool{"sudo": true, "doas": true, "pkexec": true, "su": true}
 	for _, c := range ctx.Commands() {
+		// Scriptlets already run as root under pacman — the install step this
+		// rule points escalating builds toward — so there is nothing to escalate
+		// there. In practice most scriptlet uses are `sudo -u`/`su -l`, which
+		// de-escalate to a normal user: the opposite of the hazard.
+		if !buildWriteScope(c.Unit, c.Fn) {
+			continue
+		}
 		// sudo/doas are unwrapped by newCommand, so inspect the raw first word.
 		raw := basename(c.RawName)
 		if esc[raw] || esc[c.Name] {
@@ -285,13 +331,22 @@ func shortFlagMode(a string) string {
 // --- PB404: install step not redirected into $pkgdir -----------------------
 
 func checkInstallDestdir(ctx *Context) []Finding {
+	// Functions that stand a $pkgdir-rooted virtualenv up and activate it.
+	// Everything pip installs afterwards lands in the staging tree — the same
+	// redirection this rule asks for, spelled through PATH instead of a flag.
+	venvFns := map[string]bool{}
+	for _, c := range ctx.Commands() {
+		if bindsPkgdirVenv(c) {
+			venvFns[c.Fn] = true
+		}
+	}
 	var out []Finding
 	for _, c := range ctx.Commands() {
 		if c.Fn != "package" && !strings.HasPrefix(c.Fn, "package_") {
 			continue
 		}
 		tool, ok := liveInstallCommand(c)
-		if !ok || installBindsDestdir(c) || funcBindsDestdir(c.Unit, c.Fn) {
+		if !ok || installBindsDestdir(c) || venvFns[c.Fn] || funcBindsDestdir(c.Unit, c.Fn) {
 			continue
 		}
 		out = append(out, c.finding("PB404", Error,
@@ -348,28 +403,158 @@ func installBindsDestdir(c Command) bool {
 		case "DESTDIR", "prefix", "PREFIX":
 			return true
 		}
+		// Build systems spell the staging root a dozen ways — INSTALL_ROOT,
+		// ROOT_DIR, INSTALL_PREFIX — so match on the value instead of trying
+		// to keep a list of names: pointing anything at $pkgdir is the point.
+		if v, _ := pkgbuild.RenderWord(as.Value, nil); referencesStaging(v) {
+			return true
+		}
 	}
 	for _, a := range c.Args {
-		if strings.Contains(a, "$pkgdir") || strings.Contains(a, "$DESTDIR") ||
-			strings.HasPrefix(a, "DESTDIR=") {
+		if referencesStaging(a) || strings.HasPrefix(a, "DESTDIR=") {
 			return true
 		}
 	}
 	return false
 }
 
-// funcBindsDestdir reports whether the named function assigns DESTDIR anywhere
-// (e.g. `export DESTDIR="$pkgdir"` before the install step).
-func funcBindsDestdir(u *pkgbuild.Unit, fn string) bool {
-	fd := u.Functions[fn]
-	if fd == nil {
+func referencesStaging(s string) bool {
+	return strings.Contains(s, "$pkgdir") || strings.Contains(s, "${pkgdir") ||
+		strings.Contains(s, "$DESTDIR") || strings.Contains(s, "${DESTDIR")
+}
+
+// destBindingTokens are how build systems are told where an install should
+// land. On its own each is meaningless — `--prefix=/usr` is the normal thing to
+// configure — so one only counts alongside a $pkgdir reference in the same word.
+var destBindingTokens = []string{"DESTDIR", "destdir", "PREFIX", "prefix", "--root", "--target"}
+
+func bindsStaging(s string) bool {
+	if !referencesStaging(s) {
 		return false
 	}
-	found := false
-	syntax.Walk(fd, func(n syntax.Node) bool {
-		if as, ok := n.(*syntax.Assign); ok && as.Name != nil && as.Name.Value == "DESTDIR" {
-			found = true
+	for _, tok := range destBindingTokens {
+		if strings.Contains(s, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+// funcBindsDestdir reports whether anything makepkg has already run has tied
+// the install destination to $pkgdir.
+//
+// The obvious case is `export DESTDIR="$pkgdir"` in the same function, but the
+// common one in practice is that the *configure* step bound it and the install
+// step inherits it: `cmake -DCMAKE_INSTALL_PREFIX="$pkgdir/usr"` in build()
+// leaves a build tree that stages correctly no matter how bare the later
+// `make install` looks. Perl's `PERL_MM_OPT="... DESTDIR='$pkgdir'"` before
+// Makefile.PL is the same idea. Those are the majority of package()s that
+// install without naming a destination, and none of them touch the live system.
+//
+// Scope is the phases that precede this one in makepkg's single shell, plus the
+// installing function itself; a sibling package_* split does not count, since
+// its configuration is not this one's.
+// PKGBUILDs also factor that setup into a helper — perl ones call a shared
+// prepare_environment that exports PERL_MM_OPT — so calls are followed one
+// level into functions the PKGBUILD defines itself.
+func funcBindsDestdir(u *pkgbuild.Unit, fn string) bool {
+	seen := map[string]bool{}
+	var scan func(name string, depth int) bool
+	scan = func(name string, depth int) bool {
+		if seen[name] {
 			return false
+		}
+		seen[name] = true
+		fd := u.Functions[name]
+		if fd == nil {
+			return false
+		}
+		if nodeBindsDestdir(fd) {
+			return true
+		}
+		if depth == 0 {
+			return false
+		}
+		for _, called := range calledFuncs(u, fd) {
+			if scan(called, depth-1) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, name := range []string{"prepare", "build", "check", fn} {
+		if scan(name, 1) {
+			return true
+		}
+	}
+	for _, stmt := range u.TopLevel {
+		if nodeBindsDestdir(stmt) {
+			return true
+		}
+	}
+	return false
+}
+
+// calledFuncs returns the PKGBUILD-defined functions invoked from root.
+func calledFuncs(u *pkgbuild.Unit, root syntax.Node) []string {
+	var out []string
+	syntax.Walk(root, func(n syntax.Node) bool {
+		call, ok := n.(*syntax.CallExpr)
+		if !ok || len(call.Args) == 0 {
+			return true
+		}
+		name, _ := pkgbuild.RenderWord(call.Args[0], nil)
+		if u.Functions[name] != nil {
+			out = append(out, name)
+		}
+		return true
+	})
+	return out
+}
+
+// bindsPkgdirVenv reports whether this call creates or activates a Python
+// virtualenv inside $pkgdir.
+func bindsPkgdirVenv(c Command) bool {
+	switch c.Name {
+	case "virtualenv", "pyvenv":
+	case "python", "python3", "python2":
+		if !c.HasArg("venv") {
+			return false
+		}
+	case "source", ".":
+		// Activating it is what actually redirects the later pip installs.
+	default:
+		return false
+	}
+	for _, a := range c.Args {
+		if referencesStaging(a) {
+			return true
+		}
+	}
+	return false
+}
+
+func nodeBindsDestdir(root syntax.Node) bool {
+	found := false
+	syntax.Walk(root, func(n syntax.Node) bool {
+		if found {
+			return false
+		}
+		switch x := n.(type) {
+		case *syntax.Assign:
+			if x.Name != nil && x.Name.Value == "DESTDIR" {
+				found = true
+				return false
+			}
+			if v, _ := pkgbuild.RenderWord(x.Value, nil); bindsStaging(v) {
+				found = true
+				return false
+			}
+		case *syntax.Word:
+			if v, _ := pkgbuild.RenderWord(x, nil); bindsStaging(v) {
+				found = true
+				return false
+			}
 		}
 		return true
 	})

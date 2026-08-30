@@ -190,10 +190,20 @@ func fixVCSPins(ctx *Context, env *FixEnv) []Edit {
 		return nil // offline: the finding stands with its suggestion
 	}
 	elems := sourceElems(&ctx.Pkg.PKGBUILD)
+	// How many sources each written element expands to. A brace group that
+	// yields several URLs shares one #fragment; resolving one URL's ref and
+	// rewriting the shared text would pin every URL in the group to it.
+	perElem := map[string]int{}
+	for _, e := range ctx.Pkg.Sources() {
+		perElem[elemKey(e.Arch, e.ElemIndex)]++
+	}
 	var edits []Edit
 	for _, e := range ctx.Pkg.Sources() {
 		if e.VCS != "git" {
 			continue // only git refs are resolvable with `git ls-remote`
+		}
+		if perElem[elemKey(e.Arch, e.ElemIndex)] > 1 {
+			continue
 		}
 		if _, ok := e.Fragment["commit"]; ok {
 			continue

@@ -34,6 +34,58 @@ func TestScriptletPersistenceMessagesNotFlagged(t *testing.T) {
 			"foo.install": "post_install() {\n  cp /usr/share/foo/zshrc ~/.zshrc\n}\n",
 		})
 	})
+
+	t.Run("PB502 not for a path that is only a test operand", func(t *testing.T) {
+		expectNoRule(t, "PB502", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n" +
+				"  if [ -f /etc/xdg/autostart/foo.desktop ]; then\n    echo present\n  fi\n" +
+				"}\n",
+		})
+	})
+
+	t.Run("PB502 fires for an in-place sed on a persistence file", func(t *testing.T) {
+		expectRule(t, "PB502", map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n  sed -i 's/x/y/' /etc/cron.d/foo\n}\n",
+		})
+	})
+
+	t.Run("PB502 not for a sed that only filters", func(t *testing.T) {
+		expectNoRule(t, "PB502", map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n  sed -n '1p' /etc/cron.d/foo\n}\n",
+		})
+	})
+
+	t.Run("PB502 fires for an -Ei cluster", func(t *testing.T) {
+		expectRule(t, "PB502", map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n  sed -Ei 's/x/y/' /etc/cron.d/foo\n}\n",
+		})
+	})
+
+	t.Run("PB502 not for an i inside an attached -e script", func(t *testing.T) {
+		// -e swallows the rest of the argument; the i is sed script, not a flag.
+		expectNoRule(t, "PB502", map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n  sed -es/i/x/ /etc/cron.d/foo\n}\n",
+		})
+	})
+
+	t.Run("PB502 removal is reported below error", func(t *testing.T) {
+		// Cleaning up in pre_remove is correct behaviour, so it must not cost
+		// the package the grade an installed-persistence finding would.
+		files := map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "pre_remove() {\n  rm -f /etc/cron.d/foo\n}\n",
+		}
+		for _, f := range lint(t, files) {
+			if f.RuleID == "PB502" && f.Severity >= Error {
+				t.Errorf("removal reported at %v, want below error: %s", f.Severity, f.Message)
+			}
+		}
+	})
 }
 
 // A scriptlet that fails to parse is walked by no rule, so the parse failure

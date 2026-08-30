@@ -48,12 +48,15 @@ var integrityRules = []Rule{
 		Fix:      fixVCSPins,
 	},
 	{
-		ID:       "PB104",
-		Name:     "insecure-transport",
-		Severity: Error,
-		Doc: "Sources fetched over http://, git:// or ftp:// can be modified in transit. With a " +
-			"strong checksum this downgrades availability rather than integrity, but combined with " +
-			"SKIP or weak sums it is a working man-in-the-middle vector. Use https:// (or git+https://). " +
+		ID:          "PB104",
+		Name:        "insecure-transport",
+		Severity:    Warn,
+		MaxSeverity: Error,
+		Doc: "Sources fetched over http://, git:// or ftp:// can be modified in transit. Pinned to a " +
+			"strong digest the download is still verified, so an attacker in the path can break the " +
+			"build but not change what it produces — a warning. With SKIP, a weak sum, or no sum at " +
+			"all — which includes every git:// clone — nothing checks what arrives, and it is a " +
+			"working man-in-the-middle vector: an error. Use https:// (or git+https://) either way. " +
 			"Signature files fetched insecurely are PB112's concern.",
 		Check: checkInsecureTransport,
 	},
@@ -367,9 +370,28 @@ func checkChecksumCounts(ctx *Context) []Finding {
 			continue
 		}
 		sums := ctx.Pkg.Checksums(arch)
+		// Whether any algorithm actually covers this source array. makepkg
+		// only needs one: check_checksums verifies each algo in turn and is
+		// satisfied as soon as one has the same length as the sources.
+		covered := false
+		for _, vals := range sums {
+			if len(vals) == n {
+				covered = true
+				break
+			}
+		}
 		for _, algo := range sumAlgoNames {
 			vals, ok := sums[algo]
 			if !ok || len(vals) == n {
+				continue
+			}
+			// An empty array declares the algorithm unused rather than short —
+			// makepkg's verify_integrity_sums only raises "differ in size" for
+			// a non-empty one — so `md5sums=()` beside a filled sha256sums is
+			// a legitimate way to retire an algorithm. With nothing else
+			// covering the sources it is still a failure, just the "integrity
+			// checks are missing" one.
+			if len(vals) == 0 && covered {
 				continue
 			}
 			name := algo + "sums"
@@ -546,6 +568,24 @@ func insecureProto(e pkgbuild.SourceEntry) (string, bool) {
 	return proto, false
 }
 
+// strongSumFor reports whether this source entry is pinned to a collision-
+// resistant digest. md5, sha1 and ck do not count: someone able to rewrite the
+// download is generally able to make it collide, so a weak sum is no backstop
+// against the very attacker insecure transport lets in.
+func strongSumFor(p *pkgbuild.Package, e pkgbuild.SourceEntry) bool {
+	sums := p.Checksums(e.Arch)
+	for _, algo := range []string{"sha224", "sha256", "sha384", "sha512", "b2"} {
+		vals := sums[algo]
+		if e.Index >= len(vals) {
+			continue
+		}
+		if v := vals[e.Index]; v != "" && !isSkip(v) {
+			return true
+		}
+	}
+	return false
+}
+
 func checkInsecureTransport(ctx *Context) []Finding {
 	var out []Finding
 	for _, e := range ctx.Pkg.Sources() {
@@ -553,8 +593,14 @@ func checkInsecureTransport(ctx *Context) []Finding {
 			continue
 		}
 		if proto, insecure := insecureProto(e); insecure {
+			if strongSumFor(ctx.Pkg, e) {
+				out = append(out, findingAt("PB104", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
+					"source %q is fetched over unencrypted %s://; the pinned digest still verifies it, "+
+						"so this costs availability rather than integrity", e.Raw, proto))
+				continue
+			}
 			out = append(out, findingAt("PB104", Error, ctx.Pkg.PKGBUILD.Path, e.Pos,
-				"source %q is fetched over unencrypted %s://", e.Raw, proto))
+				"source %q is fetched over unencrypted %s:// with nothing verifying what arrives", e.Raw, proto))
 		}
 	}
 	return out

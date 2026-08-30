@@ -55,6 +55,33 @@ func (v *Var) elemAt(i int) int {
 	return -1
 }
 
+// ElemWord returns the array element Values[i] was written as, and the position
+// to report it at. The word is nil — and the position falls back to the
+// variable's own — whenever the value has no source text of its own: a value
+// appended by a later `+=` (the merge keeps only the first assignment's AST),
+// one padded in by an indexed write, or a scalar's. Callers that rewrite source
+// text need the word; callers that only report a location can use the position
+// unconditionally.
+func (v *Var) ElemWord(i int) (*syntax.Word, syntax.Pos) {
+	if v.Assign == nil {
+		return nil, v.Pos
+	}
+	if v.Assign.Array == nil {
+		// A scalar's sole value is its whole right-hand side. Anything past
+		// index 0 was merged in from elsewhere and has no word here.
+		if i == 0 && v.Assign.Value != nil {
+			return v.Assign.Value, v.Assign.Value.Pos()
+		}
+		return nil, v.Pos
+	}
+	elems := v.Assign.Array.Elems
+	idx := v.elemAt(i)
+	if idx < 0 || idx >= len(elems) || elems[idx].Value == nil {
+		return nil, v.Pos
+	}
+	return elems[idx].Value, elems[idx].Value.Pos()
+}
+
 // Unit is a single bash file under analysis: the PKGBUILD itself or an
 // install scriptlet.
 type Unit struct {
@@ -83,6 +110,14 @@ type Package struct {
 	ScriptletErrors []ScriptletError
 	Vars            map[string]*Var
 	SrcInfo         *SrcInfo // nil when no .SRCINFO is present
+
+	// ConditionalVars names variables assigned by top-level control flow — an
+	// `if`, a `for`, a `case "$CARCH"` — rather than by a plain assignment.
+	// makepkg runs all of that before it reads the metadata, so these names
+	// are set as far as it is concerned even though Vars has no entry for
+	// them: which branch fires is not knowable without executing the file.
+	// Rules that report a field missing must check here before doing so.
+	ConditionalVars map[string]bool
 
 	// Suppressions maps a file path to that file's inline
 	// "# pkglint: ignore=PB123[,PB456]" directives (line number -> rule IDs
@@ -202,6 +237,47 @@ func parseUnit(path string, raw []byte, scriptlet bool) (Unit, error) {
 	return u, nil
 }
 
+// wordSplits reports whether this array element is one written element that
+// bash will turn into an unknown number of values.
+//
+// Two things do that, and quoting stops both. An unquoted command substitution
+// word-splits: `source=($(_source))` is however many lines _source prints, and
+// `sha256sums=($(awk 'BEGIN{…printf "SKIP\n"…}'))` however many that awk emits.
+// An unquoted glob is pathname-expanded against the build directory:
+// `source=(… *.md)` is however many .md files sit next to the PKGBUILD, which
+// is exactly why the array below it carries more checksums than there are
+// written sources. The parser records one value in either case, so the array's
+// length is only trustworthy without them.
+//
+// A glob only changes the count when it matches, though — bash leaves an
+// unmatched pattern literal — and a URL never can: matching would need a
+// directory literally named "https:" and then an empty path component. So the
+// `?` in an unquoted `…/download.php?file=x` is a query string, the element
+// really is one source, and length checks stay in business.
+func wordSplits(w *syntax.Word) bool {
+	if w == nil {
+		return false
+	}
+	// Only top-level parts: anything inside DblQuoted or SglQuoted is protected
+	// from both expansions, which is the whole distinction being drawn here.
+	glob := false
+	for _, part := range w.Parts {
+		switch x := part.(type) {
+		case *syntax.CmdSubst, *syntax.ProcSubst:
+			return true
+		case *syntax.Lit:
+			if strings.ContainsAny(x.Value, "*?[") {
+				glob = true
+			}
+		}
+	}
+	if !glob {
+		return false
+	}
+	s, _ := RenderWord(w, nil)
+	return !strings.Contains(s, "://")
+}
+
 // extractTopLevel records top-level variable assignments from the PKGBUILD.
 func (p *Package) extractTopLevel() {
 	record := func(as *syntax.Assign) {
@@ -230,7 +306,7 @@ func (p *Package) extractTopLevel() {
 					}
 					continue
 				}
-				if isRef {
+				if isRef || wordSplits(el.Value) {
 					v.CountUnknown = true
 				}
 				s, _ := RenderWord(el.Value, nil)
@@ -269,6 +345,61 @@ func (p *Package) extractTopLevel() {
 				record(as)
 			}
 		}
+	}
+	p.markConditionalAssigns()
+}
+
+// markConditionalAssigns records the variables set by top-level control flow.
+// The loop above records only assignments that run unconditionally, but plenty
+// of PKGBUILDs set arch, source and sums inside a top-level `if`, `for`, or
+// `case "$CARCH"` — makepkg runs all of that before it reads the metadata, so
+// what it ends up with is not what was recorded here. Which branch fires, and
+// how many times a loop turns, is not knowable without executing the file, so
+// rather than guess: name the variable so rules that report a field missing
+// stand down, and for arrays additionally mark the length untrustworthy so
+// rules that compare lengths do too. Either claim would otherwise be made
+// against half the data.
+func (p *Package) markConditionalAssigns() {
+	for _, stmt := range p.PKGBUILD.TopLevel {
+		switch stmt.Cmd.(type) {
+		case *syntax.CallExpr, *syntax.DeclClause:
+			continue // unconditional, and already recorded above
+		}
+		syntax.Walk(stmt, func(n syntax.Node) bool {
+			switch x := n.(type) {
+			case *syntax.FuncDecl:
+				// Function bodies run long after makepkg has read the
+				// metadata, so what they assign is not part of it.
+				return false
+			case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
+				// These run in a child shell; their assignments die with it
+				// and never reach the shell makepkg reads metadata from.
+				return false
+			case *syntax.CallExpr:
+				if len(x.Args) > 0 {
+					// `FOO=1 make` scopes FOO to that one command.
+					return false
+				}
+				return true
+			case *syntax.Assign:
+				if x.Name == nil {
+					return true
+				}
+				if p.ConditionalVars == nil {
+					p.ConditionalVars = map[string]bool{}
+				}
+				p.ConditionalVars[x.Name.Value] = true
+				// A scalar counts too. `source="x"` followed by
+				// `source+=(a b c)` is four elements to bash, not three: the
+				// append converts the scalar into element zero. Any assignment
+				// the parser did not record therefore leaves the length of
+				// whatever it merges into unknown.
+				if v, ok := p.Vars[x.Name.Value]; ok {
+					v.CountUnknown = true
+				}
+			}
+			return true
+		})
 	}
 }
 
@@ -415,7 +546,13 @@ func (p *Package) Expand(s string) string {
 				if len(v.Values) == 0 {
 					return ""
 				}
-				return v.Values[0]
+				// "$pkgname" is "${pkgname[0]}" in bash, and bash brace-expands
+				// an array assignment before indexing it: with
+				// pkgname=(demo{,-vf}) element zero is "demo", not
+				// "demo{,-vf}". Splicing the written form instead leaves braces
+				// in the result that a later expansion re-expands, turning one
+				// source into two.
+				return ExpandBraces(v.Values[0])[0]
 			}
 			if len(v.Values) == 1 {
 				return v.Values[0]

@@ -117,6 +117,41 @@ var persistencePathHints = []string{
 	"/etc/sudoers", "authorized_keys",
 }
 
+// persistenceWriters are commands whose arguments name a file they create or
+// modify. PB502 is about a scriptlet installing persistence pacman will not
+// track, so only a command that actually writes can do it.
+var persistenceWriters = map[string]bool{
+	"cp": true, "mv": true, "install": true, "ln": true, "tee": true,
+	"mkdir": true, "touch": true, "dd": true, "rsync": true,
+	"chmod": true, "chown": true, "chgrp": true, "setfacl": true,
+}
+
+// sedInPlace reports whether this sed edits its input rather than filtering it.
+// The suffix form (-i.bak) counts, and so does a cluster like -Ei — but not the
+// script attached to -e or -f (`-es/i/x/`), which those options swallow.
+func sedInPlace(c Command) bool {
+	for _, a := range c.Args {
+		if strings.HasPrefix(a, "--") {
+			if strings.HasPrefix(a, "--in-place") {
+				return true
+			}
+			continue
+		}
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		for _, r := range a[1:] {
+			if r == 'i' {
+				return true
+			}
+			if r == 'e' || r == 'f' {
+				break // the rest of the cluster is this option's own argument
+			}
+		}
+	}
+	return false
+}
+
 func checkScriptletPersistence(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.Commands() {
@@ -144,10 +179,21 @@ func checkScriptletPersistence(ctx *Context) []Finding {
 					"scriptlet enables a systemd unit; prefer documenting this or shipping a preset"))
 			}
 			continue
-		case "echo", "printf":
-			// Arguments are text being printed, often post-install instructions
-			// that mention ~/.zshrc and friends. These commands only touch a
-			// file through a redirect, which the redirect walk below catches.
+		}
+		sev, verb := Error, "touches"
+		switch {
+		case persistenceWriters[c.Name]:
+		case c.Name == "sed" && sedInPlace(c):
+		case c.Name == "rm" || c.Name == "rmdir":
+			// Deleting persistence is the opposite of installing it, and it is
+			// what a correct pre_remove does. Still worth naming — the file was
+			// outside pacman's tracking either way — but not at Error.
+			sev, verb = Warn, "removes"
+		default:
+			// A path that is only a test operand (`[ -f /etc/cron.d/foo ]`), a
+			// message to the user, or something being sourced is not a write.
+			// Real modifications go through one of the commands above, or a
+			// redirect, which the walk below catches.
 			continue
 		}
 		for _, a := range c.Args {
@@ -155,8 +201,8 @@ func checkScriptletPersistence(ctx *Context) []Finding {
 			// so report the first match only.
 			for _, hint := range persistencePathHints {
 				if strings.Contains(a, hint) {
-					out = append(out, c.finding("PB502", Error,
-						"scriptlet touches %q, a persistence location outside pacman's tracking", a))
+					out = append(out, c.finding("PB502", sev,
+						"scriptlet %s %q, a persistence location outside pacman's tracking", verb, a))
 					break
 				}
 			}

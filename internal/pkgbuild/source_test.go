@@ -22,10 +22,32 @@ func TestExpandBraces(t *testing.T) {
 		{"${_tar}", []string{"${_tar}"}},                       // parameter braces, not a group
 		{"${_tar}{,.asc}", []string{"${_tar}", "${_tar}.asc"}}, // mixed
 		{"nocomma{x}", []string{"nocomma{x}"}},                 // bash leaves this literal too
+		// Nested groups. The tar.gz case is how a PKGBUILD asks for an archive,
+		// its checksum file and that file's signature in one element; splitting
+		// on every comma instead would yield tar.gz twice and lose the .asc.
+		{"tor.tar.gz{,.sha256sum{,.asc}}", []string{
+			"tor.tar.gz", "tor.tar.gz.sha256sum", "tor.tar.gz.sha256sum.asc"}},
+		{"{agilex{3,5},arria10}-x.qdz", []string{
+			"agilex3-x.qdz", "agilex5-x.qdz", "arria10-x.qdz"}},
+		{"pre{a,b{c,d},e}post", []string{
+			"preapost", "prebcpost", "prebdpost", "preepost"}},
+		{"{a{b}}", []string{"{a{b}}"}}, // no comma at any depth: literal
+		{"un{balanced,", []string{"un{balanced,"}},
 	} {
-		if got := expandBraces(tc.in); !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("expandBraces(%q) = %v, want %v", tc.in, got, tc.want)
+		if got := ExpandBraces(tc.in); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("ExpandBraces(%q) = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+// Brace groups multiply, so an element built from enough of them would expand
+// without bound. Past the cap the element is left as written rather than
+// allocating: the input is untrusted, and no real source array needs it.
+func TestExpandBracesIsBounded(t *testing.T) {
+	in := strings.Repeat("{a,b}", 40) // 2^40 if left unbounded
+	got := ExpandBraces(in)
+	if len(got) != 1 || got[0] != in {
+		t.Errorf("ExpandBraces on %d nested groups produced %d values, want the input unexpanded", 40, len(got))
 	}
 }
 
@@ -276,6 +298,85 @@ sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'
 	if srcs[1].Expanded != "cyrus-imapd.sysusers" || !srcs[1].Local {
 		t.Errorf("second source should expand to the local file cyrus-imapd.sysusers: %+v", srcs[1])
 	}
+}
+
+// TestSourcesArchSuffixFilter pins that source_$CARCH counts only for an
+// architecture the package declares. makepkg fetches no other, so a suffix
+// naming none of them is an ordinary variable that collides with the namespace
+// — and when arch itself cannot be pinned down, every suffix stays in: missing
+// a real source array is worse than looking at one makepkg would skip.
+func TestSourcesArchSuffixFilter(t *testing.T) {
+	// urls returns url->arch for every entry, since Sources() walks a map and
+	// the order between arrays is not fixed.
+	urls := func(pkg *Package) map[string]string {
+		out := map[string]string{}
+		for _, e := range pkg.Sources() {
+			out[e.URL] = e.Arch
+		}
+		return out
+	}
+
+	t.Run("skips a suffix no arch declares", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+arch=('x86_64')
+source_prefix="https://example.com/demo"
+source=('common.conf')
+source_x86_64=("${source_prefix}-amd64.tar.gz")
+source_aarch64=("${source_prefix}-arm64.tar.gz")
+`)
+		want := map[string]string{
+			"common.conf":                           "",
+			"https://example.com/demo-amd64.tar.gz": "x86_64",
+		}
+		if got := urls(pkg); !reflect.DeepEqual(got, want) {
+			t.Errorf("Sources() = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("keeps every suffix when a conditional sets arch", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+if [[ $CARCH == aarch64 ]]; then arch=('aarch64'); else arch=('x86_64'); fi
+source_x86_64=('amd64.tar.gz')
+source_aarch64=('arm64.tar.gz')
+`)
+		want := map[string]string{"amd64.tar.gz": "x86_64", "arm64.tar.gz": "aarch64"}
+		if got := urls(pkg); !reflect.DeepEqual(got, want) {
+			t.Errorf("Sources() = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("keeps every suffix when arch names a variable", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+arch=("$CARCH")
+source_riscv64=('riscv.tar.gz')
+`)
+		want := map[string]string{"riscv.tar.gz": "riscv64"}
+		if got := urls(pkg); !reflect.DeepEqual(got, want) {
+			t.Errorf("Sources() = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("keeps every suffix when arch is unset", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+source_x86_64=('amd64.tar.gz')
+`)
+		want := map[string]string{"amd64.tar.gz": "x86_64"}
+		if got := urls(pkg); !reflect.DeepEqual(got, want) {
+			t.Errorf("Sources() = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("counts an arch a brace group writes", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, `pkgname=demo
+arch=({i,x}686)
+source_i686=('x86.tar.gz')
+source_armv7h=('arm.tar.gz')
+`)
+		want := map[string]string{"x86.tar.gz": "i686"}
+		if got := urls(pkg); !reflect.DeepEqual(got, want) {
+			t.Errorf("Sources() = %v, want %v", got, want)
+		}
+	})
 }
 
 // TestParseSourceEntry pins makepkg's [filename::]url[#fragment][?query]

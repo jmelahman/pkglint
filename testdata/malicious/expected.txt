@@ -1,7 +1,7 @@
-malicious: grade F, 16 finding(s)
+malicious: grade F, 15 finding(s)
   PKGBUILD:1:1: info [PB908] no '# Maintainer:' comment; AUR convention names the responsible maintainer at the top of the PKGBUILD
   PKGBUILD:11:9: error [PB101] remote source "http://cdn.not-github.example/badpkg.tar.gz" has no checksum (SKIP): the download is never verified
-  PKGBUILD:11:9: error [PB104] source "http://cdn.not-github.example/badpkg.tar.gz" is fetched over unencrypted http://
+  PKGBUILD:11:9: error [PB104] source "http://cdn.not-github.example/badpkg.tar.gz" is fetched over unencrypted http:// with nothing verifying what arrives
   PKGBUILD:11:9: info [PB105] source host "cdn.not-github.example" differs from project url host "github.com"
   PKGBUILD:16:3: warn [PB201] curl downloads during build(); network access belongs in prepare() with pinned hashes
   PKGBUILD:16:3: critical [PB304] a network download is piped straight into bash and executed
@@ -13,5 +13,4 @@ malicious: grade F, 16 finding(s)
   PKGBUILD:25:3: warn [PB403] chmod 4755 creates a setuid/setgid file
   badpkg.install:2:3: critical [PB501] curl accesses the network from an install scriptlet running as root
   badpkg.install:3:3: error [PB502] scriptlet creates a user with login shell "/bin/bash"; system users should get nologin
-  badpkg.install:4:43: error [PB401] redirection to "/var/spool/cron/root" writes to an absolute system path
   badpkg.install:4:43: critical [PB502] scriptlet writes to "/var/spool/cron/root", a persistence location outside pacman's tracking

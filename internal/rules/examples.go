@@ -607,6 +607,132 @@ build() {
   cargo build --release --locked
 }`,
 	},
+	"PB950": {
+		Bad: `makedepends=('cmake')
+build() {
+  cmake -B build -S .   # prefix silently defaults to /usr/local
+  cmake --build build
+}`,
+		Good: `makedepends=('cmake')
+build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=None
+  cmake --build build
+}`,
+	},
+	"PB951": {
+		Bad: `makedepends=('cmake')
+build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+}`,
+		Good: `makedepends=('cmake')
+build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=None
+  cmake --build build
+}`,
+	},
+	"PB952": {
+		Bad: `build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=None
+  cmake --build build
+}`,
+		Good: `makedepends=('cmake')
+build() {
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=None
+  cmake --build build
+}`,
+	},
+	"PB953": {
+		Bad: `makedepends=('meson')
+build() {
+  meson setup build   # prefix silently defaults to /usr/local
+}`,
+		Good: `makedepends=('meson')
+build() {
+  meson setup build --prefix=/usr
+}`,
+	},
+	"PB954": {
+		Bad: `build() {
+  meson setup build --prefix=/usr
+}`,
+		Good: `makedepends=('meson')
+build() {
+  meson setup build --prefix=/usr
+}`,
+	},
+	"PB955": {
+		Bad: `makedepends=('meson')
+build() {
+  meson setup build --prefix=/usr
+  ninja -C build
+}`,
+		Good: `makedepends=('meson')
+build() {
+  meson setup build --prefix=/usr
+  meson compile -C build
+}`,
+	},
+	"PB960": {
+		Bad: `pkgname=demo-git
+makedepends=('git')
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')
+# no pkgver(): every build ships pkgver=1.0.0 whatever the checkout holds`,
+		Good: `pkgname=demo-git
+makedepends=('git')
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd demo
+  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}`,
+	},
+	"PB961": {
+		Bad: `pkgname=demo-git
+makedepends=('git')
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd demo
+  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}`,
+		Good: `pkgname=demo-git
+provides=('demo')
+conflicts=('demo')
+makedepends=('git')
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd demo
+  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}`,
+	},
+	"PB962": {
+		Bad: `source=("$pkgname-$pkgver::git+https://example.com/demo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")
+sha256sums=('SKIP')`,
+		Good: `source=("$pkgname::git+https://example.com/demo.git#commit=3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a")
+sha256sums=('SKIP')`,
+	},
+	"PB963": {
+		Bad: `pkgname=demo-git   # ...but the source is a release tarball
+source=("https://example.com/demo-1.0.0.tar.gz")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+		Good: `pkgname=demo-git
+provides=('demo')
+conflicts=('demo')
+makedepends=('git')
+source=("git+https://example.com/demo.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd demo
+  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}`,
+	},
 
 	// PB8xx examples illustrate what in the PKGBUILD produced the offending
 	// package contents; the rules themselves run on built .pkg.tar.* archives,

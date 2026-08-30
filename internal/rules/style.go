@@ -324,6 +324,104 @@ var styleRules = []Rule{
 			"for maintainers who manage toolchains themselves, so either spelling counts.",
 		Check: checkRustMakedepends,
 	},
+	{
+		ID:       "PB950",
+		Name:     "cmake-missing-prefix",
+		Severity: Warn,
+		Doc: "CMake's install prefix defaults to /usr/local, which Arch packages must not touch " +
+			"(PB921/PB820 flag the resulting files); the CMake package guidelines configure with " +
+			"-DCMAKE_INSTALL_PREFIX=/usr. A PKGBUILD that sets another prefix explicitly (/opt " +
+			"for a self-contained tree) has made a decision and is left alone.",
+		Check: checkCMakePrefix,
+	},
+	{
+		ID:       "PB951",
+		Name:     "cmake-build-type-release",
+		Severity: Warn,
+		Doc: "-DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after the flags makepkg exports, " +
+			"silently overriding Arch's chosen -O2 and fortify settings. The CMake package " +
+			"guidelines build with -DCMAKE_BUILD_TYPE=None so the distribution's CFLAGS are what " +
+			"actually compile the code.",
+		Check: checkCMakeBuildType,
+	},
+	{
+		ID:       "PB952",
+		Name:     "cmake-missing-makedepends",
+		Severity: Warn,
+		Doc: "cmake is not part of the base build environment: without it in makedepends the " +
+			"build fails in any clean chroot, however reliably it configures on the maintainer's " +
+			"machine.",
+		Check: checkCMakeMakedepends,
+	},
+	{
+		ID:       "PB953",
+		Name:     "meson-missing-prefix",
+		Severity: Warn,
+		Doc: "Meson's install prefix defaults to /usr/local, which Arch packages must not touch; " +
+			"the Meson package guidelines configure with --prefix=/usr, or use arch-meson, which " +
+			"passes the distribution defaults for you.",
+		Check: checkMesonPrefix,
+	},
+	{
+		ID:       "PB954",
+		Name:     "meson-missing-makedepends",
+		Severity: Warn,
+		Doc: "meson (and the arch-meson wrapper it ships) is not part of the base build " +
+			"environment: without meson in makedepends the build fails in any clean chroot.",
+		Check: checkMesonMakedepends,
+	},
+	{
+		ID:       "PB955",
+		Name:     "meson-ninja-direct",
+		Severity: Info,
+		Doc: "In a meson project, `meson compile -C build` wraps ninja with the environment and " +
+			"argument handling meson configured; calling ninja directly bypasses that and breaks " +
+			"quietly when the backend or its options change. The Meson package guidelines use the " +
+			"meson wrappers for compile, test and install.",
+		Check: checkMesonNinjaDirect,
+	},
+	{
+		ID:       "PB960",
+		Name:     "vcs-missing-pkgver-fn",
+		Severity: Warn,
+		Doc: "A VCS source that follows upstream tip fetches new code on every build, but without " +
+			"a pkgver() function the package version is whatever literal pkgver= holds — so two " +
+			"different checkouts build 'the same' version and pacman never offers the upgrade. " +
+			"The VCS package guidelines derive pkgver from the checkout (git describe, revision " +
+			"counts).",
+		Check: checkVCSPkgverFn,
+	},
+	{
+		ID:       "PB961",
+		Name:     "vcs-missing-provides-conflicts",
+		Severity: Info,
+		Doc: "A -git (or -svn, -hg, -bzr) package builds the same software as its release " +
+			"counterpart: without provides and conflicts on the base name, pacman happily " +
+			"installs both at once and dependencies on the release name are unsatisfiable by the " +
+			"VCS build. The VCS package guidelines declare both.",
+		Check: checkVCSProvidesConflicts,
+	},
+	{
+		ID:       "PB962",
+		Name:     "vcs-pkgver-in-folder",
+		Severity: Warn,
+		Doc: "makepkg keeps one persistent clone per checkout folder name and updates it " +
+			"incrementally. With $pkgver in the name:: prefix of a VCS source, pkgver() renames " +
+			"the folder on every version bump, so each build abandons the cache and re-clones the " +
+			"entire repository.",
+		Check: checkVCSPkgverInFolder,
+	},
+	{
+		ID:       "PB963",
+		Name:     "vcs-suffix-mismatch",
+		Severity: Info,
+		Doc: "The VCS suffixes are a promise about what gets built: a -git package follows " +
+			"upstream's tip. A -git name with no git source builds something else under that " +
+			"promise, and a git source pinned to a fixed commit or tag is a release snapshot " +
+			"wearing a -git name — either way users and AUR helpers are misled about what " +
+			"updates mean.",
+		Check: checkVCSSuffixMismatch,
+	},
 }
 
 // --- PB901: hardcoded host architecture ------------------------------------

@@ -26,6 +26,30 @@ func pkgnames(ctx *Context) []string {
 	return out
 }
 
+// allPkgNames returns pkgnames plus the statically-known pkgbase, for the
+// prefix/suffix conventions that read through either (as PB103's -git
+// exemption does).
+func allPkgNames(ctx *Context) []string {
+	out := pkgnames(ctx)
+	for _, e := range varElems(ctx.Pkg.Vars["pkgbase"]) {
+		if val, ok := staticVal(ctx.Pkg, e.Value); ok && val != "" {
+			out = append(out, val)
+		}
+	}
+	return out
+}
+
+// nameSuffixed reports whether any built package name (pkgname element or
+// pkgbase) ends with suffix.
+func nameSuffixed(ctx *Context, suffix string) bool {
+	for _, n := range allPkgNames(ctx) {
+		if strings.HasSuffix(n, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasDep reports whether field (or a declared _$arch variant of it) names the
 // package, ignoring version constraints.
 func hasDep(ctx *Context, field, name string) bool {

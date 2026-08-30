@@ -27,7 +27,7 @@ jobs:
       - name: Enforce coverage floor
         # A ratchet, not a target: raise it as gaps close, never lower it.
         run: |
-          floor=88.0
+          floor=89.0
           total=$(go tool cover -func=cover.out | awk '/^total:/ {gsub(/%/,""); print $3}')
           echo "total statement coverage: ${total}% (floor: ${floor}%)"
           awk -v t="$total" -v f="$floor" 'BEGIN { exit (t+0 >= f+0) ? 0 : 1 }' \

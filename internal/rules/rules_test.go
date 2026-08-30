@@ -1092,6 +1092,19 @@ else
   }
 fi`)})
 	})
+	t.Run("PB201 helper declared inside build() is still build's network access", func(t *testing.T) {
+		// A function declared in another function only exists while it runs:
+		// `_dl() { curl …; }` in build() is build() downloading however it is
+		// spelled. Re-homing it (as the top-level `if` idiom does) would strip
+		// it from every phase-keyed rule.
+		expectRule(t, "PB201", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  _dl() {
+    curl -O https://example.com/extra.tar.gz
+  }
+  _dl
+}`)})
+	})
 	t.Run("PB301 nested function body still reaches function-scoped rules", func(t *testing.T) {
 		// The flip side: once attributed to pkgver(), PB602 can see it. Before
 		// the nested-FuncDecl fix this network call was invisible to every rule
@@ -1569,6 +1582,18 @@ package() {
 		}
 		expectNoRule(t, "PB405", files)
 		expectRule(t, "PB502", files)
+	})
+	t.Run("PB405 skips a build-time removal but PB401 still reports it", func(t *testing.T) {
+		// writeTargetViolation defers sensitive paths to PB405, and PB405
+		// stays silent on deleters by design — so the deferral must lapse for
+		// them, or erasing pacman.conf becomes the one /etc write nothing
+		// reports while `rm /etc/other.conf` next to it is an error.
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  rm -f /etc/pacman.conf
+}`)}
+		expectNoRule(t, "PB405", files)
+		expectRule(t, "PB401", files)
 	})
 	t.Run("PB405 writing a sudoers fragment is still critical", func(t *testing.T) {
 		expectRule(t, "PB405", map[string]string{

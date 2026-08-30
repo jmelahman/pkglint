@@ -216,8 +216,16 @@ func (ctx *Context) collect(u *pkgbuild.Unit, fn string, root *syntax.Stmt) {
 		// code that runs on source.
 		if fd, ok := node.(*syntax.FuncDecl); ok && fd.Name != nil {
 			ctx.localFuncs[u.Path+"\x00"+fd.Name.Value] = true
-			ctx.collect(u, fd.Name.Value, fd.Body)
-			return false
+			if fn == "" {
+				ctx.collect(u, fd.Name.Value, fd.Body)
+				return false
+			}
+			// Declared inside another function, though, the body only exists
+			// while that function runs — a `_dl() { curl …; }` in build() is
+			// build()'s network access however it is spelled — so its commands
+			// keep the enclosing attribution and the phase rules that key on
+			// it. Only the top-level `if` idiom above re-homes commands.
+			return true
 		}
 		stmt, ok := node.(*syntax.Stmt)
 		if !ok {

@@ -96,12 +96,18 @@ var fileWriters = map[string]bool{
 // Scriptlet removals are PB502's, and it already words them as removals.
 var fileDeleters = map[string]bool{"rm": true, "rmdir": true}
 
-func writeTargetViolation(target string) string {
+// writeTargetViolation names the hazard in writing to target, or "" when the
+// write is fine (or another rule's to report). deleting says the command
+// erases the path rather than creating it: PB405 skips deleters — retracting
+// trust configuration is not installing it — so for them the sensitive-path
+// deferral below would hand the finding to a rule that stays silent, and the
+// build-time write must be reported here after all.
+func writeTargetViolation(target string, deleting bool) string {
 	t := strings.TrimSpace(target)
 	if t == "" || strings.Contains(t, "\x00") {
 		return ""
 	}
-	if sensitiveWritePath(t) != "" {
+	if !deleting && sensitiveWritePath(t) != "" {
 		return "" // reported by PB405 instead, to avoid a duplicate finding
 	}
 	for _, p := range allowedWritePrefixes {
@@ -156,7 +162,7 @@ func checkWritesOutside(ctx *Context) []Finding {
 					return true
 				}
 				target, _ := pkgbuild.RenderWord(r.Word, vars)
-				if why := writeTargetViolation(target); why != "" {
+				if why := writeTargetViolation(target, false); why != "" {
 					out = append(out, findingAt("PB401", Error, u.Path, r.Pos(),
 						"redirection to %q %s", target, why))
 				}
@@ -176,7 +182,7 @@ func checkWritesOutside(ctx *Context) []Finding {
 			continue
 		}
 		for _, target := range writeDests(c) {
-			if why := writeTargetViolation(target); why != "" {
+			if why := writeTargetViolation(target, fileDeleters[c.Name]); why != "" {
 				out = append(out, c.finding("PB401", Error, "%s %s (%q)", c.Name, why, target))
 			}
 		}

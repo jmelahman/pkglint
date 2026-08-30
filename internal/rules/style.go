@@ -185,6 +185,145 @@ var styleRules = []Rule{
 			"can set CGO_ENABLED=0 instead, which also silences this rule.",
 		Check: checkGoCgoFlags,
 	},
+	{
+		ID:       "PB918",
+		Name:     "self-provides",
+		Severity: Warn,
+		Doc: "Every package implicitly provides its own name, so listing $pkgname in provides is " +
+			"dead metadata — at best ignored, at worst masking a typo of the capability the entry " +
+			"was meant to declare. The Arch package guidelines say provides is for other " +
+			"capabilities the package supplies (a library soname, a renamed predecessor).",
+		Check: checkSelfProvides,
+	},
+	{
+		ID:       "PB919",
+		Name:     "self-conflicts",
+		Severity: Warn,
+		Doc: "A package can never conflict with itself — pacman resolves same-name conflicts by " +
+			"upgrading — so listing $pkgname in conflicts is dead metadata that misleads readers " +
+			"about what the package actually displaces. The Arch package guidelines say to drop it.",
+		Check: checkSelfConflicts,
+	},
+	{
+		ID:       "PB920",
+		Name:     "non-spdx-license",
+		Severity: Info,
+		Doc: "Arch migrated the license field to SPDX expressions (RFC 16): 'GPL-2.0-or-later' " +
+			"says which GPL and whether later versions qualify, where the legacy 'GPL' said " +
+			"neither, and license-audit tooling parses only the SPDX form. Only known-legacy " +
+			"spellings are flagged, so a valid-but-uncommon SPDX identifier never is.",
+		Check: checkNonSPDXLicense,
+	},
+	{
+		ID:       "PB921",
+		Name:     "usr-local-install",
+		Severity: Warn,
+		Doc: "/usr/local is reserved for software the administrator builds outside the package " +
+			"manager; the Arch package guidelines forbid packages from touching it. This is the " +
+			"PKGBUILD-side complement of PB820, which flags the same files in the built archive. " +
+			"Install under /usr (usually /usr/bin, /usr/lib, /usr/share) instead.",
+		Check: checkUsrLocalInstall,
+	},
+	{
+		ID:       "PB922",
+		Name:     "usr-libexec-install",
+		Severity: Info,
+		Doc: "Arch does not use /usr/libexec: the package guidelines put internal executables " +
+			"that users should not invoke directly in /usr/lib/$pkgname instead. Upstream build " +
+			"systems often default libexecdir to /usr/libexec, so the fix is usually " +
+			"--libexecdir=/usr/lib on configure rather than moving files by hand.",
+		Check: checkUsrLibexecInstall,
+	},
+	{
+		ID:       "PB930",
+		Name:     "python-tox",
+		Severity: Warn,
+		Doc: "tox exists to test against multiple Python versions by building fresh virtualenvs " +
+			"and re-resolving dependencies from PyPI — the opposite of checking that *this* " +
+			"package works against *this* system's packages, and a network dependency inside " +
+			"check(). The Arch Python package guidelines forbid it; invoke pytest (or upstream's " +
+			"runner) directly.",
+		Check: checkPythonTox,
+	},
+	{
+		ID:       "PB931",
+		Name:     "python-lint-checkdepends",
+		Severity: Info,
+		Doc: "pytest plugins like pytest-cov, pytest-black or pytest-mypy lint upstream's code " +
+			"style or measure coverage; neither says anything about whether the built package " +
+			"works, and a new linter release starts failing builds that did not change. The Arch " +
+			"Python package guidelines say check() runs tests, not upstream's CI.",
+		Check: checkPythonLintCheckdepends,
+	},
+	{
+		ID:       "PB932",
+		Name:     "python-prebuilt-wheel",
+		Severity: Warn,
+		Doc: "A .whl source is a pre-built artifact: what lands in the package was compiled by " +
+			"whoever uploaded the wheel, not by this PKGBUILD, so nothing reviewed here is what " +
+			"ships. The Arch Python package guidelines require building from the source " +
+			"distribution except where no sdist exists at all.",
+		Check: checkPythonWheelSource,
+	},
+	{
+		ID:       "PB933",
+		Name:     "python-missing-build-backend",
+		Severity: Warn,
+		Doc: "`python -m build` and `python -m installer` come from the python-build and " +
+			"python-installer packages, which makepkg does not install for you: without them in " +
+			"makedepends the build fails in any clean chroot, however reliably it works on the " +
+			"maintainer's machine.",
+		Check: checkPythonBuildBackend,
+	},
+	{
+		ID:       "PB934",
+		Name:     "python-setup-py",
+		Severity: Warn,
+		Doc: "`python setup.py install` runs the distutils flow that setuptools has removed: it " +
+			"bypasses PEP 517 build isolation, writes egg-info metadata pip cannot manage, and " +
+			"breaks outright on modern setuptools. The Arch Python package guidelines build with " +
+			"`python -m build` and stage with `python -m installer`.",
+		Check: checkPythonSetupPy,
+	},
+	{
+		ID:       "PB940",
+		Name:     "cargo-check-release",
+		Severity: Warn,
+		Doc: "--release on cargo test/check disables debug assertions and integer-overflow " +
+			"checks — precisely the invariants a test run exists to exercise. The Arch Rust " +
+			"package guidelines run check() without --release; the shipped binary is still built " +
+			"--release in build().",
+		Check: checkCargoCheckRelease,
+	},
+	{
+		ID:       "PB941",
+		Name:     "cargo-install-tracked",
+		Severity: Warn,
+		Doc: "cargo install records what it installed in .crates.toml and .crates2.json under the " +
+			"install root; staged into $pkgdir those files ship in the package, conflict with " +
+			"every other Rust package doing the same, and describe a cargo state directory that " +
+			"does not exist on the user's system. The Rust package guidelines pass --no-track.",
+		Check: checkCargoInstallTracked,
+	},
+	{
+		ID:       "PB942",
+		Name:     "cargo-build-not-release",
+		Severity: Info,
+		Doc: "cargo builds the unoptimized, debug-assertion-laden dev profile unless told " +
+			"otherwise, so a plain `cargo build` in build() ships a slow binary. The Arch Rust " +
+			"package guidelines build with --release; a PKGBUILD that selects another profile " +
+			"explicitly (--profile) has made the call and is left alone.",
+		Check: checkCargoBuildRelease,
+	},
+	{
+		ID:       "PB944",
+		Name:     "rust-missing-makedepends",
+		Severity: Info,
+		Doc: "cargo is not part of the base build environment: without rust (or rustup) in " +
+			"makedepends the build fails in any clean chroot. rustup satisfies the dependency " +
+			"for maintainers who manage toolchains themselves, so either spelling counts.",
+		Check: checkRustMakedepends,
+	},
 }
 
 // --- PB901: hardcoded host architecture ------------------------------------

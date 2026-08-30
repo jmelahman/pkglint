@@ -230,6 +230,7 @@ func addIgnoresAll(t *testing.T, files map[string]string) map[string]string {
 func TestAddIgnores(t *testing.T) {
 	t.Run("inserts an indented directive above the finding", func(t *testing.T) {
 		got := addIgnoresAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('rust')
 build() {
   cargo build --release
 }`)})["PKGBUILD"]

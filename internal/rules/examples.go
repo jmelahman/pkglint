@@ -508,6 +508,105 @@ optdepends=('ffmpeg: video export')   # already a hard dependency`,
   go build -o demo .
 }`,
 	},
+	"PB918": {
+		Bad:  `provides=("$pkgname")   # a package always provides itself`,
+		Good: `provides=('demo-cli')   # a capability other packages can depend on`,
+	},
+	"PB919": {
+		Bad:  `conflicts=("$pkgname")   # a package can never conflict with itself`,
+		Good: `conflicts=('demo-legacy')   # the package this one actually displaces`,
+	},
+	"PB920": {
+		Bad:  `license=('GPL')   # which GPL? or-later or only?`,
+		Good: `license=('GPL-2.0-or-later')`,
+	},
+	"PB921": {
+		Bad: `package() {
+  install -Dm755 demo "$pkgdir/usr/local/bin/demo"
+}`,
+		Good: `package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"
+}`,
+	},
+	"PB922": {
+		Bad: `package() {
+  install -Dm755 helper "$pkgdir/usr/libexec/demo/helper"
+}`,
+		Good: `package() {
+  install -Dm755 helper "$pkgdir/usr/lib/demo/helper"
+}`,
+	},
+	"PB930": {
+		Bad: `checkdepends=('python-tox')
+check() {
+  tox
+}`,
+		Good: `checkdepends=('python-pytest')
+check() {
+  pytest
+}`,
+	},
+	"PB931": {
+		Bad:  `checkdepends=('python-pytest' 'python-pytest-cov')`,
+		Good: `checkdepends=('python-pytest')`,
+	},
+	"PB932": {
+		Bad: `source=("https://files.pythonhosted.org/packages/py3/d/demo/demo-1.0-py3-none-any.whl")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+		Good: `source=("https://files.pythonhosted.org/packages/source/d/demo/demo-1.0.tar.gz")
+sha256sums=('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')`,
+	},
+	"PB933": {
+		Bad: `build() {
+  python -m build --wheel --no-isolation
+}`,
+		Good: `makedepends=('python-build' 'python-installer')
+build() {
+  python -m build --wheel --no-isolation
+}`,
+	},
+	"PB934": {
+		Bad: `build() {
+  python setup.py build
+}`,
+		Good: `makedepends=('python-build' 'python-installer')
+build() {
+  python -m build --wheel --no-isolation
+}`,
+	},
+	"PB940": {
+		Bad: `check() {
+  cargo test --release --locked
+}`,
+		Good: `check() {
+  cargo test --locked
+}`,
+	},
+	"PB941": {
+		Bad: `package() {
+  cargo install --locked --root "$pkgdir/usr" --path .
+}`,
+		Good: `package() {
+  cargo install --locked --no-track --root "$pkgdir/usr" --path .
+}`,
+	},
+	"PB942": {
+		Bad: `build() {
+  cargo build --locked
+}`,
+		Good: `build() {
+  cargo build --release --locked
+}`,
+	},
+	"PB944": {
+		Bad: `build() {
+  cargo build --release --locked
+}`,
+		Good: `makedepends=('rust')
+build() {
+  cargo build --release --locked
+}`,
+	},
 
 	// PB8xx examples illustrate what in the PKGBUILD produced the offending
 	// package contents; the rules themselves run on built .pkg.tar.* archives,

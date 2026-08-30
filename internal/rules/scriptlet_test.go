@@ -5,6 +5,37 @@ import (
 	"testing"
 )
 
+// echo/printf arguments are text being printed, not files being touched, so a
+// post-install message mentioning ~/.zshrc must not trip the persistence rule.
+// An actual write via redirection still must.
+func TestScriptletPersistenceMessagesNotFlagged(t *testing.T) {
+	t.Run("PB502 not for instructions echoed to the user", func(t *testing.T) {
+		expectNoRule(t, "PB502", map[string]string{
+			"PKGBUILD": pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n" +
+				"  echo \"You have to execute 'cp /usr/share/oh-my-zsh/zshrc ~/.zshrc' to use it.\"\n" +
+				"}\n" +
+				"post_remove() {\n" +
+				"  printf '%s\\n' 'Please remove ~/.zshrc to avoid errors.'\n" +
+				"}\n",
+		})
+	})
+
+	t.Run("PB502 still fires when echo redirects into a persistence path", func(t *testing.T) {
+		expectRule(t, "PB502", map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n  echo 'export PATH=/opt/foo:$PATH' >> ~/.zshrc\n}\n",
+		})
+	})
+
+	t.Run("PB502 still fires for non-output commands with persistence args", func(t *testing.T) {
+		expectRule(t, "PB502", map[string]string{
+			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+			"foo.install": "post_install() {\n  cp /usr/share/foo/zshrc ~/.zshrc\n}\n",
+		})
+	})
+}
+
 // A scriptlet that fails to parse is walked by no rule, so the parse failure
 // itself has to be reported (PB503) rather than silently dropped.
 func TestScriptletParseErrorReported(t *testing.T) {

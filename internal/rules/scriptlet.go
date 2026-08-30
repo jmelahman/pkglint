@@ -144,6 +144,11 @@ func checkScriptletPersistence(ctx *Context) []Finding {
 					"scriptlet enables a systemd unit; prefer documenting this or shipping a preset"))
 			}
 			continue
+		case "echo", "printf":
+			// Arguments are text being printed, often post-install instructions
+			// that mention ~/.zshrc and friends. These commands only touch a
+			// file through a redirect, which the redirect walk below catches.
+			continue
 		}
 		for _, a := range c.Args {
 			// The hints overlap (/etc/zsh and .zshrc both match /etc/zsh/.zshrc),

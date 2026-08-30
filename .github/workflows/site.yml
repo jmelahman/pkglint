@@ -29,10 +29,10 @@ jobs:
           path: .cache
           key: aur-snapshots-${{ github.run_id }}
           restore-keys: aur-snapshots-
-      # The corpus is every base the AUR has seen a change to in the last 90
-      # days: ~23,600, still far more than one run can download. Widening the
+      # The corpus is every base the AUR has seen a change to in the last 180
+      # days: ~35,000, still far more than one run can download. Widening the
       # window is a one-line change and the state carries over, so this can
-      # grow later — 180d is ~35,000 bases and a year is ~47,600.
+      # grow later — a year is ~47,600 bases.
       #
       # data/state.jsonl carries the previous scan, so a base whose
       # LastModified has not moved is served from it without a fetch, and
@@ -58,7 +58,7 @@ jobs:
       - run: >
           go run ./site
           -maintainer Jamison
-          -since-days 90
+          -since-days 180
           -top 500
           -budget 8000
           -deadline 1h

@@ -24,7 +24,12 @@ somepkg: grade F, 3 finding(s)
   PKGBUILD:16:3: critical [PB304] a network download is piped straight into bash and executed
   PKGBUILD:11:1: error [PB101] remote source "http://..." has no checksum (SKIP): the download is never verified
   PKGBUILD:24:3: error [PB402] sudo escalates privileges during a build; ...
+
+1 package linted: 1 with findings
 ```
+
+Packages with nothing to report stay out of the way — they are only counted in
+the closing summary line (`--verbose` lists them individually).
 
 ## Install
 
@@ -56,6 +61,7 @@ pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
   --fail-on SEVERITY           # exit 1 at or above: info, warn, error (default), critical, never
   --ignore PB105,PB206         # disable rules
   --color auto|always|never    # colorize text output (auto = only on a terminal; honors NO_COLOR)
+  --verbose                    # list packages with no findings individually, not just in the summary
   --rules                      # list every rule with its documentation
   --fix                        # apply safe auto-fixes in place
   --unsafe-fix                 # also apply behavior-changing fixes (implies --fix)

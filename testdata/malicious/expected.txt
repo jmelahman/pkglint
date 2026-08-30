@@ -14,3 +14,5 @@ malicious: grade F, 15 finding(s)
   badpkg.install:2:3: critical [PB501] curl accesses the network from an install scriptlet running as root
   badpkg.install:3:3: error [PB502] scriptlet creates a user with login shell "/bin/bash"; system users should get nologin
   badpkg.install:4:43: critical [PB502] scriptlet writes to "/var/spool/cron/root", a persistence location outside pacman's tracking
+
+1 package linted: 1 with findings

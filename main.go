@@ -43,6 +43,7 @@ func run(args []string, stdout io.Writer) int {
 		offline    bool
 		noInline   bool
 		addIgnores bool
+		verbose    bool
 	)
 
 	code := 0
@@ -84,7 +85,7 @@ archives (default: .)`,
 				code = runFix(paths, ignoreSet(ignore), level, diff, offline, noInline, stdout)
 				return nil
 			}
-			code = lint(paths, format, failOn, ignore, color, noInline, stdout)
+			code = lint(paths, format, failOn, ignore, color, noInline, verbose, stdout)
 			return nil
 		},
 	}
@@ -99,6 +100,7 @@ archives (default: .)`,
 	cmd.Flags().BoolVar(&offline, "offline", false, "with --fix: skip fixes needing network access (e.g. resolving VCS refs)")
 	cmd.Flags().BoolVar(&noInline, "no-inline-ignores", false, "disregard '# pkglint: ignore=' directives, reporting the findings they suppress (audit a package without trusting its annotations)")
 	cmd.Flags().BoolVar(&addIgnores, "add-ignores", false, "insert '# pkglint: ignore=' directives suppressing every current finding")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "text output: list packages with no findings individually instead of only in the summary")
 	cmd.SetVersionTemplate("pkglint {{.Version}}\n")
 	cmd.SetArgs(args)
 	cmd.SetOut(stdout)
@@ -127,8 +129,9 @@ func ignoreSet(csv string) map[string]bool {
 // process exit code. A path may be a package directory / PKGBUILD (static
 // PKGBUILD analysis) or a built .pkg.tar.* archive (package analysis).
 // noInline disregards the packages' own inline-ignore directives, so findings
-// they suppress are reported anyway.
-func lint(paths []string, format, failOn, ignore, color string, noInline bool, stdout io.Writer) int {
+// they suppress are reported anyway. verbose lists findings-free packages in
+// text output, which otherwise only counts them in the closing summary.
+func lint(paths []string, format, failOn, ignore, color string, noInline, verbose bool, stdout io.Writer) int {
 	ignored := ignoreSet(ignore)
 
 	if len(paths) == 0 {
@@ -188,7 +191,7 @@ func lint(paths []string, format, failOn, ignore, color string, noInline bool, s
 			fmt.Fprintln(os.Stderr, "pkglint:", err)
 			return 2
 		}
-		report.RenderText(stdout, reports, colorize)
+		report.RenderText(stdout, reports, colorize, verbose)
 	default:
 		fmt.Fprintf(os.Stderr, "pkglint: unknown format %q\n", format)
 		return 2

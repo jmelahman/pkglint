@@ -168,12 +168,20 @@ func (s styler) grade(g string) string {
 // grade are trusted enum/registry values. Color is applied only around those
 // trusted tokens (and the already-sanitized name), so untrusted content can
 // neither carry its own escapes nor break out of ours.
-func RenderText(w io.Writer, reports []PackageReport, color bool) {
+//
+// Packages with no findings are silent unless verbose is set; a one-line
+// summary at the end accounts for every package either way.
+func RenderText(w io.Writer, reports []PackageReport, color, verbose bool) {
 	s := styler(color)
-	for i, r := range reports {
-		if i > 0 {
+	printed := 0
+	for _, r := range reports {
+		if r.Err == "" && len(r.Findings) == 0 && !verbose {
+			continue
+		}
+		if printed > 0 {
 			fmt.Fprintln(w)
 		}
+		printed++
 		if r.Err != "" {
 			fmt.Fprintf(w, "%s: %s %s\n",
 				s.wrap(ansiBold, sanitize(r.Name)), s.wrap(ansiBoldRed, "error:"), sanitize(r.Err))
@@ -196,6 +204,46 @@ func RenderText(w io.Writer, reports []PackageReport, color bool) {
 				sanitize(f.Path), f.Line, f.Col, s.severity(f.Severity), s.wrap(ansiDim, "["+f.RuleID+"]"), sanitize(f.Message))
 		}
 	}
+	if printed > 0 {
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintf(w, "%s\n", summarize(reports))
+}
+
+// summarize condenses the run into one line: how many packages were linted and
+// how they split across clean / with findings / failed to load (zero-count
+// groups are omitted).
+func summarize(reports []PackageReport) string {
+	clean, flawed, failed := 0, 0, 0
+	for _, r := range reports {
+		switch {
+		case r.Err != "":
+			failed++
+		case len(r.Findings) > 0:
+			flawed++
+		default:
+			clean++
+		}
+	}
+	noun := "packages"
+	if len(reports) == 1 {
+		noun = "package"
+	}
+	var parts []string
+	if clean > 0 {
+		parts = append(parts, fmt.Sprintf("%d clean", clean))
+	}
+	if flawed > 0 {
+		parts = append(parts, fmt.Sprintf("%d with findings", flawed))
+	}
+	if failed > 0 {
+		parts = append(parts, fmt.Sprintf("%d failed to load", failed))
+	}
+	out := fmt.Sprintf("%d %s linted", len(reports), noun)
+	if len(parts) > 0 {
+		out += ": " + strings.Join(parts, ", ")
+	}
+	return out
 }
 
 // RenderJSON writes reports as a JSON array.

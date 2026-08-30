@@ -72,7 +72,7 @@ func TestRenderTextSanitizesUntrustedFields(t *testing.T) {
 		Col:      1,
 	}})
 	var buf bytes.Buffer
-	RenderText(&buf, []PackageReport{r}, false)
+	RenderText(&buf, []PackageReport{r}, false, false)
 	out := buf.String()
 
 	for _, bad := range []rune{0x1b, 0x0d, 0x07} {
@@ -92,7 +92,7 @@ func TestRenderTextSanitizesUntrustedFields(t *testing.T) {
 func TestRenderTextSanitizesNameAndErr(t *testing.T) {
 	r := NewError("pkg\x1b[2Kname", errors.New("boom\rspoofed: grade A, no findings"))
 	var buf bytes.Buffer
-	RenderText(&buf, []PackageReport{r}, false)
+	RenderText(&buf, []PackageReport{r}, false, false)
 	out := buf.String()
 
 	for _, bad := range []rune{0x1b, 0x0d} {
@@ -102,6 +102,45 @@ func TestRenderTextSanitizesNameAndErr(t *testing.T) {
 	}
 	if !strings.Contains(out, `\x1b[2K`) || !strings.Contains(out, `boom\x0dspoofed`) {
 		t.Errorf("name/err not escaped as expected:\n%q", out)
+	}
+}
+
+// TestRenderTextSummary pins the quiet-by-default contract: packages with no
+// findings appear only in the closing summary unless verbose is set, and the
+// summary accounts for every package.
+func TestRenderTextSummary(t *testing.T) {
+	reports := []PackageReport{
+		New("/some/dir/clean", nil),
+		New("/some/dir/flawed", []rules.Finding{
+			{RuleID: "PB204", Severity: rules.Warn, Message: "m", Path: "p", Line: 3, Col: 1},
+		}),
+		NewError("/some/dir/broken", errors.New("boom")),
+	}
+
+	var buf bytes.Buffer
+	RenderText(&buf, reports, false, false)
+	out := buf.String()
+	if strings.Contains(out, "clean:") {
+		t.Errorf("findings-free package listed without verbose:\n%s", out)
+	}
+	for _, want := range []string{"flawed: grade B", "broken: error: boom", "3 packages linted: 1 clean, 1 with findings, 1 failed to load"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	buf.Reset()
+	RenderText(&buf, reports, false, true)
+	if !strings.Contains(buf.String(), "clean: grade A, no findings") {
+		t.Errorf("verbose output missing the findings-free package:\n%s", buf.String())
+	}
+
+	// A single clean package renders as nothing but the summary, with zero-count
+	// groups omitted and the noun singular.
+	buf.Reset()
+	RenderText(&buf, []PackageReport{New("/some/dir/clean", nil)}, false, false)
+	if got, want := buf.String(), "1 package linted: 1 clean\n"; got != want {
+		t.Errorf("clean-only output = %q, want %q", got, want)
 	}
 }
 
@@ -176,8 +215,8 @@ func TestRenderTextColor(t *testing.T) {
 		NewError("broken", errors.New("boom")),
 	}
 	var colored, plain bytes.Buffer
-	RenderText(&colored, reports, true)
-	RenderText(&plain, reports, false)
+	RenderText(&colored, reports, true, false)
+	RenderText(&plain, reports, false, false)
 
 	out := colored.String()
 	for _, want := range []string{

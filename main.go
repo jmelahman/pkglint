@@ -32,15 +32,17 @@ func main() {
 
 func run(args []string, stdout io.Writer) int {
 	var (
-		format    string
-		failOn    string
-		ignore    string
-		color     string
-		listRules bool
-		doFix     bool
-		unsafeFix bool
-		diff      bool
-		offline   bool
+		format     string
+		failOn     string
+		ignore     string
+		color      string
+		listRules  bool
+		doFix      bool
+		unsafeFix  bool
+		diff       bool
+		offline    bool
+		noInline   bool
+		addIgnores bool
 	)
 
 	code := 0
@@ -67,15 +69,22 @@ archives (default: .)`,
 				}
 				return nil
 			}
+			if addIgnores {
+				if doFix || unsafeFix || noInline {
+					return fmt.Errorf("--add-ignores cannot be combined with --fix, --unsafe-fix, or --no-inline-ignores")
+				}
+				code = runAddIgnores(paths, ignoreSet(ignore), diff, stdout)
+				return nil
+			}
 			if doFix || unsafeFix {
 				level := rules.FixSafe
 				if unsafeFix {
 					level = rules.FixUnsafe
 				}
-				code = runFix(paths, ignoreSet(ignore), level, diff, offline, stdout)
+				code = runFix(paths, ignoreSet(ignore), level, diff, offline, noInline, stdout)
 				return nil
 			}
-			code = lint(paths, format, failOn, ignore, color, stdout)
+			code = lint(paths, format, failOn, ignore, color, noInline, stdout)
 			return nil
 		},
 	}
@@ -86,8 +95,10 @@ archives (default: .)`,
 	cmd.Flags().BoolVar(&listRules, "rules", false, "print all rules and exit")
 	cmd.Flags().BoolVar(&doFix, "fix", false, "apply safe auto-fixes in place")
 	cmd.Flags().BoolVar(&unsafeFix, "unsafe-fix", false, "apply safe and behavior-changing auto-fixes in place (implies --fix)")
-	cmd.Flags().BoolVar(&diff, "diff", false, "with --fix/--unsafe-fix: show changes instead of writing them")
+	cmd.Flags().BoolVar(&diff, "diff", false, "with --fix/--unsafe-fix/--add-ignores: show changes instead of writing them")
 	cmd.Flags().BoolVar(&offline, "offline", false, "with --fix: skip fixes needing network access (e.g. resolving VCS refs)")
+	cmd.Flags().BoolVar(&noInline, "no-inline-ignores", false, "disregard '# pkglint: ignore=' directives, reporting the findings they suppress (audit a package without trusting its annotations)")
+	cmd.Flags().BoolVar(&addIgnores, "add-ignores", false, "insert '# pkglint: ignore=' directives suppressing every current finding")
 	cmd.SetVersionTemplate("pkglint {{.Version}}\n")
 	cmd.SetArgs(args)
 	cmd.SetOut(stdout)
@@ -115,7 +126,9 @@ func ignoreSet(csv string) map[string]bool {
 // lint runs the rules over each path and renders the reports, returning the
 // process exit code. A path may be a package directory / PKGBUILD (static
 // PKGBUILD analysis) or a built .pkg.tar.* archive (package analysis).
-func lint(paths []string, format, failOn, ignore, color string, stdout io.Writer) int {
+// noInline disregards the packages' own inline-ignore directives, so findings
+// they suppress are reported anyway.
+func lint(paths []string, format, failOn, ignore, color string, noInline bool, stdout io.Writer) int {
 	ignored := ignoreSet(ignore)
 
 	if len(paths) == 0 {
@@ -150,6 +163,9 @@ func lint(paths []string, format, failOn, ignore, color string, stdout io.Writer
 		if err != nil {
 			reports = append(reports, report.NewError(path, err))
 			continue
+		}
+		if noInline {
+			pkg.Suppressions = nil
 		}
 		findings := rules.Run(pkg, ignored)
 		reports = append(reports, report.New(path, findings))
@@ -223,7 +239,8 @@ func colorEnabled(mode string, w io.Writer) (bool, error) {
 // runFix applies auto-fixes at the given level, writing files in place (or,
 // with diff, printing the changes it would make). It also nudges toward the
 // manual follow-ups for findings that can't be rewritten mechanically.
-func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, offline bool, stdout io.Writer) int {
+// noInline disregards inline-ignore directives, so suppressed fixes apply too.
+func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, offline, noInline bool, stdout io.Writer) int {
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
@@ -242,6 +259,9 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 			fmt.Fprintf(os.Stderr, "pkglint: %s: %v\n", path, err)
 			rc = 2
 			continue
+		}
+		if noInline {
+			pkg.Suppressions = nil
 		}
 		applied := 0
 		for _, r := range rules.Fix(pkg, ignore, level, env) {
@@ -272,6 +292,57 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 			fmt.Fprintf(stdout, "%s: %d fix(es) would be applied (dry run)\n", rel(path), applied)
 		default:
 			fmt.Fprintf(stdout, "%s: applied %d fix(es)\n", rel(path), applied)
+		}
+	}
+	return rc
+}
+
+// runAddIgnores inserts inline-ignore directives suppressing every finding the
+// packages currently report (or, with diff, prints the insertions it would
+// make). It is the reviewed-and-accepted counterpart to --fix: the findings
+// stay in the file as annotations instead of being repaired.
+func runAddIgnores(paths []string, ignore map[string]bool, diff bool, stdout io.Writer) int {
+	if len(paths) == 0 {
+		paths = []string{"."}
+	}
+	rc := 0
+	for _, path := range paths {
+		if pkgfile.IsPackagePath(path) {
+			fmt.Fprintf(stdout, "%s: built packages cannot carry ignore directives; annotate the PKGBUILD instead\n", rel(path))
+			continue
+		}
+		pkg, err := pkgbuild.Load(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pkglint: %s: %v\n", path, err)
+			rc = 2
+			continue
+		}
+		applied := 0
+		for _, r := range rules.AddIgnores(pkg, ignore) {
+			if !r.Changed() {
+				continue
+			}
+			for _, e := range r.Applied {
+				applied++
+				fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", rel(e.Path), e.Line, e.RuleID, e.Desc)
+				if diff {
+					fmt.Fprint(stdout, editHunk(r.Original, e))
+				}
+			}
+			if !diff {
+				if err := writeFixed(r.Path, r.Fixed); err != nil {
+					fmt.Fprintf(os.Stderr, "pkglint: writing %s: %v\n", r.Path, err)
+					rc = 2
+				}
+			}
+		}
+		switch {
+		case applied == 0:
+			fmt.Fprintf(stdout, "%s: no findings to suppress\n", rel(path))
+		case diff:
+			fmt.Fprintf(stdout, "%s: %d ignore directive(s) would be added (dry run)\n", rel(path), applied)
+		default:
+			fmt.Fprintf(stdout, "%s: added %d ignore directive(s)\n", rel(path), applied)
 		}
 	}
 	return rc

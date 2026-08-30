@@ -1,0 +1,2 @@
+suppressed: grade B, 1 finding(s)
+  PKGBUILD:16:3: warn [PB913] ignore directive for PB203 matches no finding on this or the next line; remove it

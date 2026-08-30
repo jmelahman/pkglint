@@ -463,6 +463,15 @@ makedepends=('cmake')`,
 optdepends=('ffmpeg: video export')   # already a hard dependency`,
 		Good: `optdepends=('ffmpeg: video export')`,
 	},
+	"PB913": {
+		Bad: `build() {
+  # pkglint: ignore=PB203
+  cargo build --locked --release   # --locked is present, so nothing suppresses
+}`,
+		Good: `build() {
+  cargo build --locked --release
+}`,
+	},
 
 	// PB8xx examples illustrate what in the PKGBUILD produced the offending
 	// package contents; the rules themselves run on built .pkg.tar.* archives,

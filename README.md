@@ -59,8 +59,10 @@ pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
   --rules                      # list every rule with its documentation
   --fix                        # apply safe auto-fixes in place
   --unsafe-fix                 # also apply behavior-changing fixes (implies --fix)
-  --diff                       # with --fix/--unsafe-fix: show changes instead of writing
+  --diff                       # with --fix/--unsafe-fix/--add-ignores: show changes instead of writing
   --offline                    # with --fix: skip fixes needing network (e.g. VCS ref resolution)
+  --add-ignores                # insert ignore directives suppressing every current finding
+  --no-inline-ignores          # disregard ignore directives (audit an untrusted package)
 ```
 
 Suppress a reviewed, intentional finding inline:
@@ -72,7 +74,16 @@ go build -o "$pkgname" .
 
 The directive covers its own line and the line below it, in the file it appears
 in only: an `ignore=` in an `.install` scriptlet never affects the `PKGBUILD`,
-or vice versa.
+or vice versa. `--add-ignores` writes these directives for you, one per finding
+still reported, so a package can adopt pkglint without first fixing (or while
+deliberately keeping) what it flags; `--diff` previews the insertions.
+
+Directives are audited, not just obeyed. A directive that no longer matches a
+finding on its line or the next — the issue was fixed, or the ID was never a
+pkglint rule — is itself flagged (PB913, `stale-ignore-directive`), and `--fix`
+deletes it, so a fixed issue cannot leave behind a comment that would silence
+its return. And when reviewing a package you don't trust, `--no-inline-ignores`
+disregards every directive and reports whatever the maintainer suppressed.
 
 ### Auto-fixing
 
@@ -81,7 +92,7 @@ writing. Fixes come in two tiers:
 
 | Tier   | Flag           | Rules                             | What it does                                                                                                                                                                                                                                                               |
 | ------ | -------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Safe   | `--fix`        | PB103, PB203, PB205, PB705, PB708 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`) |
+| Safe   | `--fix`        | PB103, PB203, PB205, PB705, PB708, PB913 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); append `--locked` to `cargo`; delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`); remove stale ignore directives |
 | Unsafe | `--unsafe-fix` | PB204, PB206–PB209, PB403         | Add `-mod=vendor` to `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits          |
 
 Safe fixes preserve behavior or restore a security default; unsafe fixes are
@@ -121,7 +132,7 @@ any of them with e.g. `args: [--ignore, PB105, --fail-on, critical]`.
 | Consistency   | PB601–PB603 | PKGBUILD / .SRCINFO drift, network access in `pkgver()`, provides/replaces/conflicts claims on core system packages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Correctness   | PB701–PB711 | makepkg build-breakers: invalid pkgname/pkgver/pkgrel/epoch, backup leading slash, unknown `options`, `provides` comparison operators, scalar-vs-array field types, schema variables set inside `package()`, missing/duplicate/mixed `arch`, VCS sources without their client in makedepends                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Built package | PB801–PB839 | everything namcap checks in a `.pkg.tar.*`: ELF in `any` packages and nonstandard paths, executable stacks, text relocations, missing RELRO, non-PIE executables, unstripped binaries, insecure RPATH/RUNPATH, missing/unused library and interpreter dependencies (resolved through pacman's database, statically — no `ldd`), stale soname declarations, pkg-config requirements, FHS layout, permissions and ownership, empty directories, invalid filenames, cross-directory hardlinks, dangling symlinks, `.la`/`perllocal.pod`/info `dir`/MIME-cache landmines, stale python bytecode, `site-packages/tests`, systemd/D-Bus units under `/etc`, missing license and backup files, doc-heavy packages, sphinx caches — plus the full scriptlet analysis over the packaged `.INSTALL` |
-| Style         | PB901–PB912 | namcap's PKGBUILD conventions: hardcoded architectures instead of `$CARCH`, custom variables without `_` prefix, `$startdir`, redundant makedepends, pinned SourceForge mirrors, pkgname repeated in pkgdesc, makepkg-internal output helpers, missing Maintainer tag, uppercase package names, missing pkgdesc/url/license, version-only download names, depends duplicated in optdepends                                                                                                                                                                                                                                                                                                                                                                                                |
+| Style         | PB901–PB913 | namcap's PKGBUILD conventions: hardcoded architectures instead of `$CARCH`, custom variables without `_` prefix, `$startdir`, redundant makedepends, pinned SourceForge mirrors, pkgname repeated in pkgdesc, makepkg-internal output helpers, missing Maintainer tag, uppercase package names, missing pkgdesc/url/license, version-only download names, depends duplicated in optdepends, stale ignore directives                                                                                                                                                                                                                                                                                                                                                                                                |
 
 `pkglint --rules` prints the full documentation for each.
 A full reference including examples of each rule is available in the [documentation](https://jamison.lahman.dev/pkglint/rules/).

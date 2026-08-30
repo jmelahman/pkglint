@@ -122,6 +122,20 @@ var styleRules = []Rule{
 			"is optional. Keep exactly one of the two.",
 		Check: checkDuplicatedOptdepends,
 	},
+	{
+		ID:       "PB913",
+		Name:     "stale-ignore-directive",
+		Severity: Warn,
+		Doc: "A '# pkglint: ignore=' directive that matches no finding on its own or the next " +
+			"line — the issue was fixed, or the ID was never a pkglint rule — no longer documents " +
+			"a reviewed exception. It misleads reviewers into thinking a finding exists there, and " +
+			"if the flagged construct ever comes back, the leftover directive silences it without " +
+			"anyone re-reviewing. The auto-fix removes the stale IDs, or the whole comment once " +
+			"none remain.",
+		Check:    checkStaleIgnores,
+		FixLevel: FixSafe,
+		Fix:      fixStaleIgnores,
+	},
 }
 
 // --- PB901: hardcoded host architecture ------------------------------------

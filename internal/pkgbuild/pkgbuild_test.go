@@ -622,3 +622,47 @@ func TestInstallFilesContainment(t *testing.T) {
 		}
 	})
 }
+
+// TestParseDirective pins the inline-ignore syntax both the suppression parser
+// and the stale-directive rule (which edits by span) build on.
+func TestParseDirective(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		line string
+		ids  []string
+		list string // line[IDsStart:IDsEnd]
+	}{
+		{"plain", "# pkglint: ignore=PB101", []string{"PB101"}, "PB101"},
+		{"multiple ids", "# pkglint: ignore=PB101,PB102", []string{"PB101", "PB102"}, "PB101,PB102"},
+		{"comma-space and duplicates", "# pkglint: ignore=PB101, PB102, PB101", []string{"PB101", "PB102"}, "PB101, PB102, PB101"},
+		{"trailing separators trimmed", "# pkglint: ignore=PB101, ", []string{"PB101"}, "PB101"},
+		{"trailing comment prose stops the list", "# pkglint: ignore=PB101 -- reviewed", []string{"PB101"}, "PB101"},
+		{"after code", `go build . # pkglint: ignore=PB204`, []string{"PB204"}, "PB204"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, ok := ParseDirective(tc.line)
+			if !ok {
+				t.Fatalf("ParseDirective(%q) found nothing", tc.line)
+			}
+			if !reflect.DeepEqual(d.IDs, tc.ids) {
+				t.Errorf("IDs = %v, want %v", d.IDs, tc.ids)
+			}
+			if got := tc.line[d.IDsStart:d.IDsEnd]; got != tc.list {
+				t.Errorf("ID-list span = %q, want %q", got, tc.list)
+			}
+			if tc.line[d.Start] != '#' {
+				t.Errorf("Start points at %q, want '#'", tc.line[d.Start])
+			}
+		})
+	}
+	for _, line := range []string{
+		"echo hello",
+		"# pkglint: ignore=",
+		"# pkglint: ignore=, ,",
+		"# just a comment mentioning pkglint",
+	} {
+		if d, ok := ParseDirective(line); ok {
+			t.Errorf("ParseDirective(%q) = %+v, want no directive", line, d)
+		}
+	}
+}

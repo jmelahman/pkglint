@@ -374,3 +374,95 @@ func TestResolveGitRefSchemeGuard(t *testing.T) {
 		})
 	}
 }
+
+// TestNoInlineIgnores pins the audit mode: without the flag the maintainer's
+// directives are honored (and audited by PB913); with it they are disregarded
+// entirely, so the suppressed findings surface and nothing audits comments
+// that are no longer in force.
+func TestNoInlineIgnores(t *testing.T) {
+	var buf bytes.Buffer
+	run([]string{"--fail-on=never", "testdata/suppressed"}, &buf)
+	trusted := buf.String()
+	if !strings.Contains(trusted, "PB913") {
+		t.Errorf("default run should flag the stale directive, got:\n%s", trusted)
+	}
+	if strings.Contains(trusted, "PB204") {
+		t.Errorf("default run should honor the PB204 suppression, got:\n%s", trusted)
+	}
+
+	buf.Reset()
+	run([]string{"--fail-on=never", "--no-inline-ignores", "testdata/suppressed"}, &buf)
+	audited := buf.String()
+	if !strings.Contains(audited, "PB204") {
+		t.Errorf("--no-inline-ignores should surface the suppressed PB204, got:\n%s", audited)
+	}
+	if strings.Contains(audited, "PB913") {
+		t.Errorf("--no-inline-ignores disables directives, so none can be stale, got:\n%s", audited)
+	}
+}
+
+// --add-ignores rewrites the package to accept its current findings; mixing it
+// with modes that fix or distrust the same annotations is contradictory.
+func TestAddIgnoresRejectsConflictingFlags(t *testing.T) {
+	for _, flags := range [][]string{
+		{"--add-ignores", "--fix"},
+		{"--add-ignores", "--unsafe-fix"},
+		{"--add-ignores", "--no-inline-ignores"},
+	} {
+		var buf bytes.Buffer
+		if code := run(append(flags, "testdata/clean"), &buf); code != 2 {
+			t.Errorf("%v: got exit %d, want 2", flags, code)
+		}
+	}
+}
+
+func TestAddIgnoresWritesAndDryRuns(t *testing.T) {
+	const body = `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='demo'
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+
+build() {
+  cargo build --release
+}
+`
+	dir := writeFixture(t, "# Maintainer: Sam Coder <sam@example.com>\n"+body, 0o644)
+
+	var buf bytes.Buffer
+	if code := run([]string{"--add-ignores", "--diff", dir}, &buf); code != 0 {
+		t.Fatalf("--add-ignores --diff: got exit %d, want 0\n%s", code, buf.String())
+	}
+	if !strings.Contains(buf.String(), "dry run") || !strings.Contains(buf.String(), "+   # pkglint: ignore=PB203") {
+		t.Errorf("dry run should preview the insertion, got:\n%s", buf.String())
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), "ignore=") {
+		t.Error("--diff must not modify the file")
+	}
+
+	buf.Reset()
+	if code := run([]string{"--add-ignores", dir}, &buf); code != 0 {
+		t.Fatalf("--add-ignores: got exit %d, want 0\n%s", code, buf.String())
+	}
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(fixed), "# pkglint: ignore=PB203\n  cargo build --release") {
+		t.Errorf("directive not inserted above the finding:\n%s", fixed)
+	}
+
+	// The annotated package now lints clean at the default threshold.
+	buf.Reset()
+	if code := run([]string{dir}, &buf); code != 0 {
+		t.Errorf("annotated package should lint clean, exit %d:\n%s", code, buf.String())
+	}
+}

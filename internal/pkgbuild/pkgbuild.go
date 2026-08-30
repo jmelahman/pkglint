@@ -608,20 +608,55 @@ func (p *Package) Units() []Unit {
 
 var suppressRe = regexp.MustCompile(`#\s*pkglint:\s*ignore=([A-Z0-9, ]+)`)
 
+// Directive is one inline "# pkglint: ignore=PB123[,PB456]" directive found in
+// a single line of source, with the byte spans a rewriter needs to edit it.
+type Directive struct {
+	IDs      []string // rule IDs in written order, duplicates dropped
+	Start    int      // offset of the directive's '#' within the line
+	IDsStart int      // span of the rule-ID list, trailing spaces and
+	IDsEnd   int      // commas trimmed
+}
+
+// ParseDirective returns the inline-ignore directive in one line of source (or
+// one comment's raw text), if it carries one. Suppression parsing and the
+// stale-directive rule both build on it, so the syntax that is honored and the
+// syntax that is audited cannot drift apart.
+func ParseDirective(line string) (Directive, bool) {
+	m := suppressRe.FindStringSubmatchIndex(line)
+	if m == nil {
+		return Directive{}, false
+	}
+	d := Directive{Start: m[0], IDsStart: m[2], IDsEnd: m[3]}
+	for d.IDsEnd > d.IDsStart {
+		if c := line[d.IDsEnd-1]; c != ' ' && c != ',' {
+			break
+		}
+		d.IDsEnd--
+	}
+	seen := map[string]bool{}
+	for id := range strings.SplitSeq(line[d.IDsStart:d.IDsEnd], ",") {
+		if id = strings.TrimSpace(id); id != "" && !seen[id] {
+			seen[id] = true
+			d.IDs = append(d.IDs, id)
+		}
+	}
+	return d, len(d.IDs) > 0
+}
+
 func parseSuppressions(raw []byte) map[int]map[string]bool {
 	out := map[int]map[string]bool{}
-	for i, line := range strings.Split(string(raw), "\n") {
-		m := suppressRe.FindStringSubmatch(line)
-		if m == nil {
+	n := 0
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		n++
+		d, ok := ParseDirective(line)
+		if !ok {
 			continue
 		}
 		ids := map[string]bool{}
-		for _, id := range strings.Split(m[1], ",") {
-			if id = strings.TrimSpace(id); id != "" {
-				ids[id] = true
-			}
+		for _, id := range d.IDs {
+			ids[id] = true
 		}
-		out[i+1] = ids
+		out[n] = ids
 	}
 	return out
 }

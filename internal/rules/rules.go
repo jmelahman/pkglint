@@ -153,6 +153,9 @@ type Context struct {
 	// Unit.Functions does not carry. Rules that exempt a command by name need
 	// it: the exemption has to lapse when the PKGBUILD supplies the body.
 	localFuncs map[string]bool
+	// suppUsed caches which inline-ignore directives actually suppress a
+	// finding; see Context.suppressionUsage.
+	suppUsed map[suppKey]bool
 
 	pkgFacts *packageFacts // lazily computed facts shared by package rules
 }

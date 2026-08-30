@@ -112,9 +112,14 @@ func CollectEdits(ctx *Context, ignore map[string]bool, level FixLevel, env *Fix
 // Fix computes and applies auto-fixes for a package at the given level,
 // returning one FixResult per unit that had edits applied.
 func Fix(pkg *pkgbuild.Package, ignore map[string]bool, level FixLevel, env *FixEnv) []FixResult {
-	ctx := NewContext(pkg)
+	return applyByUnit(pkg, CollectEdits(NewContext(pkg), ignore, level, env))
+}
+
+// applyByUnit applies the edits to the units they address, returning one
+// FixResult per unit that had edits.
+func applyByUnit(pkg *pkgbuild.Package, edits []Edit) []FixResult {
 	byPath := map[string][]Edit{}
-	for _, e := range CollectEdits(ctx, ignore, level, env) {
+	for _, e := range edits {
 		byPath[e.Path] = append(byPath[e.Path], e)
 	}
 	var results []FixResult

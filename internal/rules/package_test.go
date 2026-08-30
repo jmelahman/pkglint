@@ -701,6 +701,34 @@ func TestDocsHeavy(t *testing.T) {
 	}
 }
 
+func TestJarLocation(t *testing.T) {
+	got := ruleIDs(pkgLint(t, nil, pkgtest.Info("demo", "any"),
+		pkgtest.Member{Name: "usr/share/demo/demo.jar", Data: []byte("PK")},
+		pkgtest.Member{Name: "usr/share/java/demo/lib.jar", Data: []byte("PK")}))
+	if got["PB842"] != 1 {
+		t.Errorf("want 1 PB842 (the private copy only), got %d", got["PB842"])
+	}
+	// A symlink from the app's tree into usr/share/java is the guideline fix.
+	link := ruleIDs(pkgLint(t, nil, pkgtest.Info("demo", "any"),
+		pkgtest.Member{Name: "usr/share/java/demo/demo.jar", Data: []byte("PK")},
+		pkgtest.Member{Name: "usr/share/demo/demo.jar", Type: '2', Link: "/usr/share/java/demo/demo.jar"}))
+	if link["PB842"] != 0 {
+		t.Errorf("symlinked jar: want no PB842, got %d", link["PB842"])
+	}
+}
+
+// TestLibexecStaysPB820 pins why the guideline sweep added no usr/libexec
+// package rule: PB820 already reports those files as outside the standard
+// FHS directories (usr/libexec is not a valid-path prefix), so a second rule
+// would double-report every file.
+func TestLibexecStaysPB820(t *testing.T) {
+	got := ruleIDs(pkgLint(t, nil, pkgtest.Info("demo", "any"),
+		pkgtest.Member{Name: "usr/libexec/demo/helper", Data: []byte("x"), Mode: 0o755}))
+	if got["PB820"] == 0 {
+		t.Errorf("usr/libexec file should draw PB820, got %v", got)
+	}
+}
+
 func TestPackageScriptletAnalysis(t *testing.T) {
 	fs := pkgLint(t, nil, pkgtest.Info("demo", "any"),
 		pkgtest.Member{Name: ".INSTALL", Data: []byte(

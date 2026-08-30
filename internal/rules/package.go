@@ -335,6 +335,15 @@ var packageRules = []Rule{
 			"documentation hook that should be disabled (--disable-scrollkeeper).",
 		Check: checkScrollkeeper,
 	},
+	{
+		ID: "PB842", Name: "java-jar-location", Scope: ScopePackage,
+		Severity: Info,
+		Doc: "The Java package guidelines put every .jar under usr/share/java (usually in a " +
+			"per-package subdirectory) so other packages can find libraries by convention and " +
+			"wrapper scripts share one classpath root; an application that insists on its own " +
+			"layout gets symlinks into its tree, not private copies of the jars.",
+		Check: checkJarLocation,
+	},
 }
 
 // pkgFinding builds a finding anchored at a member path of the package.

@@ -1107,6 +1107,15 @@ package() {
   install -Dm644 demo.conf "$pkgdir/usr/share/dbus-1/system.d/demo.conf"
 }`,
 	},
+	"PB842": {
+		Bad: `package() {
+  install -Dm644 demo.jar "$pkgdir/usr/share/demo/demo.jar"   # private jar copy
+}`,
+		Good: `package() {
+  install -Dm644 demo.jar "$pkgdir/usr/share/java/demo/demo.jar"
+  ln -s /usr/share/java/demo/demo.jar "$pkgdir/usr/share/demo/demo.jar"
+}`,
+	},
 	"PB834": {
 		Bad: `license=('LicenseRef-demo-eula')
 package() {

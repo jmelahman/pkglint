@@ -634,3 +634,28 @@ func checkScrollkeeper(ctx *Context) []Finding {
 	}
 	return out
 }
+
+// --- PB842: jar placement -------------------------------------------------------
+
+// PB842 is the only built-package rule the guideline sweep added: the other
+// candidates were already PB820's. Files under /usr/libexec draw its
+// outside-the-standard-directories warning (usr/libexec is not a valid-path
+// prefix), /run is in its forbidden set, and /opt stays valid on purpose —
+// namcap's valid_paths and the guidelines both allow self-contained trees
+// there.
+
+func checkJarLocation(ctx *Context) []Finding {
+	var out []Finding
+	for i := range ctx.File.Entries {
+		e := &ctx.File.Entries[i]
+		if !e.IsFile() || !strings.HasSuffix(e.Name, ".jar") {
+			continue
+		}
+		if strings.HasPrefix(e.Name, "usr/share/java/") {
+			continue
+		}
+		out = append(out, pkgFinding("PB842", Info, e.Name,
+			"jar outside usr/share/java; the Java package guidelines put jars there (symlink into the app's own tree when it insists on a private layout)"))
+	}
+	return out
+}

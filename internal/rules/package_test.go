@@ -715,6 +715,12 @@ func TestJarLocation(t *testing.T) {
 	if link["PB842"] != 0 {
 		t.Errorf("symlinked jar: want no PB842, got %d", link["PB842"])
 	}
+	// A JVM's own jars live under its usr/lib/jvm home, not usr/share/java.
+	jvm := ruleIDs(pkgLint(t, nil, pkgtest.Info("jdk-openjdk", "x86_64"),
+		pkgtest.Member{Name: "usr/lib/jvm/java-25-openjdk/lib/jrt-fs.jar", Data: []byte("PK")}))
+	if jvm["PB842"] != 0 {
+		t.Errorf("JVM-internal jar: want no PB842, got %d", jvm["PB842"])
+	}
 }
 
 // TestLibexecStaysPB820 pins why the guideline sweep added no usr/libexec

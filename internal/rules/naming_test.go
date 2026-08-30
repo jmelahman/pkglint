@@ -174,6 +174,15 @@ package() {
   install -Dm644 demo.jar "$pkgdir/usr/share/java/demo/demo.jar"
 }`)})
 	})
+	t.Run("PB981 depends declared inside a package function stands down", func(t *testing.T) {
+		// The ant shape: a split-style PKGBUILD sets depends in package_*(),
+		// beyond static reading.
+		expectNoRule(t, "PB981", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  depends=('java-environment')
+  install -Dm644 demo.jar "$pkgdir/usr/share/java/demo/demo.jar"
+}`)})
+	})
 	t.Run("PB981 a concrete jre satisfies it", func(t *testing.T) {
 		expectNoRule(t, "PB981", map[string]string{"PKGBUILD": pkgbuildWith("", `
 depends=('jre-openjdk')

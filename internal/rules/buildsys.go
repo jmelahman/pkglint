@@ -95,16 +95,22 @@ func checkToolMakedepends(ctx *Context, id string, cmds []Command, tool string, 
 // --- PB950: cmake configure without an install prefix ------------------------
 
 func checkCMakePrefix(ctx *Context) []Finding {
-	var out []Finding
+	var configures []Command
 	for _, c := range buildToolCommands(ctx, "cmake") {
 		if !cmakeConfigures(c) {
 			continue
 		}
 		// Any explicit prefix is a decision (the guidelines allow /opt for
-		// self-contained trees); only the silent /usr/local default is flagged.
+		// self-contained trees) — and one that covers the whole PKGBUILD: a
+		// second configure without it builds bundled deps or a test tree that
+		// installs nothing (neovim's cmake.deps), not the shipped artifacts.
 		if _, ok := cmakeDefine(c, "CMAKE_INSTALL_PREFIX"); ok {
-			continue
+			return nil
 		}
+		configures = append(configures, c)
+	}
+	var out []Finding
+	for _, c := range configures {
 		out = append(out, c.finding("PB950", Warn,
 			"cmake configure without -DCMAKE_INSTALL_PREFIX=/usr defaults to /usr/local, which Arch packages must not touch"))
 	}
@@ -129,11 +135,31 @@ func checkCMakeBuildType(ctx *Context) []Finding {
 
 // --- PB952/PB954: build system missing from makedepends ----------------------
 
+// depNameContains reports whether any depends/makedepends entry's name
+// contains sub — the leniency the cross-toolchain wrappers need, where
+// mingw-w64-cmake (which pulls cmake) is the declared dependency.
+func depNameContains(ctx *Context, sub string) bool {
+	for _, field := range []string{"depends", "makedepends"} {
+		for name := range depsFor(ctx, field) {
+			if strings.Contains(name, sub) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func checkCMakeMakedepends(ctx *Context) []Finding {
+	if depNameContains(ctx, "cmake") {
+		return nil
+	}
 	return checkToolMakedepends(ctx, "PB952", buildToolCommands(ctx, "cmake"), "cmake", "cmake")
 }
 
 func checkMesonMakedepends(ctx *Context) []Finding {
+	if depNameContains(ctx, "meson") {
+		return nil
+	}
 	return checkToolMakedepends(ctx, "PB954",
 		buildToolCommands(ctx, "meson", "arch-meson"), "meson", "meson")
 }

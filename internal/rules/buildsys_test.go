@@ -36,6 +36,18 @@ build() {
   cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/opt/demo
 }`)})
 	})
+	t.Run("PB950 a bundled-deps configure beside a prefixed one is fine", func(t *testing.T) {
+		// The neovim shape: cmake.deps installs nothing, the real tree sets
+		// the prefix.
+		expectNoRule(t, "PB950", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('cmake')
+build() {
+  cmake -S cmake.deps -B .deps -DUSE_BUNDLED=OFF
+  cmake --build .deps
+  cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}`)})
+	})
 
 	t.Run("PB951 Release build type", func(t *testing.T) {
 		expectRule(t, "PB951", map[string]string{"PKGBUILD": pkgbuildWith("", `
@@ -63,6 +75,14 @@ build() {
 makedepends=('cmake')
 build() {
   cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr
+}`)})
+	})
+	t.Run("PB952 a cross wrapper package satisfies it", func(t *testing.T) {
+		// mingw-w64-cmake pulls cmake in; the raw `cmake --build` still works.
+		expectNoRule(t, "PB952", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('mingw-w64-cmake')
+build() {
+  cmake --build build
 }`)})
 	})
 
@@ -115,6 +135,13 @@ build() {
 makedepends=('meson')
 build() {
   meson setup build --prefix=/usr
+}`)})
+	})
+	t.Run("PB954 a cross wrapper package satisfies it", func(t *testing.T) {
+		expectNoRule(t, "PB954", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('mingw-w64-meson')
+build() {
+  meson compile -C build
 }`)})
 	})
 

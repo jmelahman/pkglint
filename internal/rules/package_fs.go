@@ -651,7 +651,10 @@ func checkJarLocation(ctx *Context) []Finding {
 		if !e.IsFile() || !strings.HasSuffix(e.Name, ".jar") {
 			continue
 		}
-		if strings.HasPrefix(e.Name, "usr/share/java/") {
+		// usr/lib/jvm is the java-runtime-common home for whole JVM
+		// distributions; the JDK's internal jars are part of the JVM, not
+		// libraries other packages load by convention.
+		if strings.HasPrefix(e.Name, "usr/share/java/") || strings.HasPrefix(e.Name, "usr/lib/jvm/") {
 			continue
 		}
 		out = append(out, pkgFinding("PB842", Info, e.Name,

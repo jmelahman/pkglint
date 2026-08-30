@@ -217,6 +217,12 @@ func checkJavaRuntimeDependency(ctx *Context) []Finding {
 			return nil
 		}
 	}
+	// Split packages (ant, jdk builds) declare depends inside their
+	// package_*() functions, where the values are beyond static reading;
+	// claiming "no JVM dependency" against half the data would be a guess.
+	if fieldSetInPackageFns(ctx, "depends") {
+		return nil
+	}
 	return []Finding{varFinding(ctx, "PB981", Info, []string{"depends", "pkgname"},
 		"the package ships Java artifacts but nothing in depends provides a JVM; the Java package guidelines depend on java-runtime (or java-environment when a JDK is needed)")}
 }

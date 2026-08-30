@@ -99,5 +99,15 @@ jobs:
             echo "No changes to the report card."
           else
             git commit -m "Regenerate report card site"
-            git push
+            # master may have moved during the hour-long scan. This commit
+            # only touches generated files (docs/, data/) that no human
+            # commit does, so rebasing onto whatever landed is conflict-free
+            # — and losing the push means losing the scan's state, which the
+            # next run would then redo.
+            pushed=""
+            for _ in 1 2 3; do
+              if git push; then pushed=1; break; fi
+              git pull --rebase
+            done
+            [ -n "$pushed" ]
           fi

@@ -87,6 +87,15 @@ var fileWriters = map[string]bool{
 	"mkdir": true, "touch": true, "rm": true, "rmdir": true, "dd": true,
 }
 
+// fileDeleters name paths they remove rather than create. writeDests treats
+// their arguments as targets — right for PB401, where erasing a path outside
+// the sandbox is still a build-time write — but backwards for PB405, which is
+// about *installing* trust configuration. The scriptlets in the wild use
+// `rm -f /etc/sudoers.d/<pkg>` to retract a fragment an older release shipped,
+// which PB405 reported as granting the escalation it actually withdraws.
+// Scriptlet removals are PB502's, and it already words them as removals.
+var fileDeleters = map[string]bool{"rm": true, "rmdir": true}
+
 func writeTargetViolation(target string) string {
 	t := strings.TrimSpace(target)
 	if t == "" || strings.Contains(t, "\x00") {
@@ -610,7 +619,7 @@ func checkSensitiveWrites(ctx *Context) []Finding {
 				"pacman-key manipulates the pacman trust keyring"))
 			continue
 		}
-		if !fileWriters[c.Name] {
+		if !fileWriters[c.Name] || fileDeleters[c.Name] {
 			continue
 		}
 		for _, target := range writeDests(c) {

@@ -179,6 +179,38 @@ var benignTopLevel = map[string]bool{
 	"readonly": true, "set": true, "shopt": true, ":": true, "true": true, "false": true,
 }
 
+// pureTopLevel are commands whose whole effect is to test a condition or write
+// to stdout/stderr: they open no file, spawn no interpreter, and reach no
+// network. Arch and build-flag guards (`if [ "$CARCH" = i686 ]` selecting a
+// depends+=()) and status banners are the bulk of what this rule used to
+// report, and scoring them alongside an unauthenticated `curl | sh` buried the
+// findings worth acting on.
+//
+// `[` and `test` also settle an asymmetry: `[[ ]]` and `(( ))` parse as
+// TestClause and ArithmCmd rather than CallExpr, so they never reached this
+// rule at all. Flagging one spelling of a condition and not the other meant a
+// stylistic rewrite could move a package from F to A.
+var pureTopLevel = map[string]bool{
+	"[": true, "test": true,
+	"echo": true, "printf": true, "cat": true, "tput": true,
+	// libmakepkg's message API, sourced into the PKGBUILD's shell before it
+	// runs. PB907 already rates these a portability nit rather than a hazard.
+	"msg": true, "msg2": true, "warning": true, "error": true, "plain": true,
+}
+
+// redirectsOutput reports whether the statement sends its output to a file,
+// which is what separates a banner from a write: `cat <<EOF > helper.sh` at
+// the top level drops a file on disk the moment the PKGBUILD is sourced.
+func redirectsOutput(stmt *syntax.Stmt) bool {
+	for _, r := range stmt.Redirs {
+		switch r.Op {
+		case syntax.RdrOut, syntax.AppOut, syntax.RdrAll, syntax.AppAll:
+			return true
+		}
+	}
+	return false
+}
+
 func checkTopLevelExec(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.Commands() {
@@ -186,6 +218,19 @@ func checkTopLevelExec(ctx *Context) []Finding {
 			continue
 		}
 		if benignTopLevel[c.Name] {
+			continue
+		}
+		// eval belongs to PB302, which reports it wherever it appears and
+		// escalates to Critical on its own when the evaluated string was
+		// downloaded. Reporting it here as well stacks a second Critical on
+		// the identical statement without adding anything a reader could act
+		// on differently.
+		if c.Name == "eval" {
+			continue
+		}
+		// A PKGBUILD that defines its own echo/warning/… gets no exemption:
+		// the name would say "banner" while the body did the work.
+		if pureTopLevel[c.Name] && !redirectsOutput(c.Stmt) && !ctx.definesFunc(c, c.Name) {
 			continue
 		}
 		name := c.Name
@@ -204,6 +249,45 @@ var shellSinks = map[string]bool{
 }
 
 var downloaders = map[string]bool{"curl": true, "wget": true, "fetch": true, "aria2c": true, "axel": true}
+
+// scriptInterpreters are the shellSinks that run a program named on their own
+// command line. A shell executes stdin by default — `curl … | sh` runs what it
+// downloaded — but `python3 -c '<program>'` and `node parse.js` were handed a
+// program that is already on disk and under review, so the piped response is
+// that program's *input*, not code. The AUR idiom this distinguishes is the
+// pkgver() helper that fetches a registry's JSON and prints one field.
+var scriptInterpreters = map[string]bool{
+	"python": true, "python3": true, "python2": true,
+	"perl": true, "ruby": true, "node": true,
+}
+
+// sinkExecutesStdin reports whether a pipeline's terminating interpreter treats
+// what it reads as code. Shells always do. A scriptInterpreter only does so
+// when given no program of its own, or an explicit "-" naming stdin.
+func sinkExecutesStdin(c Command) bool {
+	if !scriptInterpreters[c.Name] {
+		return true // a shell: stdin is the script
+	}
+	for _, a := range c.Args {
+		if a == "-" {
+			return true // read the program from stdin
+		}
+		if strings.HasPrefix(a, "-") {
+			continue // a flag; -c/-e/-m carry their program in the next word
+		}
+		// A program to run, so stdin is normally its input — unless the
+		// program itself hands stdin to an evaluator, which is the same
+		// download-and-execute with one more hop. Matching the literal is
+		// conservative on purpose: over-reporting here costs a review, and
+		// under-reporting costs the finding this rule exists for.
+		return stdinEvalRe.MatchString(a)
+	}
+	return true // bare interpreter: stdin is the script
+}
+
+// stdinEvalRe matches the evaluator names an inline interpreter program would
+// use to execute what it read, across the scriptInterpreters' languages.
+var stdinEvalRe = regexp.MustCompile(`\b(exec|eval|compile|system|instance_eval|Function)\b`)
 
 var decoders = map[string]bool{"base64": true, "base32": true, "xxd": true, "uudecode": true, "openssl": true}
 
@@ -270,14 +354,16 @@ func (ctx *Context) checkPipeInto(sources map[string]bool, qualify func(Command)
 	for i := range units {
 		u := &units[i]
 		for _, segs := range pipelines(u.File) {
-			var sink string
 			last := segs[len(segs)-1]
 			sinkName := stmtCommandName(last, ctx.vars)
-			if shellSinks[sinkName] {
-				sink = sinkName
-			} else {
+			if !shellSinks[sinkName] {
 				continue
 			}
+			if call, ok := last.Cmd.(*syntax.CallExpr); ok &&
+				!sinkExecutesStdin(ctx.newCommand(u, "", last, call)) {
+				continue
+			}
+			sink := sinkName
 			for _, seg := range segs[:len(segs)-1] {
 				call, ok := seg.Cmd.(*syntax.CallExpr)
 				if !ok || len(call.Args) == 0 {

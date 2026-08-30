@@ -148,6 +148,11 @@ type Context struct {
 	// makepkg rebinds pkgname inside package_<name>(), and a function that
 	// assigns a name of its own leaves the top-level value stale.
 	fnVars map[string]map[string]string
+	// localFuncs is the set of function names the file itself declares, keyed
+	// by unit path, including those nested inside a compound statement — which
+	// Unit.Functions does not carry. Rules that exempt a command by name need
+	// it: the exemption has to lapse when the PKGBUILD supplies the body.
+	localFuncs map[string]bool
 
 	pkgFacts *packageFacts // lazily computed facts shared by package rules
 }
@@ -168,7 +173,8 @@ type Command struct {
 
 // NewContext precomputes shared state for rules.
 func NewContext(pkg *pkgbuild.Package) *Context {
-	ctx := &Context{Pkg: pkg, vars: map[string]string{}, fnVars: map[string]map[string]string{}}
+	ctx := &Context{Pkg: pkg, vars: map[string]string{}, fnVars: map[string]map[string]string{},
+		localFuncs: map[string]bool{}}
 	for name, v := range pkg.Vars {
 		// Scalars render to exactly one value; for arrays, bash expands an
 		// unsubscripted $name to the first element (and an empty array to "").
@@ -187,6 +193,7 @@ func NewContext(pkg *pkgbuild.Package) *Context {
 		}
 		sort.Strings(names)
 		for _, name := range names {
+			ctx.localFuncs[u.Path+"\x00"+name] = true
 			ctx.collect(u, name, u.Functions[name].Body)
 		}
 		for _, stmt := range u.TopLevel {
@@ -198,6 +205,20 @@ func NewContext(pkg *pkgbuild.Package) *Context {
 
 func (ctx *Context) collect(u *pkgbuild.Unit, fn string, root *syntax.Stmt) {
 	syntax.Walk(root, func(node syntax.Node) bool {
+		// parseUnit only lifts a FuncDecl into Unit.Functions when it sits
+		// directly in the file's statement list, so one declared inside a
+		// compound statement — the idiom of picking between two build() bodies
+		// with a top-level `if` — stays in TopLevel. It is still a function:
+		// its body runs when makepkg calls the phase, not when the file is
+		// sourced. Recurse under the declared name so the commands inside are
+		// attributed to it and not to the enclosing scope, which for a
+		// top-level `if` would be "" and make every one of them look like
+		// code that runs on source.
+		if fd, ok := node.(*syntax.FuncDecl); ok && fd.Name != nil {
+			ctx.localFuncs[u.Path+"\x00"+fd.Name.Value] = true
+			ctx.collect(u, fd.Name.Value, fd.Body)
+			return false
+		}
 		stmt, ok := node.(*syntax.Stmt)
 		if !ok {
 			return true
@@ -387,6 +408,12 @@ func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, c
 		cmd.ArgDyn = append(cmd.ArgDyn, dyn)
 	}
 	return cmd
+}
+
+// definesFunc reports whether the unit the command came from declares a
+// function of that name, at any nesting depth.
+func (ctx *Context) definesFunc(c Command, name string) bool {
+	return ctx.localFuncs[c.Unit.Path+"\x00"+name]
 }
 
 // Commands returns every command; optional filters restrict the results.

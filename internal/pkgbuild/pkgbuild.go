@@ -21,7 +21,6 @@ import (
 type Var struct {
 	Name   string
 	Values []string // rendered values; one element for scalar assignments
-	Array  bool
 	// ElemFor maps each Values index to the written-element counter the value
 	// came from — continuing across merged `+=` assignments — or -1 when it
 	// has no written element of its own (padded in by an indexed write). nil
@@ -34,13 +33,14 @@ type Var struct {
 	// element numbering fix code derives from the AST, which is why merges
 	// track it instead of len(Values).
 	ElemCount int
+	Assign    *syntax.Assign // underlying AST node, for byte-offset edits
+	Pos       syntax.Pos
+	Array     bool
 	// CountUnknown marks an array holding a whole-array reference that could
 	// not be statically expanded ("${files[@]}" with files unknown), so
 	// len(Values) is not the array's real length. Rules that compare lengths
 	// must not trust the count.
 	CountUnknown bool
-	Pos          syntax.Pos
-	Assign       *syntax.Assign // underlying AST node, for byte-offset edits
 }
 
 // elemAt returns v's written-element counter for Values[i], -1 when the value

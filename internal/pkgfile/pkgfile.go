@@ -30,21 +30,21 @@ const maxELFSize = 512 << 20
 // Entry is one member of the package archive.
 type Entry struct {
 	Name     string // path inside the package, as stored (no leading slash)
-	Type     byte   // tar type flag: tar.TypeReg, TypeDir, TypeSymlink, TypeLink
-	Mode     fs.FileMode
-	UID, GID int
 	Uname    string
 	Gname    string
-	Size     int64
 	Linkname string // symlink target or hardlink source
 	ModTime  time.Time
+	Size     int64
+	UID, GID int
+	Mode     fs.FileMode
+	Type     byte // tar type flag: tar.TypeReg, TypeDir, TypeSymlink, TypeLink
 
 	// Facts extracted from regular files during the single pass.
 	IsELF    bool
-	ELF      *ELFInfo // non-nil when IsELF and the file parsed
 	IsAr     bool     // static archive ("!<arch>" magic)
-	Shebang  []string // interpreter line words, e.g. ["/usr/bin/env", "python3"]
 	IsScript bool     // has a #! line
+	ELF      *ELFInfo // non-nil when IsELF and the file parsed
+	Shebang  []string // interpreter line words, e.g. ["/usr/bin/env", "python3"]
 
 	// Data holds the full contents of the few small members rules read
 	// verbatim: .INSTALL (scriptlet analysis) and pkg-config .pc files

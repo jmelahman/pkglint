@@ -14,23 +14,23 @@ import (
 
 // ELFOpts selects the properties of a synthetic ELF object.
 type ELFOpts struct {
-	Type      elf.Type    // default ET_DYN
-	Machine   elf.Machine // default EM_X86_64
 	Needed    []string
+	Undefined []string
+	Defined   []string
 	Soname    string
 	Rpath     string
 	Runpath   string
-	NoStack   bool // omit PT_GNU_STACK entirely
-	ExecStack bool // PT_GNU_STACK carries PF_X
-	Relro     bool // include PT_GNU_RELRO
-	BindNow   bool // DT_FLAGS: DF_BIND_NOW
-	TextRel   bool // DT_TEXTREL
-	PIE       bool // DT_FLAGS_1: DF_1_PIE
-	DTDebug   bool // include DT_DEBUG
-	Symtab    bool // include .symtab (an unstripped object)
-	Interp    bool // include PT_INTERP (/lib64/ld-linux-x86-64.so.2)
-	Undefined []string
-	Defined   []string
+	Type      elf.Type    // default ET_DYN
+	Machine   elf.Machine // default EM_X86_64
+	NoStack   bool        // omit PT_GNU_STACK entirely
+	ExecStack bool        // PT_GNU_STACK carries PF_X
+	Relro     bool        // include PT_GNU_RELRO
+	BindNow   bool        // DT_FLAGS: DF_BIND_NOW
+	TextRel   bool        // DT_TEXTREL
+	PIE       bool        // DT_FLAGS_1: DF_1_PIE
+	DTDebug   bool        // include DT_DEBUG
+	Symtab    bool        // include .symtab (an unstripped object)
+	Interp    bool        // include PT_INTERP (/lib64/ld-linux-x86-64.so.2)
 }
 
 const (

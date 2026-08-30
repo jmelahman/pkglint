@@ -42,6 +42,201 @@ func fakeResolve(_, _ string) (string, error) {
 	return "0123456789abcdef0123456789abcdef01234567", nil
 }
 
+// Stand-in digests for one notional source file. Their only requirement is
+// that they are well-formed and distinct: the fixer never hashes anything
+// itself, it compares what a PKGBUILD declares against what LocalDigest
+// reports, so these tests are about that agreement rather than about any real
+// file's contents.
+const (
+	demoMD5    = "d3f8d5d2d1f4cbf4f4f0c1e1e1d5a5d5"
+	demoSHA1   = "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+	demoSHA256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+)
+
+// digestTable builds a LocalDigest over a filename -> digests table, so a test
+// can say exactly which sources are "already downloaded" and what they hash
+// to. Anything absent from the table reports as not fetched, which is the case
+// the fixer must decline rather than guess at.
+func digestTable(files map[string]Digests) func(string, string) (Digests, error) {
+	return func(_, filename string) (Digests, error) {
+		d, ok := files[filename]
+		if !ok {
+			return Digests{}, os.ErrNotExist
+		}
+		return d, nil
+	}
+}
+
+// demoDigests is the common single-source case: one fetched tarball.
+func demoDigests() *FixEnv {
+	return &FixEnv{LocalDigest: digestTable(map[string]Digests{
+		"demo-1.0.0.tar.gz": {MD5: demoMD5, SHA1: demoSHA1, SHA256: demoSHA256},
+	})}
+}
+
+// weakPKGBUILD is a PKGBUILD whose only digest is the weak one given.
+func weakPKGBUILD(sums string) string {
+	return pkgbuildWith(`pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+`+sums, "")
+}
+
+func TestFixWeakChecksums(t *testing.T) {
+	got := fixAll(t, map[string]string{
+		"PKGBUILD": weakPKGBUILD("md5sums=('" + demoMD5 + "')"),
+	}, FixSafe, demoDigests())["PKGBUILD"]
+	mustContain(t, got, "sha256sums=('"+demoSHA256+"')")
+	// The weak array stays: makepkg checks every array present, so keeping it
+	// costs nothing and the edit is purely additive.
+	mustContain(t, got, "md5sums=('"+demoMD5+"')")
+}
+
+// The digest the fixer writes is only meaningful because the weak one it
+// verified describes the same bytes. When the local file does not match what
+// the PKGBUILD declares, the honest move is to write nothing — the tarball was
+// re-rolled, or something worse, and either way a maintainer has to look.
+func TestFixWeakChecksumsRefusesOnMismatch(t *testing.T) {
+	got := fixAll(t, map[string]string{
+		"PKGBUILD": weakPKGBUILD("md5sums=('00000000000000000000000000000000')"),
+	}, FixSafe, demoDigests())
+	if _, ok := got["PKGBUILD"]; ok {
+		t.Errorf("a weak digest that does not match the local file must not be fixed, got:\n%s", got["PKGBUILD"])
+	}
+}
+
+// Nothing on disk means nothing to hash: pkglint does not fetch the source to
+// close the finding.
+func TestFixWeakChecksumsWithoutLocalSource(t *testing.T) {
+	env := &FixEnv{LocalDigest: digestTable(nil)}
+	got := fixAll(t, map[string]string{
+		"PKGBUILD": weakPKGBUILD("md5sums=('" + demoMD5 + "')"),
+	}, FixSafe, env)
+	if _, ok := got["PKGBUILD"]; ok {
+		t.Errorf("an unfetched source must not be fixed, got:\n%s", got["PKGBUILD"])
+	}
+}
+
+// Without the capability at all — a caller that supplied no FixEnv — the rule
+// behaves as it did before it was fixable.
+func TestFixWeakChecksumsNeedsCapability(t *testing.T) {
+	got := fixAll(t, map[string]string{
+		"PKGBUILD": weakPKGBUILD("md5sums=('" + demoMD5 + "')"),
+	}, FixSafe, nil)
+	if _, ok := got["PKGBUILD"]; ok {
+		t.Errorf("no LocalDigest means no fix, got:\n%s", got["PKGBUILD"])
+	}
+}
+
+// sha1 is the better witness, so it is what gets verified when both are there.
+// Only one strong array is written even though both weak arrays are reported.
+func TestFixWeakChecksumsPrefersSHA1(t *testing.T) {
+	got := fixAll(t, map[string]string{
+		"PKGBUILD": weakPKGBUILD("md5sums=('00000000000000000000000000000000')\nsha1sums=('" + demoSHA1 + "')"),
+	}, FixSafe, demoDigests())["PKGBUILD"]
+	mustContain(t, got, "sha256sums=('"+demoSHA256+"')")
+	if n := strings.Count(got, "sha256sums="); n != 1 {
+		t.Errorf("expected exactly one sha256sums array, got %d:\n%s", n, got)
+	}
+}
+
+// ck is makepkg's CRC and pkglint does not compute it, so there is no witness
+// to check the local bytes against and no fix to make.
+func TestFixWeakChecksumsSkipsCk(t *testing.T) {
+	got := fixAll(t, map[string]string{
+		"PKGBUILD": weakPKGBUILD("cksums=('123456789')"),
+	}, FixSafe, demoDigests())
+	if _, ok := got["PKGBUILD"]; ok {
+		t.Errorf("a ck-only package has nothing to verify against, got:\n%s", got["PKGBUILD"])
+	}
+}
+
+// A SKIP carries across to the strong array rather than becoming a digest:
+// what PB101 and PB111 report must not be silently altered by a PB102 fix.
+func TestFixWeakChecksumsCarriesSKIP(t *testing.T) {
+	body := pkgbuildWith(`pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz"
+        "https://example.com/demo-$pkgver.tar.gz.sig")
+md5sums=('`+demoMD5+`'
+         'SKIP')`, "")
+	got := fixAll(t, map[string]string{"PKGBUILD": body}, FixSafe, demoDigests())["PKGBUILD"]
+	// Values align under the first quote, as updpkgsums writes them.
+	mustContain(t, got, "sha256sums=('"+demoSHA256+"'\n            'SKIP')")
+}
+
+// An array of nothing but SKIP would satisfy "a strong digest is present" and
+// silence PB102 while verifying nothing at all — a regression dressed as a
+// fix. Reaching that state takes a real digest written against a VCS source,
+// which is what makes the rule fire while leaving the fixer with no file to
+// hash.
+func TestFixWeakChecksumsRefusesAllSKIP(t *testing.T) {
+	body := pkgbuildWith(`pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("git+https://example.com/demo.git#tag=v1.0.0")
+md5sums=('`+demoMD5+`')`, "")
+	got := fixAll(t, map[string]string{"PKGBUILD": body}, FixSafe, demoDigests())
+	if _, ok := got["PKGBUILD"]; ok {
+		t.Errorf("an all-SKIP strong array must not be written, got:\n%s", got["PKGBUILD"])
+	}
+}
+
+// makepkg pairs sums to sources by index. When the counts already disagree
+// (PB110's finding), writing an array here would produce a confidently
+// misaligned one rather than a partial fix.
+func TestFixWeakChecksumsRefusesOnCountMismatch(t *testing.T) {
+	body := pkgbuildWith(`pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz"
+        "https://example.com/extra-$pkgver.tar.gz")
+md5sums=('`+demoMD5+`')`, "")
+	got := fixAll(t, map[string]string{"PKGBUILD": body}, FixSafe, demoDigests())
+	if _, ok := got["PKGBUILD"]; ok {
+		t.Errorf("a sums/source count mismatch must not be fixed, got:\n%s", got["PKGBUILD"])
+	}
+}
+
+// Arch-specific arrays get their own sibling, named for the same arch.
+func TestFixWeakChecksumsPerArch(t *testing.T) {
+	body := pkgbuildWith(`pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source_x86_64=("https://example.com/demo-$pkgver.tar.gz")
+md5sums_x86_64=('`+demoMD5+`')`, "")
+	got := fixAll(t, map[string]string{"PKGBUILD": body}, FixSafe, demoDigests())["PKGBUILD"]
+	mustContain(t, got, "sha256sums_x86_64=('"+demoSHA256+"')")
+}
+
+// Applying the fix twice must not append a second array: once sha256sums is
+// there, PB102 no longer fires and neither does its fixer.
+func TestFixWeakChecksumsIdempotent(t *testing.T) {
+	src := weakPKGBUILD("md5sums=('" + demoMD5 + "')")
+	once := fixAll(t, map[string]string{"PKGBUILD": src}, FixSafe, demoDigests())["PKGBUILD"]
+	twice := fixAll(t, map[string]string{"PKGBUILD": once}, FixSafe, demoDigests())
+	if _, ok := twice["PKGBUILD"]; ok {
+		t.Errorf("second pass changed the file again:\n%s", twice["PKGBUILD"])
+	}
+}
+
 func mustContain(t *testing.T, got, want string) {
 	t.Helper()
 	if !strings.Contains(got, want) {

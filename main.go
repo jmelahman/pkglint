@@ -7,6 +7,12 @@ package main
 
 import (
 	"context"
+	// md5 and sha1 are here to *check* the weak digests a PKGBUILD already
+	// carries, never to produce a new one — see localDigest.
+	"crypto/md5"  //nolint:gosec
+	"crypto/sha1" //nolint:gosec
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -247,7 +253,9 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
-	env := &rules.FixEnv{}
+	// LocalDigest is not gated on --offline: it only reads files that are
+	// already on disk, so there is no network access for --offline to skip.
+	env := &rules.FixEnv{LocalDigest: localDigest}
 	if !offline {
 		env.ResolveRef = resolveGitRef
 	}
@@ -285,7 +293,22 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 				}
 			}
 		}
-		for _, s := range manualSuggestions(pkg, ignore) {
+		// Nudge on what is *left*. Some fixes only sometimes apply — PB102's
+		// needs the sources on disk — so suggestions read from the pre-fix
+		// package would keep telling the user to run updpkgsums for a digest
+		// that has just been written. Re-reading what was actually saved is
+		// the only account of the remaining findings that cannot drift from
+		// the file; with --diff nothing was written, so the original stands.
+		residual := pkg
+		if !diff && applied > 0 {
+			if reloaded, err := pkgbuild.Load(path); err == nil {
+				if noInline {
+					reloaded.Suppressions = nil
+				}
+				residual = reloaded
+			}
+		}
+		for _, s := range manualSuggestions(residual, ignore) {
 			fmt.Fprintf(stdout, "%s: %s\n", rel(path), s)
 		}
 		switch {
@@ -366,6 +389,57 @@ func manualSuggestions(pkg *pkgbuild.Package, ignore map[string]bool) []string {
 		out = append(out, "run `makepkg --printsrcinfo > .SRCINFO` to regenerate .SRCINFO from the PKGBUILD")
 	}
 	return out
+}
+
+// localDigest hashes an already-downloaded source and is the only file access
+// the fix path performs outside the package directory. It does no network I/O:
+// a source that has not been fetched has no digest here, and PB102's fixer
+// leaves the finding alone rather than going and getting one.
+//
+// filename comes from a source=() entry — including the fully maintainer-
+// controlled name before a `::` — so it is required to be a bare filename.
+// Without that check a crafted entry like `../../.ssh/id_ed25519::https://…`
+// would walk the fixer out of the directories it is meant to read, and the
+// digest of whatever it found would be written into the PKGBUILD.
+func localDigest(dir, filename string) (rules.Digests, error) {
+	if filename == "" || filename == "." || filename == ".." || filename != filepath.Base(filename) {
+		return rules.Digests{}, fmt.Errorf("refusing to hash non-filename source %q", filename)
+	}
+	// The package directory first — local sources and default makepkg downloads
+	// land there — then $SRCDEST, where makepkg parks shared downloads when the
+	// user configures one (makepkg.conf ships it commented out).
+	dirs := []string{dir}
+	if d := os.Getenv("SRCDEST"); d != "" {
+		dirs = append(dirs, d)
+	}
+	for _, d := range dirs {
+		f, err := os.Open(filepath.Join(d, filename))
+		if err != nil {
+			continue
+		}
+		digests, err := hashAll(f)
+		_ = f.Close()
+		if err != nil {
+			return rules.Digests{}, err
+		}
+		return digests, nil
+	}
+	return rules.Digests{}, fmt.Errorf("%s: not downloaded", filename)
+}
+
+// hashAll computes every digest the fixer compares in one pass, so the weak
+// digest it verifies and the strong one it writes cannot describe different
+// bytes.
+func hashAll(r io.Reader) (rules.Digests, error) {
+	m, s1, s256 := md5.New(), sha1.New(), sha256.New()
+	if _, err := io.Copy(io.MultiWriter(m, s1, s256), r); err != nil {
+		return rules.Digests{}, err
+	}
+	return rules.Digests{
+		MD5:    hex.EncodeToString(m.Sum(nil)),
+		SHA1:   hex.EncodeToString(s1.Sum(nil)),
+		SHA256: hex.EncodeToString(s256.Sum(nil)),
+	}, nil
 }
 
 // gitTransports are the URL schemes `git ls-remote` may be pointed at. The

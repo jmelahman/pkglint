@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jmelahman/pkglint/internal/pkgfile/pkgtest"
+	"github.com/jmelahman/pkglint/internal/rules"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -381,6 +382,151 @@ func TestResolveGitRefSchemeGuard(t *testing.T) {
 				t.Errorf("git invoked as %q, want the git+ prefix stripped", got[0])
 			}
 		})
+	}
+}
+
+// TestLocalDigestFilenameGuard is localDigest's counterpart to the scheme
+// guard above. The name it is handed comes from a source=() entry — the part
+// before `::` is written by whoever wrote the PKGBUILD — so anything that is
+// not a bare filename must be refused before it is joined to a directory.
+// Without this, `../../.ssh/id_ed25519::https://…` would have the fixer hash a
+// file outside the package and write the digest into the PKGBUILD.
+func TestLocalDigestFilenameGuard(t *testing.T) {
+	dir := t.TempDir()
+	// A file the traversal attempts would reach if the guard let them through.
+	outside := filepath.Dir(dir)
+	if err := os.WriteFile(filepath.Join(outside, "victim"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"../victim",
+		"../../etc/passwd",
+		"sub/demo.tar.gz",
+		"/etc/passwd",
+		".",
+		"..",
+		"",
+	} {
+		t.Run("reject "+name, func(t *testing.T) {
+			if _, err := localDigest(dir, name); err == nil ||
+				!strings.Contains(err.Error(), "non-filename source") {
+				t.Errorf("localDigest(%q) error = %v, want a non-filename rejection", name, err)
+			}
+		})
+	}
+}
+
+// A source that is simply not downloaded yet is an ordinary miss, not an
+// error the user should see as a rejection: the fixer treats it as "no digest
+// available" and leaves the finding standing.
+func TestLocalDigestReportsMissingSource(t *testing.T) {
+	if _, err := localDigest(t.TempDir(), "demo-1.0.0.tar.gz"); err == nil ||
+		!strings.Contains(err.Error(), "not downloaded") {
+		t.Errorf("localDigest of an absent source = %v, want a not-downloaded error", err)
+	}
+}
+
+// The digests must be those of the file actually on disk, and must all come
+// from one read — that agreement is the whole basis for trusting the sha256
+// the PB102 fix writes.
+func TestLocalDigestHashesTheFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "demo.tar.gz"), []byte("hello pkglint\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := localDigest(dir, "demo.tar.gz")
+	if err != nil {
+		t.Fatalf("localDigest: %v", err)
+	}
+	// Independently produced: printf 'hello pkglint\n' | md5sum / sha1sum / sha256sum
+	want := rules.Digests{
+		MD5:    "81e9507e65bc63dd82650f6e96666192",
+		SHA1:   "c5be7bc75da5a8cacf181fe5a8a3cc9f7ac33dfb",
+		SHA256: "ba77dc247b5b85c4a0f955c19011f57614e7135998f1c4d875348381f38d9695",
+	}
+	if got != want {
+		t.Errorf("localDigest = %+v, want %+v", got, want)
+	}
+}
+
+// $SRCDEST is where makepkg parks shared downloads, so a source cached there
+// counts as fetched even though it is not beside the PKGBUILD.
+func TestLocalDigestFindsSrcdest(t *testing.T) {
+	cache := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cache, "demo.tar.gz"), []byte("hello pkglint\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SRCDEST", cache)
+	got, err := localDigest(t.TempDir(), "demo.tar.gz")
+	if err != nil {
+		t.Fatalf("localDigest: %v", err)
+	}
+	if got.SHA256 != "ba77dc247b5b85c4a0f955c19011f57614e7135998f1c4d875348381f38d9695" {
+		t.Errorf("SHA256 = %q, want the cached file's digest", got.SHA256)
+	}
+}
+
+// The full PB102 path through --fix: a downloaded source whose weak digest
+// matches gains a sha256sums array, and the updpkgsums nudge — computed from
+// what is left *after* fixing — goes quiet, because the finding it nudged
+// about is now closed.
+func TestFixWeakChecksumsEndToEnd(t *testing.T) {
+	dir := writeFixture(t, `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+md5sums=('81e9507e65bc63dd82650f6e96666192')
+`, 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "demo-1.0.0.tar.gz"), []byte("hello pkglint\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if code := run([]string{"--fix", dir}, &buf); code != 0 {
+		t.Fatalf("--fix: got exit %d, want 0\n%s", code, buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "[PB102]") {
+		t.Errorf("expected a PB102 fix to be reported, got:\n%s", out)
+	}
+	if strings.Contains(out, "updpkgsums") {
+		t.Errorf("the checksum fix was applied, so the updpkgsums nudge should be gone:\n%s", out)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "sha256sums=('ba77dc247b5b85c4a0f955c19011f57614e7135998f1c4d875348381f38d9695')") {
+		t.Errorf("PKGBUILD should carry the local file's sha256, got:\n%s", got)
+	}
+}
+
+// The post-fix reload that recomputes the nudges re-reads the file's inline
+// directives; under --no-inline-ignores they must stay disregarded, or a
+// suppressed finding's nudge would vanish exactly when some other fix applied.
+func TestFixNoInlineKeepsNudges(t *testing.T) {
+	dir := writeFixture(t, `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+md5sums=('81e9507e65bc63dd82650f6e96666192') # pkglint: ignore=PB102
+export GOSUMDB=off
+`, 0o644)
+	var buf bytes.Buffer
+	if code := run([]string{"--fix", "--no-inline-ignores", dir}, &buf); code != 0 {
+		t.Fatalf("--fix --no-inline-ignores: got exit %d, want 0\n%s", code, buf.String())
+	}
+	out := buf.String()
+	if !strings.Contains(out, "[PB205]") {
+		t.Errorf("expected the GOSUMDB fix to apply, got:\n%s", out)
+	}
+	if !strings.Contains(out, "updpkgsums") {
+		t.Errorf("--no-inline-ignores surfaces the suppressed PB102, so its nudge must survive the post-fix reload:\n%s", out)
 	}
 }
 

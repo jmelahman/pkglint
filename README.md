@@ -98,14 +98,29 @@ writing. Fixes come in two tiers:
 
 | Tier   | Flag           | Rules                             | What it does                                                                                                                                                                                                                                                               |
 | ------ | -------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Safe   | `--fix`        | PB103, PB205, PB705, PB708, PB913, PB916 | Pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`); remove stale ignore directives; insert `-modcacherw` into go commands so the module cache stays removable |
+| Safe   | `--fix`        | PB102, PB103, PB205, PB705, PB708, PB913, PB916 | Add `sha256sums` beside a weak `md5sums`/`sha1sums` (see below); pin a mutable VCS tag/branch to its current commit (via `git ls-remote`); delete Go verification-disabling env settings; strip a leading slash from `backup` entries; wrap a scalar list field (`depends=foo`) in an array (`depends=(foo)`); remove stale ignore directives; insert `-modcacherw` into go commands so the module cache stays removable |
 | Unsafe | `--unsafe-fix` | PB203, PB204, PB206–PB209, PB403, PB914–PB915 | Append `--locked` to `cargo` (fails the build if no Cargo.lock ships); add a `go mod download` prepare() step; insert `-buildmode=pie` and `-trimpath` into `go build`; switch `npm install`→`ci` and `yarn install`→`--immutable`; append `--frozen-lockfile` to `pnpm`/`bun install`, `--no-scripts` to `composer install`, `--frozen` to `bundle install` and `uv sync`; drop setuid/setgid mode bits |
 
 Safe fixes preserve behavior or restore a security default; unsafe fixes are
 mechanical but change what the build does, so review them. An inline
 `# pkglint: ignore=` on a finding's line also suppresses its fix. Findings whose
-remediation isn't a mechanical rewrite (checksums, `.SRCINFO`) print a one-line
-suggestion (`updpkgsums`, `makepkg --printsrcinfo`) instead.
+remediation isn't a mechanical rewrite print a one-line suggestion instead:
+`updpkgsums` for checksums, `makepkg --printsrcinfo` for a stale `.SRCINFO`.
+Those suggestions are computed from what is left *after* fixing, so a checksum
+`--fix` repaired is not then nagged about.
+
+The PB102 fix is the one whose remedy is data rather than syntax, so it applies
+only where it can prove what it writes. It hashes sources **already downloaded**
+into the package directory or `$SRCDEST` — pkglint never fetches a source, since
+that would mean issuing requests to URLs read out of an untrusted file — and it
+emits a digest only after re-computing the existing `md5`/`sha1` from the same
+read and finding it matches. The `sha256sums` it adds therefore covers bytes the
+weak digest already vouched for: replacing them would take an md5 *preimage*,
+not the collision that makes md5 unfit for new use. Sources that aren't present,
+a digest that doesn't match, or an array pkglint can't pair index-for-index all
+leave the finding standing, and `updpkgsums` remains the way to close it. The
+weak array is kept — makepkg checks every array present, so the edit is purely
+additive.
 
 ### Commit hook
 

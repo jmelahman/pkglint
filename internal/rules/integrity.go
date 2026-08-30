@@ -29,8 +29,14 @@ var integrityRules = []Rule{
 		Severity: Warn,
 		Doc: "md5 and sha1 are broken for collision resistance. When they are the only digests " +
 			"present, an attacker able to produce collisions can substitute the source artifact. " +
-			"Add sha256sums, sha512sums or b2sums.",
-		Check: checkWeakChecksums,
+			"Add sha256sums, sha512sums or b2sums. --fix adds them for sources already downloaded " +
+			"into the package directory or makepkg's source cache, and only after re-checking the " +
+			"weak digest against those same bytes; it never downloads a source to do so, so a " +
+			"package whose sources are not present keeps the finding and `updpkgsums` remains the " +
+			"way to close it.",
+		Check:    checkWeakChecksums,
+		FixLevel: FixSafe,
+		Fix:      fixWeakChecksums,
 	},
 	{
 		ID:       "PB103",
@@ -450,23 +456,12 @@ func checkWeakChecksums(ctx *Context) []Finding {
 	var out []Finding
 	for _, arch := range ctx.archesWithSums() {
 		sums := ctx.Pkg.Checksums(arch)
-		strong := len(sums["sha224"]) > 0 || len(sums["sha256"]) > 0 || len(sums["sha384"]) > 0 ||
-			len(sums["sha512"]) > 0 || len(sums["b2"]) > 0
-		if strong {
+		if hasStrongSum(sums) {
 			continue
 		}
 		for _, algo := range []string{"ck", "md5", "sha1"} {
-			real := false
-			for _, s := range sums[algo] {
-				if !isSkip(s) {
-					real = true
-				}
-			}
-			if real {
-				name := algo + "sums"
-				if arch != "" {
-					name += "_" + arch
-				}
+			if hasRealSum(sums[algo]) {
+				name := sumsName(algo, arch)
 				v := ctx.Pkg.Vars[name]
 				out = append(out, findingAt("PB102", Warn, ctx.Pkg.PKGBUILD.Path, v.Pos,
 					"%s is the strongest digest present; add sha256sums or b2sums", name))
@@ -474,6 +469,38 @@ func checkWeakChecksums(ctx *Context) []Finding {
 		}
 	}
 	return out
+}
+
+// hasStrongSum reports whether a Checksums map carries any digest strong
+// enough to satisfy PB102. The fixer shares it so that what clears the rule
+// and what the fix aims to produce cannot drift apart.
+func hasStrongSum(sums map[string][]string) bool {
+	for _, algo := range []string{"sha224", "sha256", "sha384", "sha512", "b2"} {
+		if len(sums[algo]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasRealSum reports whether the array carries at least one actual digest, as
+// opposed to being empty or entirely SKIP.
+func hasRealSum(vals []string) bool {
+	for _, s := range vals {
+		if !isSkip(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// sumsName is the variable a checksum array lives in: "md5sums" for the base
+// array, "md5sums_x86_64" for an arch-specific one.
+func sumsName(algo, arch string) string {
+	if arch == "" {
+		return algo + "sums"
+	}
+	return algo + "sums_" + arch
 }
 
 func (ctx *Context) archesWithSums() []string {

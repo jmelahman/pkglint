@@ -66,6 +66,30 @@ type FixEnv struct {
 	// stands. Implementations run `git ls-remote` or similar — network I/O the
 	// rules package deliberately delegates to the caller.
 	ResolveRef func(url, ref string) (string, error)
+
+	// LocalDigest hashes a source file that is *already* on disk, given the
+	// package directory and the local filename makepkg gives the source. It
+	// returns an error when the file is not there, and the fixer that needs it
+	// then emits no edit and the finding stands.
+	//
+	// It never downloads. A digest cannot be derived from PKGBUILD text the
+	// way a commit hash can be derived from a ref, so PB102's fix only repairs
+	// packages whose sources have been fetched already — deliberately, since
+	// fetching would mean pkglint issuing requests to URLs it read out of an
+	// untrusted file. Implementations look in the package directory and
+	// makepkg's source cache and nowhere else; the rules package does no file
+	// I/O of its own.
+	LocalDigest func(dir, filename string) (Digests, error)
+}
+
+// Digests are hashes of one local source file, all computed from a single read
+// so they provably describe the same bytes — which is what lets a fixer check
+// a weak digest and emit a strong one for the same content. A field is empty
+// when the implementation did not compute that algorithm.
+type Digests struct {
+	MD5    string
+	SHA1   string
+	SHA256 string
 }
 
 // Fixer computes edits that resolve a rule's findings. It returns nil for
@@ -349,6 +373,181 @@ func sourceElems(u *pkgbuild.Unit) map[string]*syntax.Word {
 		}
 	}
 	return out
+}
+
+// --- PB102: add a strong digest beside a weak one --------------------------
+
+// fixWeakChecksums writes a sha256sums array next to a weak md5sums/sha1sums,
+// but only when it can show the bytes it hashed are the bytes the weak digest
+// already vouched for.
+//
+// This fix is unlike every other one here: the value to write is data, not
+// syntax, and no amount of reading the PKGBUILD recovers it. env.LocalDigest
+// supplies it from sources already fetched, so a package whose sources have
+// never been downloaded simply keeps the finding — see LocalDigest's comment
+// for why pkglint will not fetch them to close it.
+//
+// What makes the result trustworthy rather than merely plausible is that the
+// weak digest is re-computed from the very same read as the sha256 and must
+// match. The sha256 written therefore describes bytes the existing chain
+// already covered: substituting them needs an md5 *preimage*, not the
+// collision that makes md5 unfit for new use. Without that check the fix would
+// just be laundering whatever happens to sit in the cache into an
+// authoritative-looking digest. A mismatch — upstream silently re-rolled the
+// tarball, or something worse — abandons the array rather than certifying it.
+//
+// Arrays are all-or-nothing per arch. makepkg pairs sums to sources by index,
+// so an array with a gap in it is not a partial fix but a misaligned one.
+func fixWeakChecksums(ctx *Context, env *FixEnv) []Edit {
+	if env == nil || env.LocalDigest == nil {
+		return nil
+	}
+	var edits []Edit
+	for _, arch := range ctx.archesWithSums() {
+		if e, ok := strongSumsEdit(ctx, env, arch); ok {
+			edits = append(edits, e)
+		}
+	}
+	return edits
+}
+
+// strongSumsEdit builds the one sha256sums array for arch, or reports that it
+// could not. Both weak arrays being present (md5sums *and* sha1sums) still
+// yields a single edit, since one strong array is what clears the finding.
+func strongSumsEdit(ctx *Context, env *FixEnv, arch string) (Edit, bool) {
+	sums := ctx.Pkg.Checksums(arch)
+	if hasStrongSum(sums) {
+		return Edit{}, false // PB102 is silent here; nothing to fix
+	}
+	witness, v := weakSumsVar(ctx, sums, arch)
+	if v == nil {
+		return Edit{}, false
+	}
+	vals := sums[witness.algo]
+	// One plain array assignment holding exactly these values: the array the
+	// edit writes has to pair index-for-index with what makepkg pairs, and a
+	// count arrived at through `+=` merges or brace groups is a count this
+	// fixer cannot reproduce by writing elements out one per line. Those are
+	// left to updpkgsums.
+	if v.CountUnknown || v.Assign == nil || v.Assign.Array == nil ||
+		len(v.Assign.Array.Elems) != len(v.Values) || len(vals) != len(v.Values) {
+		return Edit{}, false
+	}
+	srcs := sourcesForArch(ctx, arch)
+	if len(srcs) != len(vals) {
+		return Edit{}, false // PB110's territory; pairing here would misalign
+	}
+	strong := make([]string, len(vals))
+	hashed := 0
+	for i, e := range srcs {
+		s, ok := strongSumValue(ctx, env, e, witness, vals[i])
+		if !ok {
+			return Edit{}, false
+		}
+		if !isSkip(s) {
+			hashed++
+		}
+		strong[i] = s
+	}
+	// An all-SKIP array would satisfy the rule's "a strong digest is present"
+	// test while verifying nothing — silencing PB102 instead of fixing it.
+	if hashed == 0 {
+		return Edit{}, false
+	}
+	raw := ctx.Pkg.PKGBUILD.Raw
+	// Insert on the line after the weak array ends, past any trailing comment
+	// on its closing line.
+	at := off(v.Assign.End())
+	for at < len(raw) && raw[at] != '\n' {
+		at++
+	}
+	return Edit{
+		Path:  ctx.Pkg.PKGBUILD.Path,
+		Start: at,
+		End:   at,
+		New:   "\n" + sumsArrayText(sumsName("sha256", arch), strong),
+		Line:  int(v.Pos.Line()),
+		Desc: fmt.Sprintf("add %s (%d digest(s) hashed locally and checked against %s)",
+			sumsName("sha256", arch), hashed, sumsName(witness.algo, arch)),
+	}, true
+}
+
+// strongSumValue returns one source's sha256sums entry: SKIP where makepkg wants
+// one, else the local file's hash — gated on the weak digest matching the same
+// bytes.
+func strongSumValue(ctx *Context, env *FixEnv, e pkgbuild.SourceEntry, witness weakWitness, weak string) (string, bool) {
+	// A VCS source has no single file to hash and takes SKIP in every sums
+	// array. So does an entry already written SKIP: that is a detached
+	// signature doing the verifying, or an unverified source, and either way
+	// PB101 and PB111 own it. Carrying the SKIP across keeps this fix from
+	// quietly changing what is verified.
+	if e.VCS != "" || isSkip(weak) {
+		return "SKIP", true
+	}
+	d, err := env.LocalDigest(ctx.Pkg.Dir, effectiveFilename(e))
+	if err != nil || d.SHA256 == "" {
+		return "", false
+	}
+	if got := witness.of(d); got == "" || !strings.EqualFold(got, weak) {
+		return "", false
+	}
+	return d.SHA256, true
+}
+
+// weakWitness is a weak digest the fixer can re-compute, and so can use to
+// check that a local file is the one a PKGBUILD already describes.
+type weakWitness struct {
+	algo string
+	of   func(Digests) string
+}
+
+// weakWitnesses are those digests, best first: sha1 is the stronger witness of
+// the two. ck is deliberately absent — it is makepkg's CRC, which pkglint does
+// not compute, so a ck-only package offers nothing to check the bytes against
+// and gets no fix.
+var weakWitnesses = []weakWitness{
+	{"sha1", func(d Digests) string { return d.SHA1 }},
+	{"md5", func(d Digests) string { return d.MD5 }},
+}
+
+// weakSumsVar picks the weak array to verify against, returning the witness
+// and the Var holding it. A nil Var means there is nothing usable.
+func weakSumsVar(ctx *Context, sums map[string][]string, arch string) (weakWitness, *pkgbuild.Var) {
+	for _, w := range weakWitnesses {
+		if !hasRealSum(sums[w.algo]) {
+			continue
+		}
+		if v := ctx.Pkg.Vars[sumsName(w.algo, arch)]; v != nil {
+			return w, v
+		}
+	}
+	return weakWitness{}, nil
+}
+
+// sourcesForArch returns arch's sources in the index order makepkg pairs
+// checksums by.
+func sourcesForArch(ctx *Context, arch string) []pkgbuild.SourceEntry {
+	var out []pkgbuild.SourceEntry
+	for _, e := range ctx.Pkg.Sources() {
+		if e.Arch == arch {
+			out = append(out, e)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Index < out[j].Index })
+	return out
+}
+
+// sumsArrayText renders a sums array the way updpkgsums does: one value per
+// line, aligned under the first, so a long array stays readable.
+func sumsArrayText(name string, vals []string) string {
+	var b strings.Builder
+	b.WriteString(name + "=('" + vals[0] + "'")
+	indent := strings.Repeat(" ", len(name)+2)
+	for _, v := range vals[1:] {
+		b.WriteString("\n" + indent + "'" + v + "'")
+	}
+	b.WriteString(")")
+	return b.String()
 }
 
 // --- PB203: cargo without --locked -----------------------------------------

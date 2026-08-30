@@ -193,9 +193,82 @@ var benignTopLevel = map[string]bool{
 var pureTopLevel = map[string]bool{
 	"[": true, "test": true,
 	"echo": true, "printf": true, "cat": true, "tput": true,
+	// A pure reader: grep has no write form at all, and `grep -q` guards are
+	// how PKGBUILDs probe the host for a feature before appending a depends.
+	"grep": true, "egrep": true, "fgrep": true,
 	// libmakepkg's message API, sourced into the PKGBUILD's shell before it
 	// runs. PB907 already rates these a portability nit rather than a hazard.
 	"msg": true, "msg2": true, "warning": true, "error": true, "plain": true,
+}
+
+// pureTopLevelUse reports whether this invocation is one of the pure ones.
+// date and sed are pure in their common forms but each keeps one escape hatch
+// into system state, so they are judged per call rather than by name.
+func pureTopLevelUse(c Command) bool {
+	if pureTopLevel[c.Name] {
+		return true
+	}
+	switch c.Name {
+	case "date":
+		// `export KBUILD_BUILD_TIMESTAMP="$(date -Ru…)"` is the kernel
+		// packages' reproducible-builds idiom, verbatim from core/linux.
+		// Reading the clock is pure; setting it is not.
+		return !dateSetsClock(c)
+	case "sed":
+		// Filtering a pipe is pure; -i and the w script forms write files.
+		return !sedInPlace(c) && !sedWritesFile(c)
+	}
+	return false
+}
+
+// dateSetsClock reports whether this date invocation sets the system clock
+// rather than printing it: GNU -s/--set, or the POSIX operand form — a
+// positional argument not starting with '+' (`date 0501120026`).
+func dateSetsClock(c Command) bool {
+	for i := 0; i < len(c.Args); i++ {
+		a := c.Args[i]
+		switch {
+		case strings.HasPrefix(a, "--"):
+			if strings.HasPrefix(a, "--set") {
+				return true
+			}
+			// A detached value follows its option; don't read it as the
+			// POSIX operand form.
+			if a == "--date" || a == "--file" || a == "--reference" {
+				i++
+			}
+		case strings.HasPrefix(a, "-") && len(a) > 1:
+			if strings.ContainsRune(a[1:], 's') {
+				return true // -s anywhere in a cluster is --set
+			}
+			// A trailing -d/-f/-r takes the next word as its value; attached
+			// values (-d@1234) are already part of this argument.
+			switch a[len(a)-1] {
+			case 'd', 'f', 'r':
+				i++
+			}
+		case !strings.HasPrefix(a, "+"):
+			return true // POSIX operand form sets the clock
+		}
+	}
+	return false
+}
+
+// sedWriteRe conservatively matches sed's file-writing script forms: the
+// `w file` / `W file` command (possibly address-prefixed) and the `s///w file`
+// flag. A replacement that merely contains " w " keeps the finding — for this
+// rule that is the right direction to be wrong.
+var sedWriteRe = regexp.MustCompile(`(^|[;{[:space:]/0-9$])[wW][[:space:]]`)
+
+func sedWritesFile(c Command) bool {
+	for _, a := range c.Args {
+		// Telling script arguments from input files apart needs full option
+		// parsing; checking every non-flag argument over-matches at worst.
+		if !strings.HasPrefix(a, "-") && sedWriteRe.MatchString(a) {
+			return true
+		}
+	}
+	return false
 }
 
 // redirectsOutput reports whether the statement sends its output to a file,
@@ -230,7 +303,7 @@ func checkTopLevelExec(ctx *Context) []Finding {
 		}
 		// A PKGBUILD that defines its own echo/warning/… gets no exemption:
 		// the name would say "banner" while the body did the work.
-		if pureTopLevel[c.Name] && !redirectsOutput(c.Stmt) && !ctx.definesFunc(c, c.Name) {
+		if pureTopLevelUse(c) && !redirectsOutput(c.Stmt) && !ctx.definesFunc(c, c.Name) {
 			continue
 		}
 		name := c.Name

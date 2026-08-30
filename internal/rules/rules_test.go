@@ -1128,6 +1128,40 @@ warning "this package is deprecated"
 msg2 "using $_lib"
 cat /dev/null`)})
 	})
+	t.Run("PB301 reading the clock at top level is not execution", func(t *testing.T) {
+		// The kernel packages' reproducible-builds idiom, verbatim from
+		// core/linux: every kernel-family PKGBUILD carries this line.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
+			`export KBUILD_BUILD_TIMESTAMP="$(date -Ru${SOURCE_DATE_EPOCH:+d @$SOURCE_DATE_EPOCH})"`)})
+	})
+	t.Run("PB301 setting the clock is still flagged", func(t *testing.T) {
+		for _, line := range []string{
+			`date -s '2026-01-01'`,
+			`date --set=now`,
+			`date 0501120026`, // the POSIX operand form also sets the clock
+		} {
+			expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 a filtering sed at top level is pure", func(t *testing.T) {
+		// The ungoogled-chromium shape: build a list at the top level by
+		// piping printf through a substitution.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
+			`_libs=$(printf '%s\n' libjpeg libpng | sed 's/^libjpeg$/&_turbo/')`)})
+	})
+	t.Run("PB301 a sed that writes a file is still flagged", func(t *testing.T) {
+		for _, line := range []string{
+			`sed -i 's/x/y/' notes.txt`,
+			`sed 's/x/y/w out.txt' notes.txt`,
+			`printf x | sed 's/x/y/' > out.txt`,
+		} {
+			expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 a grep probe at top level is pure", func(t *testing.T) {
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
+			"if grep -q avx2 /proc/cpuinfo; then\n  _simd=avx2\nfi")})
+	})
 	t.Run("PB301 an inert command that redirects to a file is a write", func(t *testing.T) {
 		for _, line := range []string{
 			"cat <<EOF > helper.sh\n#!/bin/sh\nEOF",

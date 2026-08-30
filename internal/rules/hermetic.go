@@ -38,8 +38,12 @@ var hermeticRules = []Rule{
 		Doc: "cargo without --locked (or --frozen/--offline) may resolve and fetch dependency " +
 			"versions that differ from the committed Cargo.lock, so the built artifact is not " +
 			"reproducible and unreviewed code can enter the build.",
-		Check:    checkCargoLocked,
-		FixLevel: FixSafe,
+		Check: checkCargoLocked,
+		// --locked hard-fails when the source ships no Cargo.lock (or one out
+		// of sync with Cargo.toml), so the rewrite can break a working build —
+		// the same reason the other lockfile-enforcing fixes (PB206–PB209)
+		// are unsafe.
+		FixLevel: FixUnsafe,
 		Fix:      fixCargoLocked,
 	},
 	{

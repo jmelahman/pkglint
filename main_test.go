@@ -163,9 +163,9 @@ func TestPackageArchive(t *testing.T) {
 	}
 }
 
-// fixablePKGBUILD carries one safe fix (cargo without --locked), one safe
-// line-removal fix (GOSUMDB=off), one unsafe fix (npm install), and a SKIP
-// checksum that only a manual `updpkgsums` can resolve.
+// fixablePKGBUILD carries one safe line-removal fix (GOSUMDB=off), two unsafe
+// fixes (cargo without --locked, npm install), and a SKIP checksum that only
+// a manual `updpkgsums` can resolve.
 const fixablePKGBUILD = `pkgname=demo
 pkgver=1.0.0
 pkgrel=1
@@ -195,8 +195,8 @@ func writeFixture(t *testing.T, content string, mode os.FileMode) string {
 func TestFixDiffIsDryRun(t *testing.T) {
 	dir := writeFixture(t, fixablePKGBUILD, 0o644)
 	var buf bytes.Buffer
-	if code := run([]string{"--fix", "--diff", dir}, &buf); code != 0 {
-		t.Fatalf("--fix --diff: got exit %d, want 0\n%s", code, buf.String())
+	if code := run([]string{"--unsafe-fix", "--diff", dir}, &buf); code != 0 {
+		t.Fatalf("--unsafe-fix --diff: got exit %d, want 0\n%s", code, buf.String())
 	}
 	out := buf.String()
 	if !strings.Contains(out, "dry run") {
@@ -223,8 +223,8 @@ func TestFixWritesInPlace(t *testing.T) {
 		t.Fatalf("--fix: got exit %d, want 0\n%s", code, buf.String())
 	}
 	out := buf.String()
-	if !strings.Contains(out, "applied 2 fix(es)") {
-		t.Errorf("want 2 applied fixes (cargo --locked, GOSUMDB removal), got:\n%s", out)
+	if !strings.Contains(out, "applied 1 fix(es)") {
+		t.Errorf("want 1 applied fix (GOSUMDB removal), got:\n%s", out)
 	}
 	if !strings.Contains(out, "updpkgsums") {
 		t.Errorf("SKIP checksum should nudge toward updpkgsums, got:\n%s", out)
@@ -233,11 +233,11 @@ func TestFixWritesInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(fixed), "cargo build --release --locked") {
-		t.Errorf("cargo --locked not applied:\n%s", fixed)
-	}
 	if strings.Contains(string(fixed), "GOSUMDB") {
 		t.Errorf("GOSUMDB=off line not removed:\n%s", fixed)
+	}
+	if strings.Contains(string(fixed), "--locked") {
+		t.Errorf("--fix must not apply the unsafe cargo --locked rewrite:\n%s", fixed)
 	}
 	if strings.Contains(string(fixed), "npm ci") {
 		t.Errorf("--fix must not apply the unsafe npm-ci rewrite:\n%s", fixed)
@@ -263,6 +263,9 @@ func TestUnsafeFixEscalates(t *testing.T) {
 	}
 	if !strings.Contains(string(fixed), "npm ci") {
 		t.Errorf("--unsafe-fix should rewrite npm install to npm ci:\n%s", fixed)
+	}
+	if !strings.Contains(string(fixed), "cargo build --release --locked") {
+		t.Errorf("--unsafe-fix should append --locked to cargo build:\n%s", fixed)
 	}
 }
 

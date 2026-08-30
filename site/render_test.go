@@ -17,7 +17,7 @@ func TestRenderFixableBadges(t *testing.T) {
 	// fails loudly if a rule's FixLevel changes rather than silently passing.
 	for id, want := range map[string]rules.FixLevel{
 		"PB101": rules.FixNone,
-		"PB203": rules.FixSafe,
+		"PB205": rules.FixSafe,
 		"PB204": rules.FixUnsafe,
 	} {
 		r, ok := rules.RuleByID(id)
@@ -36,7 +36,7 @@ func TestRenderFixableBadges(t *testing.T) {
 		Grade:   "D",
 		Findings: []rules.Finding{
 			{RuleID: "PB101", Severity: rules.Error, Message: "no checksum", Path: "PKGBUILD", Line: 3},
-			{RuleID: "PB203", Severity: rules.Warn, Message: "cargo not locked", Path: "PKGBUILD", Line: 8},
+			{RuleID: "PB205", Severity: rules.Warn, Message: "GOSUMDB disabled", Path: "PKGBUILD", Line: 8},
 			{RuleID: "PB204", Severity: rules.Warn, Message: "go downloads modules", Path: "PKGBUILD", Line: 9},
 		},
 	}}
@@ -76,8 +76,8 @@ func TestRenderFixableBadges(t *testing.T) {
 	}
 
 	// Rule pages: fixable rules advertise the flag, PB101 does not.
-	if r := read(filepath.Join("rules", "PB203.html")); !strings.Contains(r, "pkglint --fix") {
-		t.Errorf("PB203 rule page missing --fix guidance:\n%s", r)
+	if r := read(filepath.Join("rules", "PB205.html")); !strings.Contains(r, "pkglint --fix") {
+		t.Errorf("PB205 rule page missing --fix guidance:\n%s", r)
 	}
 	if r := read(filepath.Join("rules", "PB204.html")); !strings.Contains(r, "pkglint --unsafe-fix") {
 		t.Errorf("PB204 rule page missing --unsafe-fix guidance:\n%s", r)

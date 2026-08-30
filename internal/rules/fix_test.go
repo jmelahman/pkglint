@@ -57,10 +57,16 @@ func mustNotContain(t *testing.T, got, want string) {
 }
 
 func TestFixCargoLocked(t *testing.T) {
-	got := fixPKGBUILD(t, `
+	body := `
 build() {
   cargo build --release
-}`, FixSafe, nil)
+}`
+	// --locked fails outright when the source ships no Cargo.lock, so the
+	// rewrite is behavior-changing and must not run at the safe level.
+	if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+		t.Errorf("FixSafe should not apply the unsafe PB203 fix, got:\n%s", got["PKGBUILD"])
+	}
+	got := fixPKGBUILD(t, body, FixUnsafe, nil)
 	mustContain(t, got, "cargo build --release --locked")
 }
 
@@ -513,12 +519,14 @@ build() {
 }
 
 // An inline suppression on the finding's line must also suppress its fix.
+// Run at FixUnsafe, where the PB203 fix is otherwise eligible, so the
+// directive is what blocks it.
 func TestFixSuppression(t *testing.T) {
 	got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   # pkglint: ignore=PB203
   cargo build --release
-}`)}, FixSafe, nil)
+}`)}, FixUnsafe, nil)
 	if _, ok := got["PKGBUILD"]; ok {
 		t.Errorf("suppressed rule should not be fixed, got:\n%s", got["PKGBUILD"])
 	}

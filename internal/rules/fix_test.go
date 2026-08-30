@@ -570,6 +570,75 @@ build() {
 	mustContain(t, got, "cargo build --release --locked")
 }
 
+func TestFixCargoCheckRelease(t *testing.T) {
+	t.Run("removed mid-line", func(t *testing.T) {
+		body := `
+check() {
+  cargo test --release --locked
+}`
+		// Rebuilding the crate in the dev profile changes what the check run
+		// does, so the safe level leaves it alone.
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+			t.Errorf("FixSafe should not apply the unsafe PB940 fix, got:\n%s", got["PKGBUILD"])
+		}
+		got := fixPKGBUILD(t, body, FixUnsafe, nil)
+		mustContain(t, got, "cargo test --locked")
+		mustNotContain(t, got, "--release")
+		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got}))["PB940"]; n != 0 {
+			t.Errorf("fixed PKGBUILD still has %d PB940 finding(s):\n%s", n, got)
+		}
+	})
+	t.Run("cargo check too", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+check() {
+  cargo check --release
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo check\n")
+	})
+	t.Run("continuation line taken whole", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+check() {
+  cargo test \
+    --release \
+    --locked
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo test \\\n    --locked\n")
+	})
+	t.Run("last continuation line takes the backslash above it", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+check() {
+  cargo test --locked \
+    --release
+  echo done
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo test --locked\n  echo done\n")
+	})
+	t.Run("harness argument left alone", func(t *testing.T) {
+		// `--release` here is the test binary's own flag, not cargo's; PB940
+		// does not fire and nothing may be deleted.
+		body := `
+check() {
+  cargo test --locked -- --release
+}`
+		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}))["PB940"]; n != 0 {
+			t.Errorf("PB940 fired on a harness argument (%d finding(s))", n)
+		}
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("nothing should change, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("expansion declined", func(t *testing.T) {
+		body := `
+_flags='--release'
+check() {
+  cargo test $_flags --locked
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("a --release reached through a variable must not be rewritten, got:\n%s", got["PKGBUILD"])
+		}
+	})
+}
+
 func TestFixGoEnvWeakening(t *testing.T) {
 	t.Run("standalone assignment removed", func(t *testing.T) {
 		got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo

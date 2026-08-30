@@ -296,6 +296,11 @@ var styleRules = []Rule{
 			"package guidelines run check() without --release; the shipped binary is still built " +
 			"--release in build().",
 		Check: checkCargoCheckRelease,
+		// Dropping the flag recompiles the crate in the dev profile: the check
+		// gets slower, and a suite that only passed with assertions compiled
+		// out now fails. That failure is the point, but it is a human's call.
+		FixLevel: FixUnsafe,
+		Fix:      fixCargoCheckRelease,
 	},
 	{
 		ID:       "PB941",

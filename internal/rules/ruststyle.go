@@ -10,11 +10,26 @@ import "strings"
 
 // --- PB940: cargo test/check --release ---------------------------------------
 
+// cargoRelease reports whether the command passes --release to cargo itself.
+// Everything after the `--` separator goes to the test binary, where
+// `--release` is the harness's own argument and none of cargo's business.
+func cargoRelease(c Command) bool {
+	for _, a := range c.Args {
+		switch a {
+		case "--":
+			return false
+		case "--release":
+			return true
+		}
+	}
+	return false
+}
+
 func checkCargoCheckRelease(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.CommandsNamed("cargo") {
 		sub := c.Subcommand()
-		if (sub != "test" && sub != "check") || !c.HasArg("--release") {
+		if (sub != "test" && sub != "check") || !cargoRelease(c) {
 			continue
 		}
 		out = append(out, c.finding("PB940", Warn,

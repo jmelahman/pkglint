@@ -805,6 +805,71 @@ func fixCargoLocked(ctx *Context, _ *FixEnv) []Edit {
 	return edits
 }
 
+// --- PB940: cargo test/check --release -------------------------------------
+
+// fixCargoCheckRelease deletes --release from cargo test/check so the run
+// keeps the debug assertions and overflow checks it exists to exercise. Only a
+// --release written literally before the `--` separator is removed: one that
+// arrives through a variable is not ours to rewrite, and one after `--` is the
+// test binary's argument, which cargoRelease already declines to flag.
+func fixCargoCheckRelease(ctx *Context, _ *FixEnv) []Edit {
+	var edits []Edit
+	for _, c := range ctx.CommandsNamed("cargo") {
+		sub := c.Subcommand()
+		if (sub != "test" && sub != "check") || !cargoRelease(c) {
+			continue
+		}
+		w := wordByValue(c, "--release")
+		if w == nil {
+			continue // written as an expansion: the finding stands
+		}
+		start, end := flagCut(c.Unit.Raw, off(w.Pos()), off(w.End()))
+		edits = append(edits, Edit{
+			Path:  c.Unit.Path,
+			Start: start,
+			End:   end,
+			New:   "",
+			Line:  int(w.Pos().Line()),
+			Desc:  fmt.Sprintf("drop --release from `cargo %s` (keeps debug assertions and overflow checks on)", sub),
+		})
+	}
+	return edits
+}
+
+// flagCut widens the byte range of a flag word to what deleting it should
+// actually take: the whitespace in front of it, and — when the flag sits alone
+// on a continuation line — that whole line, including the backslash that would
+// otherwise be left continuing into nothing or dangling off the line above.
+func flagCut(raw []byte, start, end int) (int, int) {
+	for start > 0 && (raw[start-1] == ' ' || raw[start-1] == '\t') {
+		start--
+	}
+	if start == 0 || raw[start-1] != '\n' {
+		return start, end
+	}
+	rest := end
+	for rest < len(raw) && (raw[rest] == ' ' || raw[rest] == '\t') {
+		rest++
+	}
+	switch {
+	case rest+1 < len(raw) && raw[rest] == '\\' && raw[rest+1] == '\n':
+		// More words follow: take this line and its newline.
+		return start, rest + 2
+	case rest >= len(raw) || raw[rest] == '\n':
+		// Last line of the call: the previous line's `\` continued into it and
+		// must go too, or the command runs on into whatever comes next.
+		cut := start - 1 // the newline
+		if cut > 0 && raw[cut-1] == '\\' {
+			cut--
+			for cut > 0 && (raw[cut-1] == ' ' || raw[cut-1] == '\t') {
+				cut--
+			}
+			return cut, rest
+		}
+	}
+	return start, end
+}
+
 // --- PB204: implicit go module downloads -----------------------------------
 
 // fixGoDownloads gives the build its modules ahead of time: a prepare() that

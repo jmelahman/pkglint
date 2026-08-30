@@ -1207,3 +1207,283 @@ func TestFixLevelContract(t *testing.T) {
 		}
 	}
 }
+
+// customVarPKGBUILD is a package whose only irregularity is the custom
+// variable spelling under test, so what the fixer does with it is unambiguous.
+func customVarPKGBUILD(body string) string {
+	return `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+` + body + "\n"
+}
+
+func fixCustomVar(t *testing.T, body string) (string, bool) {
+	t.Helper()
+	got, ok := fixAll(t, map[string]string{"PKGBUILD": customVarPKGBUILD(body)}, FixUnsafe, nil)["PKGBUILD"]
+	return got, ok
+}
+
+func TestFixUnprefixedCustomVars(t *testing.T) {
+	t.Run("declaration and every reference are renamed together", func(t *testing.T) {
+		got, _ := fixCustomVar(t, `pyname=demolib
+commit=abc123
+build() {
+  cd "$srcdir/${pyname}-$pkgver"
+  echo "$commit" > rev
+  make PY=$pyname
+}`)
+		mustContain(t, got, "_pyname=demolib")
+		mustContain(t, got, "_commit=abc123")
+		mustContain(t, got, `cd "$srcdir/${_pyname}-$pkgver"`)
+		mustContain(t, got, `echo "$_commit" > rev`)
+		mustContain(t, got, "make PY=$_pyname")
+		mustNotContain(t, got, "$pyname")
+	})
+
+	// Arithmetic names a variable without a $, and the rename has to follow it
+	// there or the file starts reading an empty one.
+	t.Run("arithmetic operands are renamed", func(t *testing.T) {
+		got, _ := fixCustomVar(t, `count=1
+build() {
+  ((count++))
+  echo $((count + 1))
+}`)
+		mustContain(t, got, "_count=1")
+		mustContain(t, got, "((_count++))")
+		mustContain(t, got, "$((_count + 1))")
+	})
+
+	t.Run("unset and for-loop iterators are renamed", func(t *testing.T) {
+		got, _ := fixCustomVar(t, `mod=a
+build() {
+  for mod in a b; do echo "$mod"; done
+  unset mod
+}`)
+		mustContain(t, got, "for _mod in a b; do echo \"$_mod\"; done")
+		mustContain(t, got, "unset _mod")
+	})
+
+	t.Run("the underscored name being taken blocks the rename", func(t *testing.T) {
+		if got, ok := fixCustomVar(t, `pyname=demolib
+_pyname=other`); ok {
+			t.Errorf("rename onto an existing name should be declined, got:\n%s", got)
+		}
+	})
+
+	// An exported variable is read by whatever the build runs, and no walk of
+	// the PKGBUILD can see that side of it.
+	t.Run("exported variables are left alone", func(t *testing.T) {
+		for _, body := range []string{
+			"prefix=/usr\nexport prefix",
+			"export prefix=/usr",
+			"declare -x prefix=/usr",
+		} {
+			if got, ok := fixCustomVar(t, body); ok {
+				t.Errorf("exported variable should not be renamed, got:\n%s", got)
+			}
+		}
+	})
+
+	t.Run("an environment prefix on a command is left alone", func(t *testing.T) {
+		if got, ok := fixCustomVar(t, `flags=-O2
+build() {
+  flags=-O2 make
+}`); ok {
+			t.Errorf("command-environment assignment should not be renamed, got:\n%s", got)
+		}
+	})
+
+	// A mention the walk cannot classify might be a reference; the rename is
+	// only offered when every occurrence is accounted for.
+	t.Run("an unaccountable mention blocks the rename", func(t *testing.T) {
+		for _, body := range []string{
+			"target=all\nbuild() {\n  make target\n}",              // bare word argument
+			"target=all\nbuild() {\n  make 'target'\n}",            // quoted the same way
+			"target=all\nbuild() {\n  [[ -v target ]] && :\n}",     // a test on the name
+			"target=all\nbuild() {\n  read target < in\n}",         // an assignment this walk does not model
+			"target=all\nbuild() {\n  unset -f target\n}",          // names a function, not the variable
+			"target=all\nbuild() {\n  unset -fv target\n}",         // bundled spelling of the same flag
+			"target=all\nbuild() {\n  unset \"$w\" target\n}",      // $w could be -f, or any name
+			"target=all\nbuild() {\n  \"un\"${w}\"set\" target\n}", // maybe-unset built at run time
+			"target=all\nbuild() {\n  trap 'echo $target' EXIT\n}", // reference in deferred shell text
+			"target=all\nbuild() {\n  sh -c \"echo \\$target\"\n}", // reference behind an escape
+			"target=all\nbuild() {\n  sh <<'EOT'\n$target\nEOT\n}", // reference in a quoted heredoc
+		} {
+			if got, ok := fixCustomVar(t, body); ok {
+				t.Errorf("unaccountable mention should block the rename, got:\n%s", got)
+			}
+		}
+	})
+
+	// Run-time naming can reach any variable by a name no walk can predict —
+	// and a sourced file can read any variable with no trace here — so either
+	// stands every rename in the file down, not just the one it names.
+	t.Run("dynamic naming or sourcing blocks every rename in the file", func(t *testing.T) {
+		for _, hazard := range []string{
+			`eval "echo $pyname"`,
+			`echo "${!pyname}"`,
+			`echo "${!py@}"`, // prefix listing: a rename changes what it returns
+			`declare -n ref=pyname`,
+			`source helpers.sh`,
+			`. "$srcdir/helpers.sh"`,
+		} {
+			body := "pyname=demolib\ncommit=abc123\nbuild() {\n  " + hazard + "\n  echo \"$commit\"\n}"
+			if got, ok := fixCustomVar(t, body); ok {
+				t.Errorf("%s should block renames, got:\n%s", hazard, got)
+			}
+		}
+	})
+
+	// `${!arr[@]}` lists arr's indices: unlike every other ${!...} it names
+	// arr itself, so it neither blocks the file nor escapes the rename.
+	t.Run("array-indices expansion renames like any reference", func(t *testing.T) {
+		got, _ := fixCustomVar(t, `mods=(a b)
+build() {
+  for i in "${!mods[@]}"; do echo "${mods[$i]}"; done
+}`)
+		mustContain(t, got, `"${!_mods[@]}"`)
+		mustContain(t, got, `"${_mods[$i]}"`)
+	})
+
+	// The literal-text veto wants a whole reference, not a prefix of a longer
+	// name: text mentioning $python must not pin down a variable named py.
+	t.Run("a longer name in literal text does not block", func(t *testing.T) {
+		got, _ := fixCustomVar(t, `py=demolib
+build() {
+  sed 's/$python/x/' f
+  echo "$py"
+}`)
+		mustContain(t, got, "_py=demolib")
+		mustContain(t, got, `echo "$_py"`)
+		mustContain(t, got, "sed 's/$python/x/' f")
+	})
+
+	t.Run("known makepkg fields are never renamed", func(t *testing.T) {
+		got, ok := fixCustomVar(t, `build() {
+  echo "$pkgver"
+}`)
+		if ok {
+			t.Errorf("schema fields should not be renamed, got:\n%s", got)
+		}
+	})
+
+	// A directive on any line of the rename waives all of it: renaming the
+	// references while the declaration keeps its name would break the build.
+	t.Run("an inline directive waives the whole rename", func(t *testing.T) {
+		got, ok := fixCustomVar(t, `# pkglint: ignore=PB902
+pyname=demolib
+build() {
+  echo "$pyname"
+}`)
+		if ok {
+			t.Errorf("suppressed rename should not be applied, got:\n%s", got)
+		}
+	})
+
+	t.Run("the renamed file is clean of PB902", func(t *testing.T) {
+		got, _ := fixCustomVar(t, `pyname=demolib
+build() {
+  echo "${pyname}"
+}`)
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		pkg, err := pkgbuild.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range Run(pkg, nil) {
+			if f.RuleID == "PB902" {
+				t.Errorf("PB902 still reported after the fix: %s", f.Message)
+			}
+		}
+	})
+}
+
+// A grouped rewrite must not be applied in part: if one of its edits is
+// dropped for overlapping another, the rest go with it.
+func TestApplyEditsGroupsAreAllOrNothing(t *testing.T) {
+	raw := []byte("abcdefgh")
+	out, applied := ApplyEdits(raw, []Edit{
+		{Start: 0, End: 4, New: "X"},                  // wins the overlap
+		{Start: 2, End: 3, New: "Y", Group: "rename"}, // dropped, taking its group
+		{Start: 6, End: 7, New: "Z", Group: "rename"},
+	})
+	if string(out) != "Xefgh" {
+		t.Errorf("got %q, want %q", out, "Xefgh")
+	}
+	if len(applied) != 1 || applied[0].New != "X" {
+		t.Errorf("expected only the ungrouped edit to apply, got %+v", applied)
+	}
+}
+
+// Dropping a broken group frees the range its members held, so an edit they
+// displaced gets its turn on the next round.
+func TestApplyEditsGroupDropFreesOverlap(t *testing.T) {
+	out, applied := ApplyEdits([]byte("abcdefgh"), []Edit{
+		{Start: 0, End: 2, New: "X", Group: "rename"}, // group breaks below
+		{Start: 0, End: 4, New: "Y"},                  // displaced by it at first
+		{Start: 5, End: 6, New: "Z"},                  // breaks the group by overlapping
+		{Start: 5, End: 7, New: "W", Group: "rename"},
+	})
+	if string(out) != "YeZgh" {
+		t.Errorf("got %q, want %q", out, "YeZgh")
+	}
+	if len(applied) != 2 {
+		t.Errorf("expected 2 applied, got %+v", applied)
+	}
+}
+
+// PB103 rewrites a whole source element, PB902 rewrites a variable reference
+// inside one. When they collide the rename must lose as a unit: applying its
+// other edits would leave the element referring to a variable the file no
+// longer sets.
+func TestFixRenameYieldsToOverlappingEdit(t *testing.T) {
+	got := fixAll(t, map[string]string{"PKGBUILD": `pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+tagname=v$pkgver
+source=("git+https://example.com/demo.git#tag=$tagname")
+sha256sums=('SKIP')
+build() {
+  echo "$tagname"
+}
+`}, FixUnsafe, &FixEnv{ResolveRef: fakeResolve})["PKGBUILD"]
+	mustContain(t, got, "#commit=0123456789abcdef")
+	mustContain(t, got, "tagname=v$pkgver")
+	mustContain(t, got, `echo "$tagname"`)
+	mustNotContain(t, got, "_tagname")
+}
+
+// Arrays reach their name through more spellings than a scalar does — an
+// append, an element write, a length, a whole-array expansion, and expansions
+// nested in a heredoc or a command substitution. All of them are the same
+// variable, so all of them move together.
+func TestFixUnprefixedCustomVarsArrayForms(t *testing.T) {
+	got, _ := fixCustomVar(t, `mods=(a b)
+mods+=(c)
+mods[1]=z
+build() {
+  local n=${#mods[@]}
+  cat <<EOT
+${mods[0]} and $n
+EOT
+  echo "$(printf '%s\n' "${mods[@]}")"
+}`)
+	for _, want := range []string{
+		"_mods=(a b)", "_mods+=(c)", "_mods[1]=z",
+		"${#_mods[@]}", "${_mods[0]}", "${_mods[@]}",
+	} {
+		mustContain(t, got, want)
+	}
+	mustNotContain(t, got, "${mods")
+}

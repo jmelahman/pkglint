@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jmelahman/pkglint/internal/pkgbuild"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -32,7 +33,9 @@ var styleRules = []Rule{
 		Doc: "Custom variables must start with an underscore (_commit, _pyname) so they can never " +
 			"collide with a current or future makepkg field. A bare custom name is silently shipped " +
 			"to any tool that parses PKGBUILD metadata and may change meaning under a newer pacman.",
-		Check: checkUnprefixedCustomVars,
+		Check:    checkUnprefixedCustomVars,
+		FixLevel: FixUnsafe,
+		Fix:      fixUnprefixedCustomVars,
 	},
 	{
 		ID:       "PB903",
@@ -794,9 +797,11 @@ func knownPKGBUILDVars(ctx *Context) map[string]bool {
 	return known
 }
 
-func checkUnprefixedCustomVars(ctx *Context) []Finding {
+// unprefixedCustomVars returns the variables PB902 flags, keyed by name. The
+// fixer shares it so what gets renamed is exactly what got reported.
+func unprefixedCustomVars(ctx *Context) map[string]*pkgbuild.Var {
 	known := knownPKGBUILDVars(ctx)
-	var out []Finding
+	out := map[string]*pkgbuild.Var{}
 	for name, v := range ctx.Pkg.Vars {
 		if known[name] || strings.HasPrefix(name, "_") {
 			continue
@@ -807,6 +812,14 @@ func checkUnprefixedCustomVars(ctx *Context) []Finding {
 		if name != strings.ToLower(name) {
 			continue
 		}
+		out[name] = v
+	}
+	return out
+}
+
+func checkUnprefixedCustomVars(ctx *Context) []Finding {
+	var out []Finding
+	for name, v := range unprefixedCustomVars(ctx) {
 		out = append(out, findingAt("PB902", Warn, ctx.Pkg.PKGBUILD.Path, v.Pos,
 			"custom variable %q should be prefixed with an underscore (_%s) to avoid clashing with makepkg fields",
 			name, name))

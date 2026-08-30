@@ -886,19 +886,21 @@ func fixCargoLocked(ctx *Context, _ *FixEnv) []Edit {
 
 // --- PB940: cargo test/check --release -------------------------------------
 
-// fixCargoCheckRelease deletes --release from cargo test/check so the run
-// keeps the debug assertions and overflow checks it exists to exercise. Only a
-// --release written literally before the `--` separator is removed: one that
-// arrives through a variable is not ours to rewrite, and one after `--` is the
-// test binary's argument, which cargoRelease already declines to flag.
+// fixCargoCheckRelease deletes the release flag from cargo test/check so the
+// run keeps the debug assertions and overflow checks it exists to exercise. It
+// removes whichever spelling the command used, `--release` or `-r`, and only
+// one written literally before the `--` separator: one that arrives through a
+// variable is not ours to rewrite, and one after `--` is the test binary's
+// argument, which cargoReleaseFlag already declines to report.
 func fixCargoCheckRelease(ctx *Context, _ *FixEnv) []Edit {
 	var edits []Edit
 	for _, c := range ctx.CommandsNamed("cargo") {
 		sub := c.Subcommand()
-		if (sub != "test" && sub != "check") || !cargoRelease(c) {
+		flag := cargoReleaseFlag(c)
+		if (sub != "test" && sub != "check") || flag == "" {
 			continue
 		}
-		w := wordByValue(c, "--release")
+		w := wordByValue(c, flag)
 		if w == nil {
 			continue // written as an expansion: the finding stands
 		}
@@ -909,7 +911,7 @@ func fixCargoCheckRelease(ctx *Context, _ *FixEnv) []Edit {
 			End:   end,
 			New:   "",
 			Line:  int(w.Pos().Line()),
-			Desc:  fmt.Sprintf("drop --release from `cargo %s` (keeps debug assertions and overflow checks on)", sub),
+			Desc:  fmt.Sprintf("drop %s from `cargo %s` (keeps debug assertions and overflow checks on)", flag, sub),
 		})
 	}
 	return edits
@@ -947,6 +949,73 @@ func flagCut(raw []byte, start, end int) (int, int) {
 		}
 	}
 	return start, end
+}
+
+// --- PB942: cargo build without --release ----------------------------------
+
+// fixCargoBuildRelease inserts --release into the build() cargo build, right
+// after the subcommand word: cargo reads its own flags anywhere ahead of the
+// `--` separator, and putting it there keeps it out of whatever the PKGBUILD
+// hands the compiler on the far side.
+//
+// Two shapes are declined rather than guessed at. A command whose words do not
+// all render — `cargo build "${myflags[@]}"`, the way a PKGBUILD collects
+// flags it reuses — may already select a profile in there, and cargo rejects
+// --release next to --profile outright, so inserting one would break the build
+// the fix means to improve. And a PKGBUILD that reaches into a debug/
+// directory is reading the artifact this flag moves: cargo writes the dev
+// profile to target/debug and the release one to target/release, so the flag
+// alone would leave package() copying a path that no longer exists. Repointing
+// it is a rewrite of package(), not a flag insertion, so the finding stands.
+func fixCargoBuildRelease(ctx *Context, _ *FixEnv) []Edit {
+	var edits []Edit
+	for _, c := range cargoDevProfileBuilds(ctx) {
+		if hasOpaqueArg(c) || namesDevArtifact(c.Unit) {
+			continue
+		}
+		w := wordByValue(c, "build")
+		if w == nil {
+			continue // the subcommand itself came through an expansion
+		}
+		at := off(w.End())
+		edits = append(edits, Edit{
+			Path:  c.Unit.Path,
+			Start: at,
+			End:   at,
+			New:   " --release",
+			Line:  int(c.Stmt.Pos().Line()),
+			Desc:  "insert --release into `cargo build` (ships the optimized profile)",
+		})
+	}
+	return edits
+}
+
+// hasOpaqueArg reports whether any of the command's arguments still carries an
+// expansion after rendering, which is pkglint saying it does not know what the
+// command is being told to do.
+func hasOpaqueArg(c Command) bool {
+	for i, a := range c.Args {
+		if hasVarRef(a) || (i < len(c.ArgDyn) && c.ArgDyn[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+// devArtifactRe matches a reference to a debug/ directory, which in a Rust
+// build tree is cargo's dev-profile output: target/debug, the
+// target/<triple>/debug of a --target build, or the same under whatever
+// CARGO_TARGET_DIR the PKGBUILD picked. Matching the directory rather than any
+// particular target path costs the odd unrelated debug/ (Arch's own
+// /usr/lib/debug among them) a fix it could have had, which is the cheap side
+// of the trade: the alternative is emitting one that stops the build.
+var devArtifactRe = regexp.MustCompile(`/debug\b`)
+
+// namesDevArtifact reports whether the unit names a debug/ path anywhere,
+// source text included — a fix that has to be sure cannot limit itself to the
+// arguments it managed to resolve.
+func namesDevArtifact(u *pkgbuild.Unit) bool {
+	return u != nil && devArtifactRe.Match(u.Raw)
 }
 
 // --- PB204: implicit go module downloads -----------------------------------

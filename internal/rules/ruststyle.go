@@ -10,20 +10,26 @@ import "strings"
 
 // --- PB940: cargo test/check --release ---------------------------------------
 
-// cargoRelease reports whether the command passes --release to cargo itself.
-// Everything after the `--` separator goes to the test binary, where
-// `--release` is the harness's own argument and none of cargo's business.
-func cargoRelease(c Command) bool {
+// cargoReleaseFlag returns the spelling the command uses to ask cargo for the
+// release profile — `--release` or its short form `-r`, which cargo documents
+// as the same flag and which real PKGBUILDs prefer — or "" when it asks for
+// neither. Everything after the `--` separator goes to the program cargo runs,
+// where `--release` is that program's own argument and none of cargo's
+// business.
+func cargoReleaseFlag(c Command) string {
 	for _, a := range c.Args {
 		switch a {
 		case "--":
-			return false
-		case "--release":
-			return true
+			return ""
+		case "--release", "-r":
+			return a
 		}
 	}
-	return false
+	return ""
 }
+
+// cargoRelease reports whether the command passes --release to cargo itself.
+func cargoRelease(c Command) bool { return cargoReleaseFlag(c) != "" }
 
 func checkCargoCheckRelease(ctx *Context) []Finding {
 	var out []Finding
@@ -54,17 +60,41 @@ func checkCargoInstallTracked(ctx *Context) []Finding {
 
 // --- PB942: cargo build without --release ------------------------------------
 
+// cargoDevProfileBuilds returns the build() cargo builds left on cargo's
+// unoptimized default profile: the commands PB942 reports, and the ones its
+// fix inserts --release into, so rule and fix cannot drift apart.
+//
+// Two builds are somebody's decision rather than an oversight. One that names
+// a profile explicitly (--profile) has chosen it, like an explicit -buildmode
+// in PB914. And one whose build() also runs a release build is half of a
+// deliberate pair — packages compile the dev profile alongside it for a test
+// that needs its stricter limits — where the binary that ships still comes out
+// of the release half.
+func cargoDevProfileBuilds(ctx *Context) []Command {
+	var dev []Command
+	release := map[string]bool{}
+	for _, c := range ctx.CommandsNamed("cargo") {
+		if c.Subcommand() != "build" || c.Fn != "build" {
+			continue
+		}
+		if cargoRelease(c) || cargoHasProfile(c) {
+			release[c.Unit.Path] = true
+			continue
+		}
+		dev = append(dev, c)
+	}
+	out := dev[:0]
+	for _, c := range dev {
+		if !release[c.Unit.Path] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func checkCargoBuildRelease(ctx *Context) []Finding {
 	var out []Finding
-	for _, c := range ctx.CommandsNamed("cargo") {
-		if c.Subcommand() != "build" || c.Fn != "build" || c.HasArg("--release") {
-			continue
-		}
-		// An explicit profile is a decision, like an explicit -buildmode in
-		// PB914.
-		if cargoHasProfile(c) {
-			continue
-		}
+	for _, c := range cargoDevProfileBuilds(ctx) {
 		out = append(out, c.finding("PB942", Info,
 			"cargo build without --release ships an unoptimized debug binary; the Rust package guidelines build with --release"))
 	}

@@ -637,6 +637,127 @@ check() {
 			t.Errorf("a --release reached through a variable must not be rewritten, got:\n%s", got["PKGBUILD"])
 		}
 	})
+	t.Run("short spelling removed", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+check() {
+  cargo test -r --locked
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo test --locked")
+	})
+}
+
+func TestFixCargoBuildRelease(t *testing.T) {
+	t.Run("inserted after the subcommand", func(t *testing.T) {
+		body := `
+build() {
+  cargo build --locked
+}`
+		// The release profile is a different compile, so the safe level leaves
+		// it alone.
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+			t.Errorf("FixSafe should not apply the unsafe PB942 fix, got:\n%s", got["PKGBUILD"])
+		}
+		got := fixPKGBUILD(t, body, FixUnsafe, nil)
+		mustContain(t, got, "cargo build --release --locked")
+		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got}))["PB942"]; n != 0 {
+			t.Errorf("fixed PKGBUILD still has %d PB942 finding(s):\n%s", n, got)
+		}
+	})
+	t.Run("the flag lands ahead of a continuation", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+build() {
+  cargo build --locked \
+    --features extras
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo build --release --locked \\\n    --features extras\n")
+	})
+	t.Run("short spelling is already the release profile", func(t *testing.T) {
+		body := `
+build() {
+  cargo build -r --locked
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("`cargo build -r` already builds --release, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("flags behind an expansion declined", func(t *testing.T) {
+		// The array may already name a profile, and cargo refuses --release
+		// beside --profile, so the fix cannot insert into what it cannot read.
+		body := `
+build() {
+  _myflags=(--release --features extras)
+  cargo build --locked "${_myflags[@]}"
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("flags reached through an expansion must not be added to, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("a dev-profile artifact path declines the fix", func(t *testing.T) {
+		// --release would move the binary to target/release and leave this
+		// package() copying a path that no longer exists.
+		body := `
+build() {
+  cargo build --locked
+}
+package() {
+  install -Dm755 target/debug/demo "$pkgdir/usr/bin/demo"
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("a package reading target/debug must keep its finding, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("a subcommand behind an expansion declined", func(t *testing.T) {
+		// The rule resolves $_sub to `build` and fires; the fix has no literal
+		// word to insert after, so it leaves the finding standing.
+		body := `
+_sub=build
+build() {
+  cargo $_sub --locked
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("nothing to insert after, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("a deliberate pair of profiles is left alone", func(t *testing.T) {
+		body := `
+build() {
+  cargo build --locked
+  cargo build --locked --release
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("a build() that already builds --release must keep its dev build, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("only the build() build ships the artifact", func(t *testing.T) {
+		body := `
+prepare() {
+  cargo build --locked
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("a cargo build outside build() must not be rewritten, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("an explicit profile is left alone", func(t *testing.T) {
+		body := `
+build() {
+  cargo build --profile dist --locked
+}`
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("an explicit --profile must not be overridden, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("alongside the PB203 lockfile fix", func(t *testing.T) {
+		// Both fixes address the same bare `cargo build`, and both insert at
+		// the end of it; the result has to be one command carrying both flags.
+		got := fixPKGBUILD(t, `
+build() {
+  cargo build
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo build --locked --release\n")
+		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got})); n["PB942"] != 0 || n["PB203"] != 0 {
+			t.Errorf("fixed PKGBUILD still has PB942=%d PB203=%d:\n%s", n["PB942"], n["PB203"], got)
+		}
+	})
 }
 
 func TestFixGoEnvWeakening(t *testing.T) {

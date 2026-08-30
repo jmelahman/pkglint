@@ -21,6 +21,12 @@ check() {
   cargo test --locked
 }`)})
 	})
+	t.Run("PB940 -r is the same flag", func(t *testing.T) {
+		expectRule(t, "PB940", map[string]string{"PKGBUILD": pkgbuildWith("", `
+check() {
+  cargo test -r --locked
+}`)})
+	})
 	t.Run("PB940 release build in build() is not a test", func(t *testing.T) {
 		expectNoRule(t, "PB940", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
@@ -53,10 +59,25 @@ build() {
   cargo build --release --locked
 }`)})
 	})
+	t.Run("PB942 -r asks for the same profile", func(t *testing.T) {
+		expectNoRule(t, "PB942", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  cargo build -r --locked
+}`)})
+	})
 	t.Run("PB942 an explicit profile is a decision", func(t *testing.T) {
 		expectNoRule(t, "PB942", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   cargo build --profile dist --locked
+}`)})
+	})
+	t.Run("PB942 a release build alongside it is the shipped one", func(t *testing.T) {
+		// Both profiles on purpose: the dev binary is what the test suite
+		// needs, and the release one is what the package installs.
+		expectNoRule(t, "PB942", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  cargo build --locked
+  cargo build --locked --release
 }`)})
 	})
 	t.Run("PB942 cargo build outside build() is not the shipped artifact", func(t *testing.T) {

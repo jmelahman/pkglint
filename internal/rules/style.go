@@ -294,10 +294,10 @@ var styleRules = []Rule{
 		ID:       "PB940",
 		Name:     "cargo-check-release",
 		Severity: Warn,
-		Doc: "--release on cargo test/check disables debug assertions and integer-overflow " +
-			"checks — precisely the invariants a test run exists to exercise. The Arch Rust " +
-			"package guidelines run check() without --release; the shipped binary is still built " +
-			"--release in build().",
+		Doc: "--release on cargo test/check (or its short spelling, -r) disables debug assertions " +
+			"and integer-overflow checks — precisely the invariants a test run exists to " +
+			"exercise. The Arch Rust package guidelines run check() without --release; the " +
+			"shipped binary is still built --release in build().",
 		Check: checkCargoCheckRelease,
 		// Dropping the flag recompiles the crate in the dev profile: the check
 		// gets slower, and a suite that only passed with assertions compiled
@@ -321,9 +321,16 @@ var styleRules = []Rule{
 		Severity: Info,
 		Doc: "cargo builds the unoptimized, debug-assertion-laden dev profile unless told " +
 			"otherwise, so a plain `cargo build` in build() ships a slow binary. The Arch Rust " +
-			"package guidelines build with --release; a PKGBUILD that selects another profile " +
-			"explicitly (--profile) has made the call and is left alone.",
+			"package guidelines build with --release (-r is the same flag); a PKGBUILD that " +
+			"selects another profile explicitly (--profile) has made the call, as has one whose " +
+			"build() runs a release build beside the dev one, and both are left alone.",
 		Check: checkCargoBuildRelease,
+		// The release profile is a different compile — slower, and a crate that
+		// only builds with debug assertions on now fails — and it moves the
+		// binary from target/debug to target/release, so anything that copies
+		// the artifact has to be checked against the new path.
+		FixLevel: FixUnsafe,
+		Fix:      fixCargoBuildRelease,
 	},
 	{
 		ID:       "PB944",

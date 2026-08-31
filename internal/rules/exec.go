@@ -192,10 +192,25 @@ func checkHiddenUnicode(ctx *Context) []Finding {
 	return out
 }
 
-// Top-level builtins that only manipulate shell/package state.
+// Top-level builtins that only manipulate the shell's own state: its
+// variables, its options, its current directory, and where control goes next.
+// None of them opens a file, spawns a process, or reaches the network, so a
+// PKGBUILD sourced for its metadata is no worse off for having run one.
 var benignTopLevel = map[string]bool{
 	"unset": true, "export": true, "declare": true, "typeset": true, "local": true,
 	"readonly": true, "set": true, "shopt": true, ":": true, "true": true, "false": true,
+	// Control flow. `exit` ends the sourcing shell rather than running
+	// anything, which is what a guard like `_die() { error "$@"; exit 1; }`
+	// exists to do; scoring it alongside a downloader said the two were the
+	// same kind of problem.
+	"exit": true, "return": true, "break": true, "continue": true, "shift": true,
+	// Variable binding from input the caller already chose: a herestring, a
+	// process substitution, a redirect. `IFS=. read -r _major _minor <<< "$pkgver"`
+	// is the portable way to split a version at the top level.
+	"read": true, "mapfile": true, "readarray": true, "getopts": true,
+	// Shell state the rest of the file reads back: the umask new files get,
+	// the directory relative paths resolve against, the command-lookup cache.
+	"umask": true, "cd": true, "pushd": true, "popd": true, "hash": true,
 }
 
 // pureTopLevel are commands whose whole effect is to test a condition or write
@@ -215,6 +230,38 @@ var pureTopLevel = map[string]bool{
 	// A pure reader: grep has no write form at all, and `grep -q` guards are
 	// how PKGBUILDs probe the host for a feature before appending a depends.
 	"grep": true, "egrep": true, "fgrep": true,
+	// Stream filters with no output-file option at all: what they are handed
+	// on stdin comes back on stdout, and nothing else moves. `pkgver="$(echo
+	// $_v | tr . $'\n' | tac | paste -s -d .)"` is four of them in a row
+	// computing a string, which the rule used to score as four criticals.
+	"cut": true, "tr": true, "rev": true, "tac": true, "paste": true,
+	"head": true, "tail": true, "nl": true, "fold": true, "wc": true,
+	"expand": true, "unexpand": true, "comm": true, "join": true, "column": true,
+	"seq": true, "expr": true, "diff": true, "cmp": true, "od": true, "strings": true,
+	// A JSON filter with no way to write a file or run a program: jq's only
+	// outputs are stdout and its exit status.
+	"jq": true,
+	// String surgery on a path. None of them touches the filesystem beyond
+	// resolving it, and realpath/readlink have no write form.
+	"basename": true, "dirname": true, "realpath": true, "readlink": true, "pwd": true,
+	// Reading the host to decide what to declare: how many cores, which user,
+	// what the C library says. Like uname below, these are the inputs a
+	// PKGBUILD's top-level `depends+=()` guards are written against.
+	"nproc": true, "arch": true, "getconf": true, "hostname": true,
+	"whoami": true, "id": true, "logname": true, "tty": true, "getent": true,
+	"ls": true, "stat": true, "file": true, "df": true, "ps": true,
+	// Where the user's XDG directories point. It reads user-dirs.dirs and
+	// prints one line; there is no form that writes one.
+	"xdg-user-dir": true,
+	// Where would this name resolve? A lookup runs nothing. `command -v` is
+	// resolved to `command` in newCommand so it never arrives here as its
+	// argument.
+	"command": true, "type": true, "which": true, "whereis": true,
+	// Digests read their input and print a hash; none of them writes.
+	"md5sum": true, "sha1sum": true, "sha224sum": true, "sha256sum": true,
+	"sha384sum": true, "sha512sum": true, "b2sum": true, "cksum": true,
+	// pacman's version comparator: two arguments in, an ordering out.
+	"vercmp": true,
 	// Prints the host's identity and exits. Every option (-a -s -n -r -v -m
 	// -p -i -o) reads, so unlike date and sed there is no escape hatch to
 	// judge per call — coreutils uname has no --set and no operand form.
@@ -225,11 +272,16 @@ var pureTopLevel = map[string]bool{
 	// libmakepkg's message API, sourced into the PKGBUILD's shell before it
 	// runs. PB907 already rates these a portability nit rather than a hazard.
 	"msg": true, "msg2": true, "warning": true, "error": true, "plain": true,
+	// libmakepkg query helpers, sourced the same way: check_option reads the
+	// OPTIONS array and in_array searches one. Both answer a question about
+	// what makepkg was already told.
+	"check_option": true, "in_array": true,
 }
 
 // pureTopLevelUse reports whether this invocation is one of the pure ones.
-// date and sed are pure in their common forms but each keeps one escape hatch
-// into system state, so they are judged per call rather than by name.
+// The names below are pure in the form PKGBUILDs use them but each keeps an
+// escape hatch into the filesystem, the network, or another program, so they
+// are judged per call rather than by name.
 func pureTopLevelUse(c Command) bool {
 	if pureTopLevel[c.Name] {
 		return true
@@ -243,8 +295,252 @@ func pureTopLevelUse(c Command) bool {
 	case "sed":
 		// Filtering a pipe is pure; -i and the w script forms write files.
 		return !sedInPlace(c) && !sedWritesFile(c)
+	case "sort":
+		// -o writes the sorted result to a file, and --compress-program names
+		// a program sort runs over its temporaries.
+		return !hasFlag(c, "-o", "--output") && !hasFlag(c, "--compress-program")
+	case "uniq":
+		// `uniq in out` writes its second operand; every other form filters.
+		return !uniqWritesFile(c)
+	case "iconv":
+		return !hasFlag(c, "-o", "--output")
+	case "find":
+		return !findActs(c)
+	case "awk", "gawk", "mawk", "nawk":
+		return awkOnlyFilters(c)
+	case "pacman":
+		return pacmanQueries(c)
+	case "pkgfile":
+		// The local file database is a read; -u refreshes it over the network.
+		return !hasFlag(c, "-u", "--update")
+	case "xargs":
+		return xargsRunsPure(c)
 	}
 	return false
+}
+
+// xargsValueFlags are the xargs options that require a value, so the word after
+// them is not the command xargs runs. The optional-value ones (-e, -i, -l,
+// --eof, --replace, --max-lines) are deliberately absent: their value has to be
+// attached, which makes the next word the command — skipping it would let
+// `xargs -i rm` read as a bare `xargs`.
+var xargsValueFlags = map[string]bool{
+	"-a": true, "-d": true, "-E": true, "-I": true,
+	"-L": true, "-n": true, "-P": true, "-s": true,
+	"--arg-file": true, "--delimiter": true, "--max-args": true,
+	"--max-procs": true, "--max-chars": true, "--process-slot-var": true,
+}
+
+// xargsRunsPure reports whether the program xargs would run is one of the
+// unconditionally pure ones. Trailing `| xargs` to trim whitespace, and
+// `| xargs -I@ printf …` to reshape a list into source= entries, are how
+// PKGBUILDs assemble arrays at the top level; what makes them safe is the
+// command on the end, not xargs itself.
+func xargsRunsPure(c Command) bool {
+	for i := 0; i < len(c.Args); i++ {
+		a := c.Args[i]
+		switch {
+		case a == "--":
+			// Everything after is the command and its arguments.
+			return i+1 < len(c.Args) && pureTopLevel[c.Args[i+1]] && !c.ArgDyn[i+1]
+		case len(a) > 1 && a[0] == '-':
+			name := a
+			if eq := strings.IndexByte(a, '='); eq > 0 && strings.HasPrefix(a, "--") {
+				// The value came attached — `--max-args=1 rm` — so the next
+				// word is the command, not the option's argument.
+				name = ""
+			} else if a[1] != '-' && len(a) > 2 {
+				// A short option with its value attached, `-n1`, or a cluster.
+				// Either way the value is not a separate word.
+				name = ""
+			}
+			if xargsValueFlags[name] {
+				i++
+			}
+		default:
+			// The first operand is the command; with no operand xargs runs
+			// echo, which prints and nothing else.
+			return pureTopLevel[a] && !c.ArgDyn[i]
+		}
+	}
+	return true
+}
+
+// hasFlag reports whether the command passes any of the given options, in the
+// spellings that carry them: exactly (`-o`, `--output`), attached (`-ofile`,
+// `--output=file`), or bundled into a short cluster (`-uo`). Long options are
+// matched whole; short ones by their letter, since a cluster does not say
+// where one option ends.
+func hasFlag(c Command, opts ...string) bool {
+	for _, a := range c.Args {
+		if len(a) < 2 || a[0] != '-' {
+			continue
+		}
+		long := a[1] == '-'
+		name, _, _ := strings.Cut(a, "=")
+		for _, opt := range opts {
+			switch {
+			case strings.HasPrefix(opt, "--"):
+				if long && name == opt {
+					return true
+				}
+			case !long && strings.ContainsRune(a[1:], rune(opt[1])):
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// uniqValueFlags are the uniq options that take a separate value, so that the
+// value is not miscounted as the operand that would make this a write.
+var uniqValueFlags = map[string]bool{
+	"-f": true, "-s": true, "-w": true,
+	"--skip-fields": true, "--skip-chars": true, "--check-chars": true,
+}
+
+func uniqWritesFile(c Command) bool {
+	operands := 0
+	for i := 0; i < len(c.Args); i++ {
+		a := c.Args[i]
+		if uniqValueFlags[a] {
+			i++
+			continue
+		}
+		if len(a) > 1 && a[0] == '-' {
+			continue
+		}
+		operands++
+	}
+	return operands >= 2
+}
+
+// findActs reports whether a find invocation does more than name what it
+// matched: -exec and friends run a command, -delete removes files, and the
+// -f* actions write their output to a file find is given.
+func findActs(c Command) bool {
+	for _, a := range c.Args {
+		switch a {
+		case "-exec", "-execdir", "-ok", "-okdir", "-delete",
+			"-fls", "-fprint", "-fprint0", "-fprintf":
+			return true
+		}
+	}
+	return false
+}
+
+// awkEscapesRe matches the awk constructs that leave the program: a redirect
+// into a file (`print > "out"`), a pipe into a shell command (`print | "sh"`),
+// system(), and gawk's extension loader.
+//
+// Requiring a quote after the redirect is what keeps the two idioms that read
+// like one apart: `while (getline > 0)` and `if (level > 0)` are comparisons,
+// and an awk that reads /proc/cpuinfo to pick an x86-64 feature level is the
+// most common awk in the corpus.
+var awkEscapesRe = regexp.MustCompile(`system[[:space:]]*\(|>>?[[:space:]]*["']|(^|[^|])\|&?[[:space:]]*["']|@load`)
+
+// awkOnlyFilters reports whether an awk invocation only reads its input and
+// prints. A program pkglint cannot read — assembled from an expansion, or in a
+// separate file named by -f — is not judged pure: what it does is not in front
+// of the reviewer either.
+func awkOnlyFilters(c Command) bool {
+	prog := -1
+	for i := 0; i < len(c.Args); i++ {
+		a := c.Args[i]
+		switch {
+		case a == "-f" || a == "--file" || strings.HasPrefix(a, "-f") ||
+			strings.HasPrefix(a, "--file="),
+			// gawk's other ways to run what is not the positional program:
+			// program text inside an option (--source), a program or library
+			// file (-i/--include, -E/--exec), a compiled extension loaded by
+			// name (-l/--load). `-i inplace` also rewrites its input files.
+			strings.HasPrefix(a, "-i"), strings.HasPrefix(a, "-l"),
+			strings.HasPrefix(a, "-E"), strings.HasPrefix(a, "--source"),
+			strings.HasPrefix(a, "--include"), strings.HasPrefix(a, "--load"),
+			strings.HasPrefix(a, "--exec"):
+			return false
+		case a == "-v" || a == "-F" || a == "--assign" || a == "--field-separator":
+			i++ // a detached option value, not the program
+		case len(a) > 1 && a[0] == '-':
+		default:
+			prog = i
+		}
+		if prog >= 0 {
+			break
+		}
+	}
+	// The rendered text cannot answer this: awk's own `$1` and a shell `$_prog`
+	// that named no known variable both come back as "$name", so the program is
+	// judged from the word it was written as. A single-quoted awk program holds
+	// no expansions at all, which is the form the corpus writes.
+	if prog < 0 || prog >= len(c.ArgWord) || !wordIsLiteral(c.ArgWord[prog]) {
+		return false
+	}
+	return !awkEscapesRe.MatchString(c.Args[prog])
+}
+
+// wordIsLiteral reports whether a word is spelled out in full: only literal
+// text, in quotes or out. Any expansion — a parameter, a command substitution,
+// arithmetic, a process substitution — means the value the command actually
+// receives is not the one in front of the reviewer.
+func wordIsLiteral(w *syntax.Word) bool {
+	if w == nil {
+		return false
+	}
+	literal := true
+	syntax.Walk(w, func(n syntax.Node) bool {
+		switch n.(type) {
+		case *syntax.Word, *syntax.Lit, *syntax.SglQuoted, *syntax.DblQuoted:
+		case nil:
+		default:
+			literal = false
+		}
+		return literal
+	})
+	return literal
+}
+
+// pacmanQueries reports whether a pacman invocation only reads the databases.
+// -Q and -T answer questions about what is installed, and a -S asked to
+// --print says what it would do without doing it. Everything else either
+// changes the system or, with -y/-u, refreshes over the network.
+func pacmanQueries(c Command) bool {
+	var reads, writes, refreshes, prints bool
+	for _, a := range c.Args {
+		if len(a) < 2 || a[0] != '-' {
+			continue
+		}
+		if a[1] == '-' {
+			name, _, _ := strings.Cut(a, "=")
+			switch name {
+			case "--query", "--deptest", "--files", "--version", "--help":
+				reads = true
+			case "--upgrade", "--remove", "--database":
+				writes = true
+			case "--refresh", "--sysupgrade":
+				refreshes = true
+			case "--print", "--print-format":
+				prints = true
+			}
+			continue
+		}
+		for _, r := range a[1:] {
+			switch r {
+			case 'Q', 'T', 'F', 'V', 'h':
+				reads = true
+			case 'U', 'R', 'D':
+				writes = true
+			case 'y', 'u':
+				refreshes = true
+			case 'p':
+				prints = true
+			}
+		}
+	}
+	if writes || refreshes {
+		return false
+	}
+	return reads || prints
 }
 
 // dateSetsClock reports whether this date invocation sets the system clock
@@ -297,6 +593,19 @@ func sedWritesFile(c Command) bool {
 	return false
 }
 
+// discardSinks are redirection targets that create nothing: the bit bucket and
+// the streams the shell already holds open. `>/dev/null` is how a PKGBUILD
+// silences a probe — `type msg >/dev/null 2>&1`, `getent group nobody
+// >/dev/null || _gid=30` — and reading it as a write made the quiet spelling of
+// an inert guard Critical while the noisy one passed.
+var discardSinks = map[string]bool{
+	"/dev/null": true, "/dev/stdout": true, "/dev/stderr": true,
+}
+
+func discardsOutput(target string) bool {
+	return discardSinks[target] || strings.HasPrefix(target, "/dev/fd/")
+}
+
 // redirectsOutput reports whether the statement sends its output to a file,
 // which is what separates a banner from a write: `cat <<EOF > helper.sh` at
 // the top level drops a file on disk the moment the PKGBUILD is sourced.
@@ -304,19 +613,100 @@ func redirectsOutput(stmt *syntax.Stmt) bool {
 	for _, r := range stmt.Redirs {
 		switch r.Op {
 		case syntax.RdrOut, syntax.AppOut, syntax.RdrAll, syntax.AppAll:
+			if target, _ := renderPlain(r.Word); discardsOutput(target) {
+				continue
+			}
 			return true
 		}
 	}
 	return false
 }
 
-func checkTopLevelExec(ctx *Context) []Finding {
-	var out []Finding
-	for _, c := range ctx.Commands() {
-		if c.Fn != "" || c.Unit.Scriptlet {
+// inert reports whether running c has no effect a PKGBUILD sourced for its
+// metadata would care about: it opens no file for writing, starts no
+// interpreter, and reaches no network. pure carries the verdict for the file's
+// own functions, so a call to a helper is judged by what the helper does.
+func (ctx *Context) inert(c Command, pure map[string]bool) bool {
+	if c.Name == "" {
+		return false // a name assembled at run time is not reviewable
+	}
+	// A PKGBUILD that supplies the body decides what the name means: `warning`
+	// is libmakepkg's banner right up until the file writes one of its own.
+	if ctx.definesFunc(c, c.Name) {
+		return pure[c.Unit.Path+"\x00"+c.Name]
+	}
+	return benignTopLevel[c.Name] || pureTopLevelUse(c)
+}
+
+// funcPurity returns, for every function the file declares, whether calling it
+// does anything beyond reading, testing and assigning. Helper functions are how
+// PKGBUILDs keep the top level readable — `_is_lto_kernel` is a `[[ ]]` and a
+// `return`, `_arch_map` is a `case` printing a string, `_source_main` is two
+// array assignments — and judging a call by its name alone made the tidier
+// spelling of a top-level `if` the more severely graded one.
+//
+// It is a greatest fixpoint: assume every declared function is pure, then drop
+// any whose body holds something that is not, and repeat until a pass changes
+// nothing. Two helpers that call each other come out pure, which a depth-first
+// walk would need cycle detection to get right, while a body that reaches a
+// downloader through any number of hops drops every caller along the way.
+func (ctx *Context) funcPurity() map[string]bool {
+	if ctx.pureFn != nil {
+		return ctx.pureFn
+	}
+	ctx.pureFn = map[string]bool{}
+	if len(ctx.funcDecls) == 0 {
+		return ctx.pureFn
+	}
+	byFn := make(map[string][]Command, len(ctx.funcDecls))
+	for _, c := range ctx.cmds {
+		if c.Fn == "" {
 			continue
 		}
-		if benignTopLevel[c.Name] {
+		key := c.Unit.Path + "\x00" + c.Fn
+		byFn[key] = append(byFn[key], c)
+	}
+	pure := ctx.pureFn
+	for key := range ctx.funcDecls {
+		pure[key] = true
+	}
+	for changed := true; changed; {
+		changed = false
+		for key, fd := range ctx.funcDecls {
+			if !pure[key] || ctx.bodyInert(byFn[key], fd, pure) {
+				continue
+			}
+			pure[key] = false
+			changed = true
+		}
+	}
+	return pure
+}
+
+func (ctx *Context) bodyInert(cmds []Command, fd *syntax.FuncDecl, pure map[string]bool) bool {
+	for _, c := range cmds {
+		if !ctx.inert(c, pure) {
+			return false
+		}
+	}
+	// A redirect can hang off a compound statement rather than any one command
+	// — `{ …; } > helper.sh`, a whole `for` loop appending to a file — so the
+	// body is walked for writes instead of asking each command about its own.
+	inert := true
+	syntax.Walk(fd.Body, func(n syntax.Node) bool {
+		if stmt, ok := n.(*syntax.Stmt); ok && redirectsOutput(stmt) {
+			inert = false
+		}
+		return inert
+	})
+	return inert
+}
+
+func checkTopLevelExec(ctx *Context) []Finding {
+	var out []Finding
+	pure := ctx.funcPurity()
+	for _, c := range ctx.Commands() {
+		if c.Fn != "" || c.Unit.Scriptlet {
 			continue
 		}
 		// eval belongs to PB302, which reports it wherever it appears and
@@ -327,9 +717,7 @@ func checkTopLevelExec(ctx *Context) []Finding {
 		if c.Name == "eval" {
 			continue
 		}
-		// A PKGBUILD that defines its own echo/warning/… gets no exemption:
-		// the name would say "banner" while the body did the work.
-		if pureTopLevelUse(c) && !redirectsOutput(c.Stmt) && !ctx.definesFunc(c, c.Name) {
+		if ctx.inert(c, pure) && !redirectsOutput(c.Stmt) {
 			continue
 		}
 		name := c.Name

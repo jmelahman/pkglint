@@ -155,6 +155,16 @@ type Context struct {
 	// Unit.Functions does not carry. Rules that exempt a command by name need
 	// it: the exemption has to lapse when the PKGBUILD supplies the body.
 	localFuncs map[string]bool
+	// funcDecls holds the bodies behind localFuncs, for the rules that judge a
+	// call by what the function does rather than by its name. Only the
+	// declarations whose commands collect() attributes to the function itself
+	// are recorded: one nested inside another function keeps the enclosing
+	// attribution, so its own body would look empty here, and an empty body
+	// reads as harmless.
+	funcDecls map[string]*syntax.FuncDecl
+	// pureFn caches the verdict funcPurity computed for every declaration in
+	// funcDecls.
+	pureFn map[string]bool
 	// suppUsed caches which inline-ignore directives actually suppress a
 	// finding; see Context.suppressionUsage.
 	suppUsed map[suppKey]bool
@@ -180,7 +190,7 @@ type Command struct {
 // NewContext precomputes shared state for rules.
 func NewContext(pkg *pkgbuild.Package) *Context {
 	ctx := &Context{Pkg: pkg, vars: map[string]string{}, fnVars: map[string]map[string]string{},
-		localFuncs: map[string]bool{}}
+		localFuncs: map[string]bool{}, funcDecls: map[string]*syntax.FuncDecl{}}
 	for name, v := range pkg.Vars {
 		// Scalars render to exactly one value; for arrays, bash expands an
 		// unsubscripted $name to the first element (and an empty array to "").
@@ -200,6 +210,7 @@ func NewContext(pkg *pkgbuild.Package) *Context {
 		sort.Strings(names)
 		for _, name := range names {
 			ctx.localFuncs[u.Path+"\x00"+name] = true
+			ctx.funcDecls[u.Path+"\x00"+name] = u.Functions[name]
 			ctx.collect(u, name, u.Functions[name].Body)
 		}
 		for _, stmt := range u.TopLevel {
@@ -223,6 +234,7 @@ func (ctx *Context) collect(u *pkgbuild.Unit, fn string, root *syntax.Stmt) {
 		if fd, ok := node.(*syntax.FuncDecl); ok && fd.Name != nil {
 			ctx.localFuncs[u.Path+"\x00"+fd.Name.Value] = true
 			if fn == "" {
+				ctx.funcDecls[u.Path+"\x00"+fd.Name.Value] = fd
 				ctx.collect(u, fd.Name.Value, fd.Body)
 				return false
 			}
@@ -251,6 +263,17 @@ var wrappers = map[string]bool{
 	"env": true, "nice": true, "ionice": true, "nohup": true, "timeout": true,
 	"stdbuf": true, "eatmydata": true, "setsid": true, "command": true,
 	"exec": true, "builtin": true, "sudo": true, "doas": true,
+}
+
+// commandLooksUp reports whether a flag word passed to `command` selects one of
+// its -v/-V lookup forms, which describe where a name would resolve rather than
+// running it. They are short options only: `command` takes no long ones, so a
+// `--` word is the end-of-options marker and the next word is a real command.
+func commandLooksUp(flag string) bool {
+	if len(flag) < 2 || flag[0] != '-' || flag[1] == '-' {
+		return false
+	}
+	return strings.ContainsAny(flag[1:], "vV")
 }
 
 // varsFor returns the variable map for rendering words inside fn, which differs
@@ -401,13 +424,24 @@ func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, c
 		base := basename(name)
 		if wrappers[base] {
 			args = args[1:]
+			lookup := false
 			// Skip the wrapper's flags and VAR=val words.
 			for len(args) > 0 {
 				s, d := pkgbuild.RenderWord(args[0], vars)
 				if !d && (hasPrefixAny(s, "-") || isAssignWord(s)) {
+					lookup = lookup || (base == "command" && commandLooksUp(s))
 					args = args[1:]
 					continue
 				}
+				break
+			}
+			if lookup {
+				// `command -v cc` prints where cc would be found and runs
+				// nothing. Resolving through to the argument made every probe
+				// for a tool read as an invocation of it — `M4="$(command -v
+				// m4)"` was reported as m4 executing at the PKGBUILD's top
+				// level, and a `command -v yarn` in build() as yarn fetching.
+				cmd.Name = "command"
 				break
 			}
 			continue

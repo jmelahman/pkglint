@@ -7,7 +7,23 @@ arch=('x86_64')
 url='https://github.com/example/goodpkg'
 license=('MIT')
 makedepends=('go')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/example/goodpkg/archive/refs/tags/v$pkgver.tar.gz")
+
+# Top-level dispatch through the file's own helpers: they only read, test and
+# print, so sourcing this PKGBUILD for its metadata runs nothing.
+_format_version() {
+  printf '%s' "${1//_/.}"
+}
+_goarch() {
+  case "$CARCH" in
+    x86_64) echo amd64 ;;
+    aarch64) echo arm64 ;;
+    *) echo "$CARCH" ;;
+  esac
+}
+_arch=$(_goarch)
+_tag=v$(_format_version "$pkgver")
+
+source=("$pkgname-$pkgver.tar.gz::https://github.com/example/goodpkg/archive/refs/tags/$_tag.tar.gz")
 sha256sums=('8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4')
 
 prepare() {
@@ -19,7 +35,7 @@ build() {
   cd "$pkgname-$pkgver"
   export CGO_CPPFLAGS="${CPPFLAGS}" CGO_CFLAGS="${CFLAGS}" CGO_CXXFLAGS="${CXXFLAGS}" CGO_LDFLAGS="${LDFLAGS}"
   export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
-  go build -o "$pkgname" .
+  GOARCH="$_arch" go build -o "$pkgname" .
 }
 
 check() {

@@ -1202,6 +1202,16 @@ cat /dev/null`)})
 		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
 			"if grep -q avx2 /proc/cpuinfo; then\n  _simd=avx2\nfi")})
 	})
+	t.Run("PB301 reading the host architecture at top level is pure", func(t *testing.T) {
+		// PB901's dispatchesOnArch calls this the portable idiom; PB301 used
+		// to call the same line Critical.
+		expectNoRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
+			"_march=$(uname -m)\ncase $(uname -m) in\n  aarch64) _lib=lib64 ;;\nesac")})
+	})
+	t.Run("PB301 a uname that writes a file is still flagged", func(t *testing.T) {
+		expectRule(t, "PB301", map[string]string{"PKGBUILD": pkgbuildWith("",
+			`uname -m > arch.txt`)})
+	})
 	t.Run("PB301 an inert command that redirects to a file is a write", func(t *testing.T) {
 		for _, line := range []string{
 			"cat <<EOF > helper.sh\n#!/bin/sh\nEOF",

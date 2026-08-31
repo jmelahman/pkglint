@@ -215,6 +215,13 @@ var pureTopLevel = map[string]bool{
 	// A pure reader: grep has no write form at all, and `grep -q` guards are
 	// how PKGBUILDs probe the host for a feature before appending a depends.
 	"grep": true, "egrep": true, "fgrep": true,
+	// Prints the host's identity and exits. Every option (-a -s -n -r -v -m
+	// -p -i -o) reads, so unlike date and sed there is no escape hatch to
+	// judge per call — coreutils uname has no --set and no operand form.
+	// PB901 already treats `case $(uname -m)` as *the* portable arch-dispatch
+	// idiom (see dispatchesOnArch); rating that same line Critical here left
+	// the two rules disagreeing about one statement.
+	"uname": true,
 	// libmakepkg's message API, sourced into the PKGBUILD's shell before it
 	// runs. PB907 already rates these a portability nit rather than a hazard.
 	"msg": true, "msg2": true, "warning": true, "error": true, "plain": true,

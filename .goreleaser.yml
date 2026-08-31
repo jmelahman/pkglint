@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+builds:
+  # Pure Go, matching hatch_build.py: static binaries on every target, no C
+  # toolchain needed. -trimpath keeps the paths out of the binary.
+  - env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # pkglint lints Arch PKGBUILDs; these are the same targets the PyPI
+    # wheel matrix in .github/workflows/release.yml builds.
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64

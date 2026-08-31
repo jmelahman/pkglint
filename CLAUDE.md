@@ -2,6 +2,22 @@
 
 Never execute anything from analyzed input: PKGBUILDs are parsed (mvdan.cc/sh),
 package archives are parsed (debug/elf) — no sourcing, no `ldd`, no interpreters.
+This holds absolutely for every analysis path — `lint`, `--fix`, `--add-ignores`,
+all of `internal/`. The single exception is `pkglint build` (`build.go`), which
+runs makepkg because that is the only way to get the artifact the PB8xx rules
+inspect: a separately named verb `pkglint <path>` never reaches, gated on the
+static findings, and confined to the `runCmd`/`lookPath` seams. Do not grow a
+second one.
+
+The gate is the whole justification, so nothing in the analyzed input may weaken
+it: it reads the findings with the file's own `# pkglint: ignore=` directives
+disregarded, a file argument must be the `PKGBUILD` makepkg will actually build,
+and makepkg's `-p`/`-D` are refused. A new way to reach `runCmd` has to answer
+"could a PKGBUILD talk its way through this?" first.
+
+(`--fix` does start `git ls-remote` to resolve a VCS ref — a subprocess, not the
+input: the URL passes `allowedGitURL`'s scheme allowlist, which exists to keep
+git's `ext::` "run this command" transport out. Keep it that way.)
 
 - `go test . -run TestGolden -update` regenerates `testdata/*/expected.txt`.
 - CI enforces a statement-coverage floor (test.yml, `-coverpkg=./...`) and a

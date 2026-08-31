@@ -184,10 +184,82 @@ repos:
       - id: pkglint
 ```
 
-Three hook ids are available: `pkglint` builds from source with the Go
-toolchain, `pkglint-system` runs whatever `pkglint` is already on `$PATH`, and
-`pkglint-fix` applies the safe auto-fixes in place (offline by default). Tune
-any of them with e.g. `args: [--ignore, PB105, --fail-on, critical]`.
+Four hook ids are available: `pkglint` builds from source with the Go
+toolchain, `pkglint-system` runs whatever `pkglint` is already on `$PATH`,
+`pkglint-fix` applies the safe auto-fixes in place (offline by default), and
+`pkglint-build` builds each PKGBUILD and lints the package it produces (see
+below). Tune any of them with e.g. `args: [--ignore, PB105, --fail-on, critical]`.
+
+### Build and validate
+
+The built-package rules need a built package. `pkglint build` produces one:
+
+```shell
+$ pkglint build ~/pkgbuilds/somepkg
+```
+
+It lints the PKGBUILD, hands the package to `makepkg`, and then lints the
+archive that comes out — ELF hardening, dependencies inferred from linked
+libraries, filesystem hygiene — questions no amount of reading the PKGBUILD can
+answer. `pkglint-build` is the same thing as a hook; it is `stages: [manual]`
+because a full build has no business running on every commit.
+
+This is the one pkglint command that executes a PKGBUILD, because that is what
+`makepkg` does. It is a separately named verb — `pkglint <path>` never reaches
+it — and it **refuses to build a package whose static findings reach
+`--fail-on`**, always refusing on a critical finding no matter what `--fail-on`
+says. `--force` overrides that; the findings still count toward the exit code.
+A refusal fails the run even under `--fail-on=never`, which grades findings and
+says nothing about whether the build happened.
+
+Because that gate decides whether to run code, the PKGBUILD gets no say in it.
+Three things follow, and each is refused rather than quietly allowed:
+
+- The gate **disregards the file's own `# pkglint: ignore=` directives** — a
+  `curl | bash` with an `ignore=PB304` above it is still a `curl | bash`, and
+  `pkglint --add-ignores` would otherwise make any package buildable. The
+  report printed beside the refusal still honours them, as every other command
+  does; only the decision to execute is taken on the unsuppressed findings.
+- A file argument must be a `PKGBUILD`. `makepkg` builds the `PKGBUILD` in its
+  working directory, so `pkglint build pkg/PKGBUILD.reviewed` would lint one
+  file and run another.
+- `makepkg`'s `-p` and `-D`/`--dir` are rejected, for the same reason: they
+  repoint the build at something pkglint never saw.
+
+One consequence of the subcommand: `pkglint build` names the command even when
+`./build` is a package directory — spell that one `pkglint ./build`. And because
+`pkglint *` in such a tree expands to exactly that, `pkglint build <bare sibling
+names>` is refused as ambiguous when `./build` is a package directory the
+arguments do not mention. A path spelled out (`pkglint build ./mypkg`) is a
+deliberate build and goes through.
+
+`makepkg` is redirected to write into a temporary `PKGDEST`, `LOGDEST` and
+`SRCPKGDEST`, and the `PKGBUILD` is held read-only while it runs — a `pkgver()`
+package's buildfile is otherwise rewritten in place, which would edit the file
+you are about to commit and build a version other than the one that was gated.
+So the packaging tree is left exactly as it was found; `--keep <dir>` moves the
+archives out. Sources are cached in `${XDG_CACHE_HOME:-~/.cache}/pkglint/sources`
+between runs, and the build tree goes under `$TMPDIR`; export `$SRCDEST` or
+`$BUILDDIR` to put either somewhere of your own (worth doing for `$BUILDDIR` if
+`/tmp` is tmpfs and the package is large). Dependencies are **not** synced, since
+that needs root and a hook that can prompt for a password is a hook that hangs —
+pass `-- -s` (or `--makepkg-arg=-s`, the form that survives pre-commit's `args:`)
+to opt in. `--nosign` is passed for the same reason: signing an artifact that is
+about to be deleted would only stop the hook on a GPG passphrase prompt.
+
+Without `makepkg` on the host — or with `--docker` or an explicit `--image`,
+either of which forces it — the build runs in a container instead. No image is
+hardcoded: name one with `--image` (which implies `--docker`) or
+`$PKGLINT_BUILD_IMAGE` (a fallback an installed `makepkg` still wins), and pick the
+runtime with `$PKGLINT_BUILD_RUNNER` (`docker` by default, else `podman`). The
+package directory is bind-mounted read-only, everything makepkg writes stays
+inside the container, and the archives come back out with `<runner> cp`, which
+extracts client-side — so they land owned by you under docker and podman alike,
+rootless or not. A container build is a clean room: it downloads its own sources
+rather than sharing the host cache. Two caveats: the image is your trust
+decision, and the container is a convenience, not a sandbox — the PKGBUILD's own
+code still runs. `-- -s` inside one needs an image whose user has passwordless
+`sudo pacman`, which stock `archlinux:base-devel` does not.
 
 ## Rules
 

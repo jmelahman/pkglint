@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/jmelahman/pkglint/internal/alpmdb"
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -42,10 +43,7 @@ func main() {
 
 func run(args []string, stdout io.Writer) int {
 	var (
-		format     string
-		failOn     string
-		ignore     string
-		color      string
+		opts       reportOpts
 		listRules  bool
 		doFix      bool
 		unsafeFix  bool
@@ -53,7 +51,6 @@ func run(args []string, stdout io.Writer) int {
 		offline    bool
 		noInline   bool
 		addIgnores bool
-		verbose    bool
 	)
 
 	code := 0
@@ -84,7 +81,7 @@ archives (default: .)`,
 				if doFix || unsafeFix || noInline {
 					return fmt.Errorf("--add-ignores cannot be combined with --fix, --unsafe-fix, or --no-inline-ignores")
 				}
-				code = runAddIgnores(paths, ignoreSet(ignore), diff, stdout)
+				code = runAddIgnores(paths, ignoreSet(opts.ignore), diff, stdout)
 				return nil
 			}
 			if doFix || unsafeFix {
@@ -92,17 +89,14 @@ archives (default: .)`,
 				if unsafeFix {
 					level = rules.FixUnsafe
 				}
-				code = runFix(paths, ignoreSet(ignore), level, diff, offline, noInline, stdout)
+				code = runFix(paths, ignoreSet(opts.ignore), level, diff, offline, noInline, stdout)
 				return nil
 			}
-			code = lint(paths, format, failOn, ignore, color, noInline, verbose, stdout)
+			code = lint(paths, opts, noInline, stdout)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "text", "output format: text, json, or sarif")
-	cmd.Flags().StringVar(&color, "color", "auto", "colorize text output: auto, always, or never")
-	cmd.Flags().StringVar(&failOn, "fail-on", "warn", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
-	cmd.Flags().StringVar(&ignore, "ignore", "", "comma-separated rule IDs to disable, e.g. PB105,PB206")
+	addReportFlags(cmd.Flags(), &opts)
 	cmd.Flags().BoolVar(&listRules, "rules", false, "print all rules and exit")
 	cmd.Flags().BoolVar(&doFix, "fix", false, "apply safe auto-fixes in place")
 	cmd.Flags().BoolVar(&unsafeFix, "unsafe-fix", false, "apply safe and behavior-changing auto-fixes in place (implies --fix)")
@@ -110,7 +104,11 @@ archives (default: .)`,
 	cmd.Flags().BoolVar(&offline, "offline", false, "with --fix: skip fixes needing network access (resolving VCS refs, verifying an https URL answers before rewriting a source's transport)")
 	cmd.Flags().BoolVar(&noInline, "no-inline-ignores", false, "disregard '# pkglint: ignore=' directives, reporting the findings they suppress (audit a package without trusting its annotations)")
 	cmd.Flags().BoolVar(&addIgnores, "add-ignores", false, "insert '# pkglint: ignore=' directives suppressing every current finding")
-	cmd.Flags().BoolVar(&verbose, "verbose", false, "text output: list packages with no findings individually instead of only in the summary")
+	cmd.AddCommand(newBuildCommand(stdout, &code))
+	// `build` and `help` are the only words the root command can no longer
+	// treat as a path; cobra's generated `completion` subcommand would widen
+	// that set for a feature this CLI does not otherwise offer.
+	cmd.CompletionOptions.DisableDefaultCmd = true
 	cmd.SetVersionTemplate("pkglint {{.Version}}\n")
 	cmd.SetArgs(args)
 	cmd.SetOut(stdout)
@@ -122,6 +120,47 @@ archives (default: .)`,
 		return 2
 	}
 	return code
+}
+
+// reportOpts is the flag set shared by the root command and `build`: which
+// rules run, how their findings are rendered, and which of them fail the run.
+type reportOpts struct {
+	format  string
+	color   string
+	failOn  string
+	ignore  string
+	verbose bool
+}
+
+// addReportFlags registers reportOpts on a command's own flag set. The root
+// command declares these locally rather than persistently, so `build` gets its
+// own copies with identical names and defaults instead of inheriting them.
+func addReportFlags(fs *pflag.FlagSet, o *reportOpts) {
+	fs.StringVar(&o.format, "format", "text", "output format: text, json, or sarif")
+	fs.StringVar(&o.color, "color", "auto", "colorize text output: auto, always, or never")
+	fs.StringVar(&o.failOn, "fail-on", "warn", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
+	fs.StringVar(&o.ignore, "ignore", "", "comma-separated rule IDs to disable, e.g. PB105,PB206")
+	fs.BoolVar(&o.verbose, "verbose", false, "text output: list packages with no findings individually instead of only in the summary")
+}
+
+// validate checks the rendering flags up front. Linting reports these errors
+// at render time, which is late but costs nothing; a build must not spend a
+// full makepkg run to discover a typo in --fail-on.
+func (o reportOpts) validate(w io.Writer) error {
+	switch o.format {
+	case "text", "json", "sarif":
+	default:
+		return fmt.Errorf("unknown format %q (want text, json, or sarif)", o.format)
+	}
+	if _, err := colorEnabled(o.color, w); err != nil {
+		return err
+	}
+	if o.failOn != "never" {
+		if _, err := rules.ParseSeverity(o.failOn); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ignoreSet parses a comma-separated rule-ID list into a set.
@@ -141,25 +180,14 @@ func ignoreSet(csv string) map[string]bool {
 // noInline disregards the packages' own inline-ignore directives, so findings
 // they suppress are reported anyway. verbose lists findings-free packages in
 // text output, which otherwise only counts them in the closing summary.
-func lint(paths []string, format, failOn, ignore, color string, noInline, verbose bool, stdout io.Writer) int {
-	ignored := ignoreSet(ignore)
+func lint(paths []string, o reportOpts, noInline bool, stdout io.Writer) int {
+	ignored := ignoreSet(o.ignore)
 
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
 
-	// The pacman local database backs the dependency-inference rules; loaded
-	// once, and only if a package archive is actually being linted. A missing
-	// database (non-Arch host) yields nil, which disables just those rules.
-	var db *alpmdb.DB
-	dbLoaded := false
-	localDB := func() *alpmdb.DB {
-		if !dbLoaded {
-			dbLoaded = true
-			db, _ = alpmdb.Load(alpmdb.DefaultRoot)
-		}
-		return db
-	}
+	localDB := newLocalDB()
 
 	var reports []report.PackageReport
 	for _, path := range paths {
@@ -184,7 +212,30 @@ func lint(paths []string, format, failOn, ignore, color string, noInline, verbos
 		reports = append(reports, report.New(path, findings))
 	}
 
-	switch format {
+	return renderReports(stdout, reports, o)
+}
+
+// newLocalDB defers loading the pacman local database until a rule that needs
+// it actually runs — it backs the dependency-inference rules, which only fire
+// over a built package archive. A missing database (a non-Arch host) yields
+// nil, which disables just those rules.
+func newLocalDB() func() *alpmdb.DB {
+	var db *alpmdb.DB
+	loaded := false
+	return func() *alpmdb.DB {
+		if !loaded {
+			loaded = true
+			db, _ = alpmdb.Load(alpmdb.DefaultRoot)
+		}
+		return db
+	}
+}
+
+// renderReports writes the reports in the requested format and returns the
+// process exit code: 1 when a finding reaches the --fail-on threshold (a
+// package that failed to load always does), 2 when rendering itself failed.
+func renderReports(stdout io.Writer, reports []report.PackageReport, o reportOpts) int {
+	switch o.format {
 	case "json":
 		if err := report.RenderJSON(stdout, reports); err != nil {
 			fmt.Fprintln(os.Stderr, "pkglint:", err)
@@ -196,21 +247,21 @@ func lint(paths []string, format, failOn, ignore, color string, noInline, verbos
 			return 2
 		}
 	case "text":
-		colorize, err := colorEnabled(color, stdout)
+		colorize, err := colorEnabled(o.color, stdout)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "pkglint:", err)
 			return 2
 		}
-		report.RenderText(stdout, reports, colorize, verbose)
+		report.RenderText(stdout, reports, colorize, o.verbose)
 	default:
-		fmt.Fprintf(os.Stderr, "pkglint: unknown format %q\n", format)
+		fmt.Fprintf(os.Stderr, "pkglint: unknown format %q\n", o.format)
 		return 2
 	}
 
-	if failOn == "never" {
+	if o.failOn == "never" {
 		return 0
 	}
-	sev, err := rules.ParseSeverity(failOn)
+	sev, err := rules.ParseSeverity(o.failOn)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "pkglint:", err)
 		return 2

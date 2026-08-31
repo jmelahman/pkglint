@@ -25,12 +25,18 @@ func checkFontArch(ctx *Context) []Finding {
 		"font files are architecture-independent, so the font package guidelines require arch=('any')")}
 }
 
-func checkFontDepends(ctx *Context) []Finding {
+// fontDepends returns a font package's depends entries: what PB971 reports,
+// and what its fix deletes.
+func fontDepends(ctx *Context) []depEntry {
 	if !isFontPackage(ctx) {
 		return nil
 	}
+	return depEntries(ctx, "depends")
+}
+
+func checkFontDepends(ctx *Context) []Finding {
 	var out []Finding
-	for _, d := range depEntries(ctx, "depends") {
+	for _, d := range fontDepends(ctx) {
 		out = append(out, findingAt("PB971", Info, ctx.Pkg.PKGBUILD.Path, d.Pos,
 			"font packages need no dependencies — fontconfig discovers installed fonts by itself; drop %q", d.Full))
 	}
@@ -62,24 +68,32 @@ func checkFontUnstableSource(ctx *Context) []Finding {
 
 // --- PB973/PB974: DKMS packages ----------------------------------------------
 
-func checkDkmsDepends(ctx *Context) []Finding {
+// dkmsDependsMissing reports the gap PB973 names, and the one its fix closes
+// by adding dkms to depends.
+func dkmsDependsMissing(ctx *Context) bool {
 	if !nameSuffixed(ctx, "-dkms") || hasDep(ctx, "depends", "dkms") {
-		return nil
+		return false
 	}
 	// Split PKGBUILDs (zfs-dkms) declare the -dkms split's depends inside its
 	// package_*() function, beyond static reading.
-	if fieldSetInPackageFns(ctx, "depends") {
+	return !fieldSetInPackageFns(ctx, "depends")
+}
+
+func checkDkmsDepends(ctx *Context) []Finding {
+	if !dkmsDependsMissing(ctx) {
 		return nil
 	}
 	return []Finding{varFinding(ctx, "PB973", Warn, []string{"depends", "pkgname"},
 		"a -dkms package ships module sources that only dkms can build and install; it must depend on dkms")}
 }
 
-func checkDkmsKernelHeaders(ctx *Context) []Finding {
+// dkmsPinnedHeaders returns a -dkms package's pinned kernel-headers depends:
+// what PB974 reports, and what its fix deletes.
+func dkmsPinnedHeaders(ctx *Context) []depEntry {
 	if !nameSuffixed(ctx, "-dkms") {
 		return nil
 	}
-	var out []Finding
+	var out []depEntry
 	for _, d := range depEntries(ctx, "depends") {
 		// linux-api-headers is glibc's userspace headers, not a kernel headers
 		// package.
@@ -87,6 +101,14 @@ func checkDkmsKernelHeaders(ctx *Context) []Finding {
 			d.Name == "linux-api-headers" {
 			continue
 		}
+		out = append(out, d)
+	}
+	return out
+}
+
+func checkDkmsKernelHeaders(ctx *Context) []Finding {
+	var out []Finding
+	for _, d := range dkmsPinnedHeaders(ctx) {
 		out = append(out, findingAt("PB974", Warn, ctx.Pkg.PKGBUILD.Path, d.Pos,
 			"%q pins one kernel's headers, but dkms already pulls the right headers for every installed kernel; the DKMS package guidelines say to drop it", d.Full))
 	}
@@ -164,12 +186,23 @@ func checkMingwPkgdesc(ctx *Context) []Finding {
 
 // --- PB979/PB980: Node.js packages -------------------------------------------
 
-func checkNpmMakedepends(ctx *Context) []Finding {
-	return checkToolMakedepends(ctx, "PB979", buildToolCommands(ctx, "npm"), "npm", "npm")
+func npmMakedependsGap(ctx *Context) (Command, bool) {
+	return toolMakedependsGap(ctx, buildToolCommands(ctx, "npm"), "npm")
 }
 
-func checkNpmUserCache(ctx *Context) []Finding {
-	var out []Finding
+func checkNpmMakedepends(ctx *Context) []Finding {
+	c, ok := npmMakedependsGap(ctx)
+	if !ok {
+		return nil
+	}
+	return toolMakedependsFinding("PB979", c, "npm", "npm")
+}
+
+// npmUncachedInstalls returns the npm installs still writing the invoking
+// user's ~/.npm: the commands PB980 reports, and the ones its fix redirects
+// into $srcdir.
+func npmUncachedInstalls(ctx *Context) []Command {
+	var out []Command
 	for _, c := range buildToolCommands(ctx, "npm") {
 		switch c.Subcommand() {
 		case "install", "i", "ci":
@@ -186,6 +219,14 @@ func checkNpmUserCache(ctx *Context) []Finding {
 		if cached {
 			continue
 		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func checkNpmUserCache(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range npmUncachedInstalls(ctx) {
 		out = append(out, c.finding("PB980", Info,
 			"npm %s writes the invoking user's ~/.npm cache; the Node.js package guidelines pass --cache \"$srcdir/npm-cache\" so the build leaves no droppings outside $srcdir", c.Subcommand()))
 	}
@@ -213,19 +254,25 @@ func javaUsed(ctx *Context) bool {
 	return false
 }
 
-func checkJavaRuntimeDependency(ctx *Context) []Finding {
+// javaRuntimeDepMissing reports the gap PB981 names, and the one its fix
+// closes by adding java-runtime to depends.
+func javaRuntimeDepMissing(ctx *Context) bool {
 	if !javaUsed(ctx) {
-		return nil
+		return false
 	}
 	for _, d := range depEntries(ctx, "depends") {
 		if hasPrefixAny(d.Name, javaRuntimeDepPrefixes...) {
-			return nil
+			return false
 		}
 	}
 	// Split packages (ant, jdk builds) declare depends inside their
 	// package_*() functions, where the values are beyond static reading;
 	// claiming "no JVM dependency" against half the data would be a guess.
-	if fieldSetInPackageFns(ctx, "depends") {
+	return !fieldSetInPackageFns(ctx, "depends")
+}
+
+func checkJavaRuntimeDependency(ctx *Context) []Finding {
+	if !javaRuntimeDepMissing(ctx) {
 		return nil
 	}
 	return []Finding{varFinding(ctx, "PB981", Info, []string{"depends", "pkgname"},

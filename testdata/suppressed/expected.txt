@@ -6,4 +6,4 @@ suppressed: grade C, 5 finding(s)
   PKGBUILD:16:3: warn [PB913] ignore directive for PB203 matches no finding on this or the next line; remove it
 
 1 package linted: 1 with findings
-2 finding(s) fixable with --fix, 2 more with --unsafe-fix
+2 finding(s) fixable with --fix, 3 more with --unsafe-fix

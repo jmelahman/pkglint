@@ -52,8 +52,14 @@ var styleRules = []Rule{
 		Severity: Warn,
 		Doc: "Everything in depends is installed during the build too, so repeating a package in " +
 			"makedepends adds nothing and misleads readers about the build's real extra " +
-			"requirements. An entry is only kept when its version constraint differs.",
+			"requirements. An entry is only kept when its version constraint differs. The " +
+			"auto-fix deletes the makedepends entry.",
 		Check: checkRedundantMakedepends,
+		// The entry provably does nothing: depends already installs the package
+		// at build time, and the rule has already exempted any entry whose
+		// version constraint asks for something different.
+		FixLevel: FixSafe,
+		Fix:      fixRedundantMakedepends,
 	},
 	{
 		ID:       "PB905",
@@ -124,8 +130,14 @@ var styleRules = []Rule{
 		Severity: Warn,
 		Doc: "A package listed in both depends and optdepends is contradictory metadata: the " +
 			"hard dependency always wins, and the optdepends line falsely suggests the feature " +
-			"is optional. Keep exactly one of the two.",
+			"is optional. Keep exactly one of the two. The auto-fix deletes the optdepends entry, " +
+			"which is the half with nothing behind it.",
 		Check: checkDuplicatedOptdepends,
+		// Nothing installed changes: depends already made the package
+		// mandatory, and the optdepends line was describing a choice pacman
+		// never offered.
+		FixLevel: FixSafe,
+		Fix:      fixDuplicatedOptdepends,
 	},
 	{
 		ID:       "PB913",
@@ -187,8 +199,14 @@ var styleRules = []Rule{
 		Doc: "cgo compiles C with CGO_CFLAGS/CGO_LDFLAGS, not the CFLAGS/LDFLAGS makepkg exports, " +
 			"so unless the PKGBUILD forwards them (export CGO_CFLAGS=\"$CFLAGS\", …) Arch's " +
 			"fortify/RELRO hardening never reaches the C parts of a Go build. Pure-Go packages " +
-			"can set CGO_ENABLED=0 instead, which also silences this rule.",
+			"can set CGO_ENABLED=0 instead, which also silences this rule. The fix writes the " +
+			"guidelines' block of CGO_* exports at the top of the function that runs the build.",
 		Check: checkGoCgoFlags,
+		// Forwarding the flags recompiles the C parts with Arch's fortify and
+		// RELRO settings, which is a different compile: code that only built
+		// without them now fails, and that failure is a human's to read.
+		FixLevel: FixUnsafe,
+		Fix:      fixGoCgoFlags,
 	},
 	{
 		ID:       "PB918",
@@ -197,8 +215,13 @@ var styleRules = []Rule{
 		Doc: "Every package implicitly provides its own name, so listing $pkgname in provides is " +
 			"dead metadata — at best ignored, at worst masking a typo of the capability the entry " +
 			"was meant to declare. The Arch package guidelines say provides is for other " +
-			"capabilities the package supplies (a library soname, a renamed predecessor).",
+			"capabilities the package supplies (a library soname, a renamed predecessor). The " +
+			"auto-fix deletes the entry, and the whole array with it when nothing else is in it.",
 		Check: checkSelfProvides,
+		// pacman derives the implicit self-provide from pkgname either way, so
+		// deleting the entry cannot change what the package satisfies.
+		FixLevel: FixSafe,
+		Fix:      fixSelfProvides,
 	},
 	{
 		ID:       "PB919",
@@ -206,8 +229,13 @@ var styleRules = []Rule{
 		Severity: Warn,
 		Doc: "A package can never conflict with itself — pacman resolves same-name conflicts by " +
 			"upgrading — so listing $pkgname in conflicts is dead metadata that misleads readers " +
-			"about what the package actually displaces. The Arch package guidelines say to drop it.",
+			"about what the package actually displaces. The Arch package guidelines say to drop " +
+			"it, and the auto-fix does — along with the whole array when nothing else is in it.",
 		Check: checkSelfConflicts,
+		// pacman resolves a same-name conflict by upgrading whatever the array
+		// says, so the entry has no effect to preserve.
+		FixLevel: FixSafe,
+		Fix:      fixSelfConflicts,
 	},
 	{
 		ID:       "PB920",
@@ -257,8 +285,13 @@ var styleRules = []Rule{
 		Doc: "pytest plugins like pytest-cov, pytest-black or pytest-mypy lint upstream's code " +
 			"style or measure coverage; neither says anything about whether the built package " +
 			"works, and a new linter release starts failing builds that did not change. The Arch " +
-			"Python package guidelines say check() runs tests, not upstream's CI.",
+			"Python package guidelines say check() runs tests, not upstream's CI. The auto-fix " +
+			"deletes the entry, unless a command in the file still passes the plugin's flag.",
 		Check: checkPythonLintCheckdepends,
+		// Dropping a declared dependency is a real change to the build
+		// environment: check() runs with one less package installed.
+		FixLevel: FixUnsafe,
+		Fix:      fixPythonLintCheckdepends,
 	},
 	{
 		ID:       "PB932",
@@ -277,8 +310,10 @@ var styleRules = []Rule{
 		Doc: "`python -m build` and `python -m installer` come from the python-build and " +
 			"python-installer packages, which makepkg does not install for you: without them in " +
 			"makedepends the build fails in any clean chroot, however reliably it works on the " +
-			"maintainer's machine.",
-		Check: checkPythonBuildBackend,
+			"maintainer's machine. The auto-fix adds the missing package to makedepends.",
+		Check:    checkPythonBuildBackend,
+		FixLevel: FixSafe,
+		Fix:      fixPythonBuildBackend,
 	},
 	{
 		ID:       "PB934",
@@ -317,8 +352,13 @@ var styleRules = []Rule{
 			"does not exist on the user's system. The Rust package guidelines pass --no-track. " +
 			"Flags kept in a variable count as passed wherever the PKGBUILD assigns it; an " +
 			"install whose flags come from outside the file is left alone, since --no-track may " +
-			"be in there.",
+			"be in there. The auto-fix appends --no-track, before any -- separator the command has.",
 		Check: checkCargoInstallTracked,
+		// --no-track changes what cargo install leaves in the install root, so
+		// a package() that went on to delete or rewrite the tracking files
+		// itself is now operating on paths that are not there.
+		FixLevel: FixUnsafe,
+		Fix:      fixCargoInstallTracked,
 	},
 	{
 		ID:       "PB942",
@@ -345,8 +385,14 @@ var styleRules = []Rule{
 		Severity: Info,
 		Doc: "cargo is not part of the base build environment: without rust (or rustup) in " +
 			"makedepends the build fails in any clean chroot. rustup satisfies the dependency " +
-			"for maintainers who manage toolchains themselves, so either spelling counts.",
+			"for maintainers who manage toolchains themselves, so either spelling counts. The " +
+			"auto-fix declares rust.",
 		Check: checkRustMakedepends,
+		// Declaring a tool the build already invokes restores a requirement the
+		// clean chroot was going to enforce anyway: a package that could not
+		// build before can build after, and nothing else moves.
+		FixLevel: FixSafe,
+		Fix:      fixToolMakedepends(rustMakedependsGap, "cargo", "rust"),
 	},
 	{
 		ID:       "PB950",
@@ -357,6 +403,11 @@ var styleRules = []Rule{
 			"-DCMAKE_INSTALL_PREFIX=/usr. A PKGBUILD that sets another prefix explicitly (/opt " +
 			"for a self-contained tree) has made a decision and is left alone.",
 		Check: checkCMakePrefix,
+		// The prefix moves every installed file, so a package() that copies
+		// out of the build tree by hardcoded path has to be checked against
+		// the new layout.
+		FixLevel: FixUnsafe,
+		Fix:      fixCMakePrefix,
 	},
 	{
 		ID:       "PB951",
@@ -365,8 +416,14 @@ var styleRules = []Rule{
 		Doc: "-DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after the flags makepkg exports, " +
 			"silently overriding Arch's chosen -O2 and fortify settings. The CMake package " +
 			"guidelines build with -DCMAKE_BUILD_TYPE=None so the distribution's CFLAGS are what " +
-			"actually compile the code.",
+			"actually compile the code. The auto-fix rewrites the value to None, leaving the rest " +
+			"of the argument — a -D prefix, a :STRING type, the quoting — as written.",
 		Check: checkCMakeBuildType,
+		// None is a different compile: -O2 without -DNDEBUG keeps assertions
+		// in, so a project that only passes its tests with them compiled out
+		// now fails. That failure is the point, but it is a human's call.
+		FixLevel: FixUnsafe,
+		Fix:      fixCMakeBuildType,
 	},
 	{
 		ID:       "PB952",
@@ -374,8 +431,11 @@ var styleRules = []Rule{
 		Severity: Warn,
 		Doc: "cmake is not part of the base build environment: without it in makedepends the " +
 			"build fails in any clean chroot, however reliably it configures on the maintainer's " +
-			"machine.",
+			"machine. The auto-fix declares cmake.",
 		Check: checkCMakeMakedepends,
+		// As with PB944: restoring a build requirement, not changing the build.
+		FixLevel: FixSafe,
+		Fix:      fixToolMakedepends(cmakeMakedependsGap, "cmake", "cmake"),
 	},
 	{
 		ID:       "PB953",
@@ -385,14 +445,21 @@ var styleRules = []Rule{
 			"the Meson package guidelines configure with --prefix=/usr, or use arch-meson, which " +
 			"passes the distribution defaults for you.",
 		Check: checkMesonPrefix,
+		// As with PB950, the prefix moves every installed file.
+		FixLevel: FixUnsafe,
+		Fix:      fixMesonPrefix,
 	},
 	{
 		ID:       "PB954",
 		Name:     "meson-missing-makedepends",
 		Severity: Warn,
 		Doc: "meson (and the arch-meson wrapper it ships) is not part of the base build " +
-			"environment: without meson in makedepends the build fails in any clean chroot.",
+			"environment: without meson in makedepends the build fails in any clean chroot. The " +
+			"auto-fix declares meson, which is also what ships arch-meson.",
 		Check: checkMesonMakedepends,
+		// As with PB944: restoring a build requirement, not changing the build.
+		FixLevel: FixSafe,
+		Fix:      fixToolMakedepends(mesonMakedependsGap, "meson", "meson"),
 	},
 	{
 		ID:       "PB955",
@@ -422,8 +489,14 @@ var styleRules = []Rule{
 		Doc: "A -git (or -svn, -hg, -bzr) package builds the same software as its release " +
 			"counterpart: without provides and conflicts on the base name, pacman happily " +
 			"installs both at once and dependencies on the release name are unsatisfiable by the " +
-			"VCS build. The VCS package guidelines declare both.",
+			"VCS build. The VCS package guidelines declare both. The auto-fix declares the pair " +
+			"together — either one alone is worse than the finding.",
 		Check: checkVCSProvidesConflicts,
+		// Both fields are installed metadata pacman acts on: after the fix the
+		// release package can no longer be installed alongside, and dependencies
+		// on it resolve to this build instead.
+		FixLevel: FixUnsafe,
+		Fix:      fixVCSProvidesConflicts,
 	},
 	{
 		ID:       "PB962",
@@ -462,8 +535,13 @@ var styleRules = []Rule{
 		Doc: "Installed fonts are discovered by fontconfig on its own; a font package needs no " +
 			"dependencies, and the historical fontconfig/xorg-font-utils entries only force " +
 			"unrelated software onto minimal systems. The font package guidelines say to declare " +
-			"none.",
+			"none. The auto-fix drops them.",
 		Check: checkFontDepends,
+		// Dropping a declared dependency is a real change to what gets
+		// installed: a font package that was quietly pulling in a renderer for
+		// its .install scriptlet stops doing so.
+		FixLevel: FixUnsafe,
+		Fix:      fixFontDepends,
 	},
 	{
 		ID:       "PB972",
@@ -481,8 +559,12 @@ var styleRules = []Rule{
 		Severity: Warn,
 		Doc: "A -dkms package installs module sources under /usr/src that only dkms can build, " +
 			"register and rebuild across kernel upgrades; without dkms in depends the package " +
-			"installs sources nothing will ever compile.",
+			"installs sources nothing will ever compile. The auto-fix declares dkms.",
 		Check: checkDkmsDepends,
+		// depends is installed-runtime metadata, not the build environment:
+		// after the fix pacman pulls dkms onto every user's machine.
+		FixLevel: FixUnsafe,
+		Fix:      fixDkmsDepends,
 	},
 	{
 		ID:       "PB974",
@@ -491,8 +573,13 @@ var styleRules = []Rule{
 		Doc: "dkms discovers every installed kernel and pulls the matching headers itself, so a " +
 			"-dkms package depending on linux-headers (or any kernel's -headers) pins one kernel " +
 			"flavor: it drags the stock headers onto linux-lts systems and adds nothing on any " +
-			"other. The DKMS package guidelines say to leave headers to dkms.",
+			"other. The DKMS package guidelines say to leave headers to dkms. The auto-fix drops " +
+			"the pinned entry.",
 		Check: checkDkmsKernelHeaders,
+		// A package that really did need one kernel's headers at install time —
+		// an .install scriptlet building against them, say — loses them.
+		FixLevel: FixUnsafe,
+		Fix:      fixDkmsKernelHeaders,
 	},
 	{
 		ID:       "PB975",
@@ -537,8 +624,12 @@ var styleRules = []Rule{
 		Name:     "npm-missing-makedepends",
 		Severity: Warn,
 		Doc: "npm is not part of the base build environment (and not bundled with the nodejs " +
-			"package): without npm in makedepends the build fails in any clean chroot.",
+			"package): without npm in makedepends the build fails in any clean chroot. The " +
+			"auto-fix declares npm.",
 		Check: checkNpmMakedepends,
+		// As with PB944: restoring a build requirement, not changing the build.
+		FixLevel: FixSafe,
+		Fix:      fixToolMakedepends(npmMakedependsGap, "npm", "npm"),
 	},
 	{
 		ID:       "PB980",
@@ -547,8 +638,14 @@ var styleRules = []Rule{
 		Doc: "npm writes every downloaded tarball into the invoking user's ~/.npm, so a build " +
 			"leaves root-owned droppings in the builder's home directory that no clean step " +
 			"removes. The Node.js package guidelines pass --cache \"$srcdir/npm-cache\" so the " +
-			"cache dies with the build directory.",
+			"cache dies with the build directory. The auto-fix appends that flag to the npm " +
+			"command.",
 		Check: checkNpmUserCache,
+		// A fresh cache directory means the install refetches everything, so
+		// a build that quietly relied on a warm ~/.npm — or on running with no
+		// network at all — behaves differently afterwards.
+		FixLevel: FixUnsafe,
+		Fix:      fixNpmUserCache,
 	},
 	{
 		ID:       "PB981",
@@ -557,8 +654,14 @@ var styleRules = []Rule{
 		Doc: "Shipped .jar files and compiled classes run on nothing without a JVM, and pacman " +
 			"cannot know that from the file list. The Java package guidelines depend on the " +
 			"java-runtime virtual (or java-environment when a full JDK is needed) so any " +
-			"installed JVM satisfies it.",
+			"installed JVM satisfies it. The auto-fix declares java-runtime.",
 		Check: checkJavaRuntimeDependency,
+		// depends is installed-runtime metadata: after the fix pacman pulls a
+		// JVM onto every user's machine, and a package that in fact needs a full
+		// JDK wants java-environment instead — a distinction the file does not
+		// state.
+		FixLevel: FixUnsafe,
+		Fix:      fixJavaRuntimeDependency,
 	},
 	{
 		ID:       "PB982",
@@ -904,35 +1007,34 @@ func depsFor(ctx *Context, field string) map[string]string {
 	return out
 }
 
-func checkRedundantMakedepends(ctx *Context) []Finding {
+// redundantMakedepends returns the makedepends entries depends already
+// covers: the entries PB904 reports, and the ones its fix deletes.
+func redundantMakedepends(ctx *Context) []depEntry {
 	depends := depsFor(ctx, "depends")
 	if len(depends) == 0 {
 		return nil
 	}
-	var out []Finding
-	names := []string{"makedepends"}
-	for _, a := range concreteArches(ctx) {
-		names = append(names, "makedepends_"+a)
-	}
-	for _, n := range names {
-		for _, e := range varElems(ctx.Pkg.Vars[n]) {
-			val, ok := staticVal(ctx.Pkg, e.Value)
-			if !ok || val == "" {
-				continue
-			}
-			name := depName(val)
-			full, dup := depends[name]
-			if !dup {
-				continue
-			}
-			// A makedepends entry with its own, different version constraint
-			// is a deliberate build-time requirement; leave it alone.
-			if name != val && full != val {
-				continue
-			}
-			out = append(out, findingAt("PB904", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
-				"%q is already in depends; every runtime dependency is installed at build time too", val))
+	var out []depEntry
+	for _, d := range depEntries(ctx, "makedepends") {
+		full, dup := depends[d.Name]
+		if !dup {
+			continue
 		}
+		// A makedepends entry with its own, different version constraint
+		// is a deliberate build-time requirement; leave it alone.
+		if d.Name != d.Full && full != d.Full {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+func checkRedundantMakedepends(ctx *Context) []Finding {
+	var out []Finding
+	for _, d := range redundantMakedepends(ctx) {
+		out = append(out, findingAt("PB904", Warn, ctx.Pkg.PKGBUILD.Path, d.Pos,
+			"%q is already in depends; every runtime dependency is installed at build time too", d.Full))
 	}
 	return out
 }
@@ -1111,28 +1213,27 @@ func checkNonUniqueSourceName(ctx *Context) []Finding {
 
 // --- PB912: depends repeated in optdepends -----------------------------------
 
-func checkDuplicatedOptdepends(ctx *Context) []Finding {
+// duplicatedOptdepends returns the optdepends entries depends already makes
+// mandatory: the entries PB912 reports, and the ones its fix deletes.
+func duplicatedOptdepends(ctx *Context) []depEntry {
 	depends := depsFor(ctx, "depends")
 	if len(depends) == 0 {
 		return nil
 	}
-	var out []Finding
-	names := []string{"optdepends"}
-	for _, a := range concreteArches(ctx) {
-		names = append(names, "optdepends_"+a)
-	}
-	for _, n := range names {
-		for _, e := range varElems(ctx.Pkg.Vars[n]) {
-			val, ok := staticVal(ctx.Pkg, e.Value)
-			if !ok || val == "" {
-				continue
-			}
-			if _, dup := depends[depName(val)]; !dup {
-				continue
-			}
-			out = append(out, findingAt("PB912", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
-				"%q is optional here but already a hard dependency in depends; keep one of the two", depName(val)))
+	var out []depEntry
+	for _, d := range depEntries(ctx, "optdepends") {
+		if _, dup := depends[d.Name]; dup {
+			out = append(out, d)
 		}
+	}
+	return out
+}
+
+func checkDuplicatedOptdepends(ctx *Context) []Finding {
+	var out []Finding
+	for _, d := range duplicatedOptdepends(ctx) {
+		out = append(out, findingAt("PB912", Warn, ctx.Pkg.PKGBUILD.Path, d.Pos,
+			"%q is optional here but already a hard dependency in depends; keep one of the two", d.Name))
 	}
 	return out
 }

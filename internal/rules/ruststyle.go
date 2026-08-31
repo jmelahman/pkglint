@@ -172,8 +172,11 @@ func checkCargoCheckRelease(ctx *Context) []Finding {
 
 // --- PB941: cargo install leaves tracking metadata ---------------------------
 
-func checkCargoInstallTracked(ctx *Context) []Finding {
-	var out []Finding
+// cargoUntrackedInstalls returns the cargo installs that still write cargo's
+// tracking files into the install root: the commands PB941 reports, and the
+// ones its fix appends --no-track to, so rule and fix cannot drift apart.
+func cargoUntrackedInstalls(ctx *Context) []Command {
+	var out []Command
 	for _, c := range ctx.CommandsNamed("cargo") {
 		// A flags variable pkglint cannot read may hold the --no-track this
 		// would report missing; the install root and crate path it can't read
@@ -181,6 +184,14 @@ func checkCargoInstallTracked(ctx *Context) []Finding {
 		if c.Subcommand() != "install" || cargoHasFlag(c, "--no-track") || cargoFlagsHidden(c) {
 			continue
 		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func checkCargoInstallTracked(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range cargoUntrackedInstalls(ctx) {
 		out = append(out, c.finding("PB941", Warn,
 			"cargo install without --no-track writes .crates.toml/.crates2.json into the install root, which ends up in the package"))
 	}
@@ -253,19 +264,16 @@ func cargoHasProfile(c Command) bool {
 // rustToolchainPackages are the packages that put cargo on $PATH.
 var rustToolchainPackages = []string{"rust", "rustup"}
 
+func rustMakedependsGap(ctx *Context) (Command, bool) {
+	return toolMakedependsGap(ctx, buildToolCommands(ctx, "cargo"), rustToolchainPackages...)
+}
+
 func checkRustMakedepends(ctx *Context) []Finding {
-	for _, name := range rustToolchainPackages {
-		if hasDep(ctx, "makedepends", name) || hasDep(ctx, "depends", name) {
-			return nil
-		}
+	c, ok := rustMakedependsGap(ctx)
+	if !ok {
+		return nil
 	}
-	for _, c := range ctx.CommandsNamed("cargo") {
-		if c.Unit.Scriptlet || c.Fn == "" {
-			continue
-		}
-		// One finding per PKGBUILD: the remedy is one makedepends entry.
-		return []Finding{c.finding("PB944", Info,
-			"cargo is used but neither rust nor rustup is in makedepends; a clean build environment cannot run this build")}
-	}
-	return nil
+	// One finding per PKGBUILD: the remedy is one makedepends entry.
+	return []Finding{c.finding("PB944", Info,
+		"cargo is used but neither rust nor rustup is in makedepends; a clean build environment cannot run this build")}
 }

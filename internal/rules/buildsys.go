@@ -28,6 +28,14 @@ func cmakeConfigures(c Command) bool {
 // cmakeDefine returns the value of a -Dname=value cache define, handling the
 // split "-D name=value" spelling and cmake's typed "-Dname:TYPE=value" form.
 func cmakeDefine(c Command, name string) (string, bool) {
+	v, _, ok := cmakeDefineAt(c, name)
+	return v, ok
+}
+
+// cmakeDefineAt additionally returns the index of the argument the value was
+// read from, which for the split spelling is the word after the bare "-D".
+// A fixer that rewrites a define has to edit that word and no other.
+func cmakeDefineAt(c Command, name string) (string, int, bool) {
 	tail := func(a, prefix string) (string, bool) {
 		rest, ok := strings.CutPrefix(a, prefix)
 		if !ok {
@@ -40,15 +48,15 @@ func cmakeDefine(c Command, name string) (string, bool) {
 	}
 	for i, a := range c.Args {
 		if v, ok := tail(a, "-D"+name); ok {
-			return v, true
+			return v, i, true
 		}
 		if a == "-D" && i+1 < len(c.Args) {
 			if v, ok := tail(c.Args[i+1], name); ok {
-				return v, true
+				return v, i + 1, true
 			}
 		}
 	}
-	return "", false
+	return "", 0, false
 }
 
 // hasArraySplat reports whether any argument word expands a whole array
@@ -103,25 +111,36 @@ func buildToolCommands(ctx *Context, names ...string) []Command {
 	return out
 }
 
-// checkToolMakedepends is the shared shape of PB944/PB952/PB954: the build
-// invokes tool but no listed package puts it on $PATH.
-func checkToolMakedepends(ctx *Context, id string, cmds []Command, tool string, packages ...string) []Finding {
+// toolMakedependsGap is the shared shape of PB944/PB952/PB954/PB979: the build
+// invokes a tool but no listed package puts it on $PATH. It returns the first
+// invocation — the one the finding points at, since the remedy is a single
+// makedepends entry however many times the tool is run — and whether the gap
+// is there at all. The fixes read the same answer, so a rule that stands down
+// takes its fix with it.
+func toolMakedependsGap(ctx *Context, cmds []Command, packages ...string) (Command, bool) {
 	if len(cmds) == 0 {
-		return nil
+		return Command{}, false
 	}
 	for _, name := range packages {
 		if hasDep(ctx, "makedepends", name) || hasDep(ctx, "depends", name) {
-			return nil
+			return Command{}, false
 		}
 	}
-	// One finding per PKGBUILD: the remedy is one makedepends entry.
-	return []Finding{cmds[0].finding(id, Warn,
-		"%s is used but %q is not in makedepends; a clean build environment cannot run this build", tool, packages[0])}
+	return cmds[0], true
+}
+
+// toolMakedependsFinding is the message all four of those rules share.
+func toolMakedependsFinding(id string, c Command, tool, pkg string) []Finding {
+	return []Finding{c.finding(id, Warn,
+		"%s is used but %q is not in makedepends; a clean build environment cannot run this build", tool, pkg)}
 }
 
 // --- PB950: cmake configure without an install prefix ------------------------
 
-func checkCMakePrefix(ctx *Context) []Finding {
+// cmakeUnprefixedConfigures returns the cmake configure steps left on the
+// default /usr/local prefix: the commands PB950 reports, and the ones its fix
+// inserts -DCMAKE_INSTALL_PREFIX=/usr into, so rule and fix cannot drift apart.
+func cmakeUnprefixedConfigures(ctx *Context) []Command {
 	var configures []Command
 	for _, c := range buildToolCommands(ctx, "cmake") {
 		if !cmakeConfigures(c) {
@@ -138,8 +157,12 @@ func checkCMakePrefix(ctx *Context) []Finding {
 		}
 		configures = append(configures, c)
 	}
+	return configures
+}
+
+func checkCMakePrefix(ctx *Context) []Finding {
 	var out []Finding
-	for _, c := range configures {
+	for _, c := range cmakeUnprefixedConfigures(ctx) {
 		out = append(out, c.finding("PB950", Warn,
 			"cmake configure without -DCMAKE_INSTALL_PREFIX=/usr defaults to /usr/local, which Arch packages must not touch"))
 	}
@@ -148,16 +171,27 @@ func checkCMakePrefix(ctx *Context) []Finding {
 
 // --- PB951: CMAKE_BUILD_TYPE=Release clobbers Arch's flags -------------------
 
-func checkCMakeBuildType(ctx *Context) []Finding {
-	var out []Finding
+// cmakeReleaseConfigures returns the cmake configure steps that ask for the
+// Release build type: the commands PB951 reports, and the ones its fix
+// rewrites to None.
+func cmakeReleaseConfigures(ctx *Context) []Command {
+	var out []Command
 	for _, c := range buildToolCommands(ctx, "cmake") {
 		if !cmakeConfigures(c) {
 			continue
 		}
 		if v, ok := cmakeDefine(c, "CMAKE_BUILD_TYPE"); ok && v == "Release" {
-			out = append(out, c.finding("PB951", Warn,
-				"-DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch's CFLAGS, overriding the distribution's -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None"))
+			out = append(out, c)
 		}
+	}
+	return out
+}
+
+func checkCMakeBuildType(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range cmakeReleaseConfigures(ctx) {
+		out = append(out, c.finding("PB951", Warn,
+			"-DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch's CFLAGS, overriding the distribution's -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None"))
 	}
 	return out
 }
@@ -178,29 +212,55 @@ func depNameContains(ctx *Context, sub string) bool {
 	return false
 }
 
-func checkCMakeMakedepends(ctx *Context) []Finding {
+func cmakeMakedependsGap(ctx *Context) (Command, bool) {
 	if depNameContains(ctx, "cmake") {
+		return Command{}, false
+	}
+	return toolMakedependsGap(ctx, buildToolCommands(ctx, "cmake"), "cmake")
+}
+
+func checkCMakeMakedepends(ctx *Context) []Finding {
+	c, ok := cmakeMakedependsGap(ctx)
+	if !ok {
 		return nil
 	}
-	return checkToolMakedepends(ctx, "PB952", buildToolCommands(ctx, "cmake"), "cmake", "cmake")
+	return toolMakedependsFinding("PB952", c, "cmake", "cmake")
+}
+
+func mesonMakedependsGap(ctx *Context) (Command, bool) {
+	if depNameContains(ctx, "meson") {
+		return Command{}, false
+	}
+	return toolMakedependsGap(ctx, buildToolCommands(ctx, "meson", "arch-meson"), "meson")
 }
 
 func checkMesonMakedepends(ctx *Context) []Finding {
-	if depNameContains(ctx, "meson") {
+	c, ok := mesonMakedependsGap(ctx)
+	if !ok {
 		return nil
 	}
-	return checkToolMakedepends(ctx, "PB954",
-		buildToolCommands(ctx, "meson", "arch-meson"), "meson", "meson")
+	return toolMakedependsFinding("PB954", c, "meson", "meson")
 }
 
 // --- PB953: meson setup without --prefix -------------------------------------
 
-func checkMesonPrefix(ctx *Context) []Finding {
-	var out []Finding
+// mesonUnprefixedConfigures returns the meson configure steps left on the
+// default /usr/local prefix: the commands PB953 reports, and the ones its fix
+// appends --prefix=/usr to.
+func mesonUnprefixedConfigures(ctx *Context) []Command {
+	var out []Command
 	for _, c := range buildToolCommands(ctx, "meson") {
 		if !mesonConfigures(c) || mesonSetsPrefix(c) || hasArraySplat(c) {
 			continue
 		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func checkMesonPrefix(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range mesonUnprefixedConfigures(ctx) {
 		out = append(out, c.finding("PB953", Warn,
 			"meson setup without --prefix=/usr defaults to /usr/local, which Arch packages must not touch (arch-meson passes the guideline flags for you)"))
 	}

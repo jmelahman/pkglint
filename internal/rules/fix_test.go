@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,6 +14,11 @@ import (
 // fixAll writes files to a temp dir, runs Fix at the given level, and returns
 // the fixed content of each changed unit keyed by base filename.
 func fixAll(t *testing.T, files map[string]string, level FixLevel, env *FixEnv) map[string]string {
+	t.Helper()
+	return fixAllIgnoring(t, files, level, env, nil)
+}
+
+func fixAllIgnoring(t *testing.T, files map[string]string, level FixLevel, env *FixEnv, ignore map[string]bool) map[string]string {
 	t.Helper()
 	dir := t.TempDir()
 	for name, content := range files {
@@ -25,12 +31,34 @@ func fixAll(t *testing.T, files map[string]string, level FixLevel, env *FixEnv) 
 		t.Fatalf("load: %v", err)
 	}
 	out := map[string]string{}
-	for _, r := range Fix(pkg, nil, level, env) {
+	for _, r := range Fix(pkg, ignore, level, env) {
 		if r.Changed() {
 			out[filepath.Base(r.Path)] = string(r.Fixed)
 		}
 	}
 	return out
+}
+
+// fixOnly runs just the named rules' fixers, by ignoring every other rule.
+//
+// The fixtures here are minimal PKGBUILDs that trip more than the rule under
+// test — a `cargo build` with no makedepends is a PB944 finding as much as a
+// PB942 one — so a test asserting that *nothing* was rewritten has to say
+// which rule it means. Tests that assert a specific rewrite do not need this;
+// they read the text they care about out of whatever else also fired.
+func fixOnly(t *testing.T, files map[string]string, level FixLevel, env *FixEnv, ids ...string) map[string]string {
+	t.Helper()
+	return fixAllIgnoring(t, files, level, env, ignoreAllBut(ids...))
+}
+
+func ignoreAllBut(ids ...string) map[string]bool {
+	ignore := map[string]bool{}
+	for _, r := range registry() {
+		if !slices.Contains(ids, r.ID) {
+			ignore[r.ID] = true
+		}
+	}
+	return ignore
 }
 
 // fixPKGBUILD is a convenience for the common single-file case.
@@ -188,7 +216,7 @@ url='https://example.com/demo'
 license=('MIT')
 source=("git+https://example.com/demo.git#tag=v1.0.0")
 md5sums=('`+demoMD5+`')`, "")
-	got := fixAll(t, map[string]string{"PKGBUILD": body}, FixSafe, demoDigests())
+	got := fixOnly(t, map[string]string{"PKGBUILD": body}, FixSafe, demoDigests(), "PB102")
 	if _, ok := got["PKGBUILD"]; ok {
 		t.Errorf("an all-SKIP strong array must not be written, got:\n%s", got["PKGBUILD"])
 	}
@@ -408,9 +436,9 @@ func TestFixInsecureTransport(t *testing.T) {
 	t.Run("a git source without ResolveRef is not rewritten", func(t *testing.T) {
 		env, _ := servedEnv("git+https://example.com/demo.git")
 		env.ResolveRef = nil
-		got := fixAll(t, map[string]string{
+		got := fixOnly(t, map[string]string{
 			"PKGBUILD": transportPKGBUILD(`"git://example.com/demo.git#commit=`+gitCommit+`"`, "sha256sums=('SKIP')"),
-		}, FixUnsafe, env)
+		}, FixUnsafe, env, "PB104")
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("expected no edit without ResolveRef, got:\n%s", got["PKGBUILD"])
 		}
@@ -421,9 +449,9 @@ func TestFixInsecureTransport(t *testing.T) {
 	for _, src := range []string{`"svn://example.com/demo/trunk"`, `"rsync://example.com/demo.tar.gz"`} {
 		t.Run("unrewritable "+src, func(t *testing.T) {
 			env, asked := servedEnv("https://example.com/demo/trunk", "https://example.com/demo.tar.gz")
-			got := fixAll(t, map[string]string{
+			got := fixOnly(t, map[string]string{
 				"PKGBUILD": transportPKGBUILD(src, "sha256sums=('SKIP')"),
-			}, FixUnsafe, env)
+			}, FixUnsafe, env, "PB104")
 			if _, ok := got["PKGBUILD"]; ok {
 				t.Errorf("expected no edit, got:\n%s", got["PKGBUILD"])
 			}
@@ -527,9 +555,9 @@ source=("$_url")
 	// the fix declines without asking anything.
 	t.Run("hg+http is not rewritten", func(t *testing.T) {
 		env, asked := servedEnv("hg+https://example.com/demo", "https://example.com/demo")
-		got := fixAll(t, map[string]string{
+		got := fixOnly(t, map[string]string{
 			"PKGBUILD": transportPKGBUILD(`"hg+http://example.com/demo"`, "sha256sums=('SKIP')"),
-		}, FixUnsafe, env)
+		}, FixUnsafe, env, "PB104")
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("expected no edit for hg+http, got:\n%s", got["PKGBUILD"])
 		}
@@ -564,7 +592,7 @@ build() {
 }`
 		// --locked fails outright when the source ships no Cargo.lock, so the
 		// rewrite is behavior-changing and must not run at the safe level.
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil, "PB203"); len(got) != 0 {
 			t.Errorf("FixSafe should not apply the unsafe PB203 fix, got:\n%s", got["PKGBUILD"])
 		}
 		got := fixPKGBUILD(t, body, FixUnsafe, nil)
@@ -594,7 +622,7 @@ build() {
 		if n := ruleIDs(lint(t, files))["PB203"]; n != 1 {
 			t.Errorf("PB203 fired %d times on an unlocked build, want exactly 1", n)
 		}
-		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, files, FixUnsafe, nil, "PB203"); len(got) != 0 {
 			t.Errorf("nothing may be written past a separator pkglint cannot point at, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -608,7 +636,7 @@ check() {
 }`
 		// Rebuilding the crate in the dev profile changes what the check run
 		// does, so the safe level leaves it alone.
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil, "PB940"); len(got) != 0 {
 			t.Errorf("FixSafe should not apply the unsafe PB940 fix, got:\n%s", got["PKGBUILD"])
 		}
 		got := fixPKGBUILD(t, body, FixUnsafe, nil)
@@ -653,7 +681,7 @@ check() {
 		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}))["PB940"]; n != 0 {
 			t.Errorf("PB940 fired on a harness argument (%d finding(s))", n)
 		}
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB940"); len(got) != 0 {
 			t.Errorf("nothing should change, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -663,7 +691,7 @@ _flags='--release'
 check() {
   cargo test $_flags --locked
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB940"); len(got) != 0 {
 			t.Errorf("a --release reached through a variable must not be rewritten, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -684,7 +712,7 @@ build() {
 }`
 		// The release profile is a different compile, so the safe level leaves
 		// it alone.
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("FixSafe should not apply the unsafe PB942 fix, got:\n%s", got["PKGBUILD"])
 		}
 		got := fixPKGBUILD(t, body, FixUnsafe, nil)
@@ -706,7 +734,7 @@ build() {
 build() {
   cargo build -r --locked
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("`cargo build -r` already builds --release, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -719,7 +747,7 @@ build() {
   cargo build --locked "${_myflags[@]}"
 }`
 		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
-		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, files, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("a build that already asks for --release must not be edited, got:\n%s", got["PKGBUILD"])
 		}
 		if n := ruleIDs(lint(t, files))["PB942"]; n != 0 {
@@ -739,7 +767,7 @@ build() {
 		if n := ruleIDs(lint(t, files))["PB942"]; n != 1 {
 			t.Errorf("PB942 fired %d times on a dev-profile build, want exactly 1", n)
 		}
-		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, files, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("an argument list with an expansion in it must not be edited, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -755,7 +783,7 @@ build() {
 		if n := ruleIDs(lint(t, files))["PB942"]; n != 1 {
 			t.Errorf("PB942 fired %d times on a dev-profile build, want exactly 1", n)
 		}
-		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, files, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("an argument list with an expansion in it must not be edited, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -769,7 +797,7 @@ build() {
 package() {
   install -Dm755 target/debug/demo "$pkgdir/usr/bin/demo"
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("a package reading target/debug must keep its finding, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -781,7 +809,7 @@ _sub=build
 build() {
   cargo $_sub --locked
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("nothing to insert after, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -791,7 +819,7 @@ build() {
   cargo build --locked
   cargo build --locked --release
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("a build() that already builds --release must keep its dev build, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -800,7 +828,7 @@ build() {
 prepare() {
   cargo build --locked
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("a cargo build outside build() must not be rewritten, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -809,7 +837,7 @@ prepare() {
 build() {
   cargo build --profile dist --locked
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
+		if got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil, "PB942"); len(got) != 0 {
 			t.Errorf("an explicit --profile must not be overridden, got:\n%s", got["PKGBUILD"])
 		}
 	})
@@ -864,7 +892,7 @@ sha256sums=('SKIP')
 		mustNotContain(t, got, "#tag=v1")
 	})
 	t.Run("offline leaves the ref alone", func(t *testing.T) {
-		got := fixAll(t, map[string]string{"PKGBUILD": body}, FixSafe, nil)
+		got := fixOnly(t, map[string]string{"PKGBUILD": body}, FixSafe, nil, "PB103")
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("expected no edit without ResolveRef, got:\n%s", got["PKGBUILD"])
 		}
@@ -880,7 +908,7 @@ url='https://example.com'
 source=("git+https://example.com/demo.git#branch=main")
 sha256sums=('SKIP')
 `
-		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		got := fixOnly(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve}, "PB103")
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("a -git package's branch should not be pinned, got:\n%s", got["PKGBUILD"])
 		}
@@ -915,7 +943,7 @@ _ref='tag=v1'
 source=("git+https://example.com/demo.git#$_ref")
 sha256sums=('SKIP')
 `
-		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		got := fixOnly(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve}, "PB103")
 		if out, ok := got["PKGBUILD"]; ok {
 			t.Errorf("a variable-hidden fragment key should not be rewritten, got:\n%s", out)
 		}
@@ -931,7 +959,7 @@ url='https://example.com'
 source=("git+https://example.com/{demo,extra}.git#tag=v1")
 sha256sums=('SKIP' 'SKIP')
 `
-		got := fixAll(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		got := fixOnly(t, map[string]string{"PKGBUILD": vcs}, FixSafe, &FixEnv{ResolveRef: fakeResolve}, "PB103")
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("a shared fragment should not be rewritten, got:\n%s", got["PKGBUILD"])
 		}
@@ -940,7 +968,7 @@ sha256sums=('SKIP' 'SKIP')
 		signed := strings.Replace(body,
 			`source=("git+https://example.com/demo.git#tag=v1")`,
 			`source=("git+https://example.com/demo.git?signed#tag=v1")`, 1)
-		got := fixAll(t, map[string]string{"PKGBUILD": signed}, FixSafe, &FixEnv{ResolveRef: fakeResolve})
+		got := fixOnly(t, map[string]string{"PKGBUILD": signed}, FixSafe, &FixEnv{ResolveRef: fakeResolve}, "PB103")
 		if _, ok := got["PKGBUILD"]; ok {
 			t.Errorf("signed tag should not be rewritten, got:\n%s", got["PKGBUILD"])
 		}
@@ -1135,6 +1163,23 @@ build() {
 	mustContain(t, got, "uv sync --frozen")
 }
 
+// PB208 covers two commands and only one of them is an edit. `gem install`
+// fetches from RubyGems with nothing pinning what it gets, and the remedy —
+// a committed Gemfile.lock, or local .gem files to install from — is not a
+// flag; the fixer leaves it alone and the finding stands.
+func TestFixBundlerLeavesGemInstall(t *testing.T) {
+	body := `
+build() {
+  gem install rails
+}`
+	got := fixPKGBUILD(t, body, FixUnsafe, nil)
+	mustNotContain(t, got, "gem install rails --")
+	files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+	if n := ruleIDs(lint(t, files))["PB208"]; n != 1 {
+		t.Errorf("expected the gem install to keep its PB208 finding, got %d", n)
+	}
+}
+
 func TestFixUvRunNotTouched(t *testing.T) {
 	got := fixPKGBUILD(t, `
 build() {
@@ -1279,11 +1324,11 @@ build() {
 // Run at FixUnsafe, where the PB203 fix is otherwise eligible, so the
 // directive is what blocks it.
 func TestFixSuppression(t *testing.T) {
-	got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+	got := fixOnly(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   # pkglint: ignore=PB203
   cargo build --release
-}`)}, FixUnsafe, nil)
+}`)}, FixUnsafe, nil, "PB203")
 	if _, ok := got["PKGBUILD"]; ok {
 		t.Errorf("suppressed rule should not be fixed, got:\n%s", got["PKGBUILD"])
 	}
@@ -1327,6 +1372,106 @@ package() {
 	}
 	if apply() {
 		t.Error("second pass should be a no-op")
+	}
+}
+
+// contractFixEnv is the stub the example contract runs fixes under. Every
+// capability answers, so the test is about whether a fixer clears its own
+// finding rather than about what a network happened to say: ResolveRef hands
+// back a fixed hash, ProbeHTTPS agrees the URL is served, and LocalDigest
+// reports the demo digests for anything asked about. None of it touches the
+// network or the disk.
+func contractFixEnv() *FixEnv {
+	return &FixEnv{
+		ResolveRef: fakeResolve,
+		ProbeHTTPS: func(string) error { return nil },
+		LocalDigest: func(string, string) (Digests, error) {
+			return Digests{MD5: demoMD5, SHA1: demoSHA1, SHA256: demoSHA256}, nil
+		},
+	}
+}
+
+// fixExampleGaps lists fixable rules whose Bad example this contract cannot
+// round-trip, with the reason. Keep it SMALL and justified: every entry is a
+// fix whose "does it actually clear the finding" question goes unasked here,
+// and must therefore be answered by a test of its own.
+var fixExampleGaps = map[string]string{
+	"PB102": "the fix writes the digest LocalDigest reports for the fetched source, and the stub " +
+		"cannot know which of the example's several sources it is being asked about; " +
+		"TestFixWeakChecksums covers the agreement between declared and reported digests.",
+	"PB208": "the rule has two halves and only one is an edit: `bundle install` gains --frozen, " +
+		"but the example's `gem install rails` has no lockfile to freeze, and the remedy — " +
+		"a committed Gemfile.lock or local .gem files — is not text this fixer can write; " +
+		"TestFixLockfileManagers covers the half that is and " +
+		"TestFixBundlerLeavesGemInstall pins the half that is not.",
+}
+
+// TestFixesClearTheirExample is the contract every auto-fix owes its rule: the
+// Bad example trips the rule, the rule's own fix is applied to it, and the
+// result no longer trips. A fix that leaves its finding standing is a diff for
+// nothing, and one that trips a *different* rule it did not before has traded
+// one complaint for another.
+//
+// Applying the fix a second time must change nothing. TestFixIdempotent asks
+// this of one hand-written PKGBUILD; asking it of every example is what makes
+// the guarantee hold for fixes nobody thought to add to that fixture.
+func TestFixesClearTheirExample(t *testing.T) {
+	for _, r := range Registry() {
+		r := r
+		if !r.FixLevel.Fixable() || r.Scope == ScopePackage {
+			continue
+		}
+		if reason, skip := fixExampleGaps[r.ID]; skip {
+			t.Logf("SKIP %s (known gap): %s", r.ID, reason)
+			continue
+		}
+		if reason, skip := knownGaps[r.ID]; skip {
+			t.Logf("SKIP %s (example gap): %s", r.ID, reason)
+			continue
+		}
+		t.Run(r.ID, func(t *testing.T) {
+			files := packageFor(r.ID, "bad", r.Bad)
+			if n := ruleIDs(lint(t, files))[r.ID]; n == 0 {
+				t.Fatalf("%s: Bad example does not trip the rule, so there is nothing to fix", r.ID)
+			}
+			env := contractFixEnv()
+			fixed := fixAll(t, files, r.FixLevel, env)
+			if len(fixed) == 0 {
+				t.Fatalf("%s: %s left the Bad example unchanged", r.ID, r.FixLevel.Flag())
+			}
+			for name, content := range fixed {
+				files[name] = content
+			}
+			if n := ruleIDs(lint(t, files))[r.ID]; n != 0 {
+				t.Errorf("%s: %d finding(s) survive the fix:\n%s", r.ID, n, files["PKGBUILD"])
+			}
+			if again := fixAll(t, files, r.FixLevel, env); len(again) != 0 {
+				t.Errorf("%s: fixing the fixed example changed it again:\n%s", r.ID, again["PKGBUILD"])
+			}
+		})
+	}
+}
+
+// TestFixExampleGapsAreStillGaps keeps that allowlist honest: an entry whose
+// example does round-trip is no longer a gap and must be removed.
+func TestFixExampleGapsAreStillGaps(t *testing.T) {
+	for id := range fixExampleGaps {
+		r, ok := RuleByID(id)
+		if !ok {
+			t.Errorf("fixExampleGaps lists unknown rule %s", id)
+			continue
+		}
+		if !r.FixLevel.Fixable() {
+			t.Errorf("fixExampleGaps lists %s, which has no fix; remove it", id)
+			continue
+		}
+		files := packageFor(id, "bad", r.Bad)
+		for name, content := range fixAll(t, files, r.FixLevel, contractFixEnv()) {
+			files[name] = content
+		}
+		if ruleIDs(lint(t, files))[id] == 0 {
+			t.Errorf("%s is in fixExampleGaps but its fix now clears the example; remove it", id)
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/jmelahman/pkglint/internal/pkgbuild"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -105,6 +106,18 @@ func varFinding(ctx *Context, id string, sev Severity, fields []string, format s
 		Message: message(format, args...)}
 }
 
+// varFindingLine is the line varFinding anchors a finding at for fields — for
+// a fixer whose edit lands elsewhere but must answer to the same suppression
+// directive as the finding it resolves.
+func varFindingLine(ctx *Context, fields ...string) int {
+	for _, f := range fields {
+		if v := ctx.Pkg.Vars[f]; v != nil {
+			return int(v.Pos.Line())
+		}
+	}
+	return 1
+}
+
 // hasDep reports whether field (or a declared _$arch variant of it) names the
 // package, ignoring version constraints.
 func hasDep(ctx *Context, field, name string) bool {
@@ -114,10 +127,18 @@ func hasDep(ctx *Context, field, name string) bool {
 
 // depEntry is one statically-known dependency-array element with its position,
 // for rules that report on the entry itself.
+//
+// Var and Word address the bytes the entry was written as, so the fixes that
+// delete a dependency read the same entries their rule does rather than
+// re-walking Vars for them. Word is nil whenever the value has no source text
+// of its own — one a later `+=` merged in, or a scalar's — and a fixer must
+// leave those alone; every rule that only reports can ignore both fields.
 type depEntry struct {
 	Name string // version constraint and description stripped
 	Full string // as written
 	Pos  syntax.Pos
+	Var  *pkgbuild.Var
+	Word *syntax.Word
 }
 
 // depEntries yields the static entries of field and its declared _$arch
@@ -130,9 +151,12 @@ func depEntries(ctx *Context, field string) []depEntry {
 		names = append(names, field+"_"+a)
 	}
 	for _, n := range names {
-		for _, e := range varElems(ctx.Pkg.Vars[n]) {
+		v := ctx.Pkg.Vars[n]
+		for _, e := range varElems(v) {
 			if val, ok := staticVal(ctx.Pkg, e.Value); ok && val != "" {
-				out = append(out, depEntry{Name: depName(val), Full: val, Pos: e.Pos})
+				out = append(out, depEntry{
+					Name: depName(val), Full: val, Pos: e.Pos, Var: v, Word: e.Word,
+				})
 			}
 		}
 	}

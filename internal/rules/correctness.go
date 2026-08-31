@@ -157,8 +157,14 @@ var correctnessRules = []Rule{
 		Severity: Warn,
 		Doc: "A VCS source (git+…, hg+…) is fetched by the corresponding client, which makepkg " +
 			"does not install for you: without the tool in makedepends the build fails on any " +
-			"machine that doesn't happen to have it — which is every clean chroot.",
+			"machine that doesn't happen to have it — which is every clean chroot. The auto-fix " +
+			"adds the client to makedepends.",
 		Check: checkVCSMakedepends,
+		// Declaring a tool the sources already need changes nothing about what
+		// is built: it restores a requirement the clean chroot was going to
+		// enforce anyway.
+		FixLevel: FixSafe,
+		Fix:      fixVCSMakedepends,
 	},
 }
 
@@ -644,14 +650,24 @@ var vcsClientPackages = map[string]string{
 	"git": "git", "hg": "mercurial", "svn": "subversion", "bzr": "breezy", "fossil": "fossil",
 }
 
-func checkVCSMakedepends(ctx *Context) []Finding {
+// vcsClientGap is one VCS client package the sources need and no dependency
+// array declares, anchored at the first source that needs it.
+type vcsClientGap struct {
+	VCS  string
+	Tool string
+	Pos  syntax.Pos
+}
+
+// vcsClientGaps returns those packages in source order, once each: the entries
+// PB711 reports, and the ones its fix writes into makedepends.
+func vcsClientGaps(ctx *Context) []vcsClientGap {
 	have := map[string]bool{}
 	for _, field := range []string{"depends", "makedepends"} {
 		for name := range depsFor(ctx, field) {
 			have[name] = true
 		}
 	}
-	var out []Finding
+	var out []vcsClientGap
 	reported := map[string]bool{}
 	for _, e := range ctx.Pkg.Sources() {
 		tool, ok := vcsClientPackages[e.VCS]
@@ -659,8 +675,16 @@ func checkVCSMakedepends(ctx *Context) []Finding {
 			continue
 		}
 		reported[tool] = true
-		out = append(out, findingAt("PB711", Warn, ctx.Pkg.PKGBUILD.Path, e.Pos,
-			"%s source needs %q in makedepends; a clean build environment does not have it", e.VCS, tool))
+		out = append(out, vcsClientGap{VCS: e.VCS, Tool: tool, Pos: e.Pos})
+	}
+	return out
+}
+
+func checkVCSMakedepends(ctx *Context) []Finding {
+	var out []Finding
+	for _, g := range vcsClientGaps(ctx) {
+		out = append(out, findingAt("PB711", Warn, ctx.Pkg.PKGBUILD.Path, g.Pos,
+			"%s source needs %q in makedepends; a clean build environment does not have it", g.VCS, g.Tool))
 	}
 	return out
 }

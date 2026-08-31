@@ -48,12 +48,21 @@ var pytestLintPlugins = map[string]bool{
 	"python-pytest-ruff": true, "python-pytest-runner": true,
 }
 
+// lintCheckdepends returns the lint/coverage plugins in checkdepends: what
+// PB931 reports, and what its fix deletes.
+func lintCheckdepends(ctx *Context) []depEntry {
+	var out []depEntry
+	for _, d := range depEntries(ctx, "checkdepends") {
+		if pytestLintPlugins[d.Name] {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 func checkPythonLintCheckdepends(ctx *Context) []Finding {
 	var out []Finding
-	for _, d := range depEntries(ctx, "checkdepends") {
-		if !pytestLintPlugins[d.Name] {
-			continue
-		}
+	for _, d := range lintCheckdepends(ctx) {
 		out = append(out, findingAt("PB931", Info, ctx.Pkg.PKGBUILD.Path, d.Pos,
 			"checkdepends names %s, a lint/coverage plugin; check() verifies the package works, not that upstream's style rules pass", d.Name))
 	}
@@ -101,14 +110,25 @@ var buildBackendPackages = map[string]string{
 	"installer": "python-installer",
 }
 
-func checkPythonBuildBackend(ctx *Context) []Finding {
-	var out []Finding
+// pythonBackendGap is one build-backend package the build runs through
+// `python -m` and no dependency array declares.
+type pythonBackendGap struct {
+	Cmd    Command
+	Module string
+	Pkg    string
+}
+
+// pythonBackendGaps returns those packages in source order, once each: the
+// entries PB933 reports, and the ones its fix writes into makedepends.
+func pythonBackendGaps(ctx *Context) []pythonBackendGap {
+	var out []pythonBackendGap
 	reported := map[string]bool{}
 	for _, c := range ctx.CommandsNamed("python", "python3") {
 		if c.Unit.Scriptlet || c.Fn == "" {
 			continue
 		}
-		pkg, ok := buildBackendPackages[pythonModuleArg(c)]
+		module := pythonModuleArg(c)
+		pkg, ok := buildBackendPackages[module]
 		if !ok || reported[pkg] {
 			continue
 		}
@@ -116,8 +136,16 @@ func checkPythonBuildBackend(ctx *Context) []Finding {
 			continue
 		}
 		reported[pkg] = true
-		out = append(out, c.finding("PB933", Warn,
-			"python -m %s needs %q in makedepends; a clean build environment does not have it", pythonModuleArg(c), pkg))
+		out = append(out, pythonBackendGap{Cmd: c, Module: module, Pkg: pkg})
+	}
+	return out
+}
+
+func checkPythonBuildBackend(ctx *Context) []Finding {
+	var out []Finding
+	for _, g := range pythonBackendGaps(ctx) {
+		out = append(out, g.Cmd.finding("PB933", Warn,
+			"python -m %s needs %q in makedepends; a clean build environment does not have it", g.Module, g.Pkg))
 	}
 	return out
 }

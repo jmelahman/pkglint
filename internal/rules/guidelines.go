@@ -10,9 +10,10 @@ package rules
 
 // --- PB918/PB919: a package providing or conflicting with itself -------------
 
-// checkSelfReference flags entries of field that name one of the packages this
-// PKGBUILD itself builds.
-func checkSelfReference(ctx *Context, id, field, why string) []Finding {
+// selfReferences returns the entries of field that name one of the packages
+// this PKGBUILD itself builds: what PB918/PB919 report, and what their fixes
+// delete.
+func selfReferences(ctx *Context, field string) []depEntry {
 	names := map[string]bool{}
 	for _, n := range pkgnames(ctx) {
 		names[n] = true
@@ -20,11 +21,20 @@ func checkSelfReference(ctx *Context, id, field, why string) []Finding {
 	if len(names) == 0 {
 		return nil
 	}
-	var out []Finding
+	var out []depEntry
 	for _, d := range depEntries(ctx, field) {
-		if !names[d.Name] {
-			continue
+		if names[d.Name] {
+			out = append(out, d)
 		}
+	}
+	return out
+}
+
+// checkSelfReference flags entries of field that name one of the packages this
+// PKGBUILD itself builds.
+func checkSelfReference(ctx *Context, id, field, why string) []Finding {
+	var out []Finding
+	for _, d := range selfReferences(ctx, field) {
 		out = append(out, findingAt(id, Warn, ctx.Pkg.PKGBUILD.Path, d.Pos,
 			"%s lists the package's own name %q; %s", field, d.Full, why))
 	}

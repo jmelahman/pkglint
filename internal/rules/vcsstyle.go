@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // PB960–PB963 lint the Arch VCS package guidelines
@@ -72,7 +73,17 @@ func checkVCSPkgverFn(ctx *Context) []Finding {
 
 // --- PB961: -git package without provides/conflicts on its counterpart -------
 
-func checkVCSProvidesConflicts(ctx *Context) []Finding {
+// vcsCounterpartGap is one -git style package that declares neither provides
+// nor conflicts on the release package it shadows.
+type vcsCounterpartGap struct {
+	Name string
+	Base string
+	Pos  syntax.Pos
+}
+
+// vcsCounterpartGaps returns those packages: the entries PB961 reports, and
+// the ones its fix declares provides and conflicts for.
+func vcsCounterpartGaps(ctx *Context) []vcsCounterpartGap {
 	// Split -git packages declare provides/conflicts per package_*()
 	// function, beyond static reading; claiming they are absent would be a
 	// guess against half the data.
@@ -81,7 +92,7 @@ func checkVCSProvidesConflicts(ctx *Context) []Finding {
 	}
 	provides := depsFor(ctx, "provides")
 	conflicts := depsFor(ctx, "conflicts")
-	var out []Finding
+	var out []vcsCounterpartGap
 	reported := map[string]bool{}
 	for _, e := range varElems(ctx.Pkg.Vars["pkgname"]) {
 		name, ok := staticVal(ctx.Pkg, e.Value)
@@ -100,10 +111,18 @@ func checkVCSProvidesConflicts(ctx *Context) []Finding {
 				continue
 			}
 			reported[name] = true
-			out = append(out, findingAt("PB961", Info, ctx.Pkg.PKGBUILD.Path, e.Pos,
-				"%q builds the same software as %q but declares neither provides=(%s) nor conflicts=(%s), so both can be installed at once and nothing can depend on either",
-				name, base, base, base))
+			out = append(out, vcsCounterpartGap{Name: name, Base: base, Pos: e.Pos})
 		}
+	}
+	return out
+}
+
+func checkVCSProvidesConflicts(ctx *Context) []Finding {
+	var out []Finding
+	for _, g := range vcsCounterpartGaps(ctx) {
+		out = append(out, findingAt("PB961", Info, ctx.Pkg.PKGBUILD.Path, g.Pos,
+			"%q builds the same software as %q but declares neither provides=(%s) nor conflicts=(%s), so both can be installed at once and nothing can depend on either",
+			g.Name, g.Base, g.Base, g.Base))
 	}
 	return out
 }

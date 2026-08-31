@@ -153,17 +153,19 @@ build() {
   cargo build --locked --release
 }`
 		expectRule(t, "PB913", map[string]string{"PKGBUILD": pkgbuildWith("", body)})
-		if got := fixPKGBUILD(t, body, FixSafe, nil); got != "" {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		if got := fixOnly(t, files, FixSafe, nil, "PB913")["PKGBUILD"]; got != "" {
 			t.Errorf("expected no rewrite of a directive tangled in prose, got:\n%s", got)
 		}
 	})
 
 	t.Run("naming PB913 in the directive suppresses the fix", func(t *testing.T) {
-		if got := fixPKGBUILD(t, `
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   # pkglint: ignore=PB203,PB913
   cargo build --locked --release
-}`, FixSafe, nil); got != "" {
+}`)}
+		if got := fixOnly(t, files, FixSafe, nil, "PB913")["PKGBUILD"]; got != "" {
 			t.Errorf("expected the escape hatch to block the fix, got:\n%s", got)
 		}
 	})

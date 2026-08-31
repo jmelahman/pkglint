@@ -232,8 +232,8 @@ func TestFixWritesInPlace(t *testing.T) {
 		t.Fatalf("--fix: got exit %d, want 0\n%s", code, buf.String())
 	}
 	out := buf.String()
-	if !strings.Contains(out, "applied 1 fix(es)") {
-		t.Errorf("want 1 applied fix (GOSUMDB removal), got:\n%s", out)
+	if !strings.Contains(out, "applied 2 fix(es)") {
+		t.Errorf("want 2 applied fixes (GOSUMDB removal, makedepends), got:\n%s", out)
 	}
 	if !strings.Contains(out, "updpkgsums") {
 		t.Errorf("SKIP checksum should nudge toward updpkgsums, got:\n%s", out)
@@ -250,6 +250,15 @@ func TestFixWritesInPlace(t *testing.T) {
 	}
 	if strings.Contains(string(fixed), "npm ci") {
 		t.Errorf("--fix must not apply the unsafe npm-ci rewrite:\n%s", fixed)
+	}
+	// PB944 and PB979 both want a makedepends this PKGBUILD does not have, and
+	// two assignments would mean the second silently dropping the first: one
+	// line, both packages.
+	if n := strings.Count(string(fixed), "makedepends="); n != 1 {
+		t.Errorf("want exactly one makedepends assignment, got %d:\n%s", n, fixed)
+	}
+	if !strings.Contains(string(fixed), "makedepends=('rust' 'npm')") {
+		t.Errorf("both build tools should be declared together:\n%s", fixed)
 	}
 	fi, err := os.Stat(filepath.Join(dir, "PKGBUILD"))
 	if err != nil {

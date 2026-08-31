@@ -297,7 +297,9 @@ var styleRules = []Rule{
 		Doc: "--release on cargo test/check (or its short spelling, -r) disables debug assertions " +
 			"and integer-overflow checks — precisely the invariants a test run exists to " +
 			"exercise. The Arch Rust package guidelines run check() without --release; the " +
-			"shipped binary is still built --release in build().",
+			"shipped binary is still built --release in build(). A --release kept in a variable " +
+			"counts as passed wherever the PKGBUILD assigns it, though only one written out in " +
+			"the command itself can be removed automatically.",
 		Check: checkCargoCheckRelease,
 		// Dropping the flag recompiles the crate in the dev profile: the check
 		// gets slower, and a suite that only passed with assertions compiled
@@ -312,7 +314,10 @@ var styleRules = []Rule{
 		Doc: "cargo install records what it installed in .crates.toml and .crates2.json under the " +
 			"install root; staged into $pkgdir those files ship in the package, conflict with " +
 			"every other Rust package doing the same, and describe a cargo state directory that " +
-			"does not exist on the user's system. The Rust package guidelines pass --no-track.",
+			"does not exist on the user's system. The Rust package guidelines pass --no-track. " +
+			"Flags kept in a variable count as passed wherever the PKGBUILD assigns it; an " +
+			"install whose flags come from outside the file is left alone, since --no-track may " +
+			"be in there.",
 		Check: checkCargoInstallTracked,
 	},
 	{
@@ -323,7 +328,9 @@ var styleRules = []Rule{
 			"otherwise, so a plain `cargo build` in build() ships a slow binary. The Arch Rust " +
 			"package guidelines build with --release (-r is the same flag); a PKGBUILD that " +
 			"selects another profile explicitly (--profile) has made the call, as has one whose " +
-			"build() runs a release build beside the dev one, and both are left alone.",
+			"build() runs a release build beside the dev one, and both are left alone. Flags kept " +
+			"in a variable count as passed wherever the PKGBUILD assigns it; a build whose flags " +
+			"come from outside the file is left alone too, since --release may be in there.",
 		Check: checkCargoBuildRelease,
 		// The release profile is a different compile — slower, and a crate that
 		// only builds with debug assertions on now fails — and it moves the

@@ -860,25 +860,37 @@ func sumsArrayText(name string, vals []string) string {
 
 // --- PB203: cargo without --locked -----------------------------------------
 
+// fixCargoLocked adds --locked to the cargo commands PB203 reports, at the end
+// of the command. Appending, rather than inserting after the subcommand, is
+// what lets it fix a command with an unreadable value in it — `cargo fetch
+// --target "$CARCH-…"`, the guidelines' own prepare() — since the edit never
+// has to know what the words in between say. cargoUnlockedCommands has already
+// left out the commands whose flags pkglint cannot read.
+//
+// The end is the wrong place once the command has a `--`, since past it the
+// words are the called program's: appending to `cargo rustc -- -C
+// target-cpu=native` hands rustc a --locked it rejects, trading the finding for
+// a build that no longer runs. The flag goes in front of the separator
+// instead — and where the separator arrives through a variable there is no
+// place in the text to put it, so the finding stands.
 func fixCargoLocked(ctx *Context, _ *FixEnv) []Edit {
 	var edits []Edit
-	for _, c := range ctx.CommandsNamed("cargo") {
-		switch c.Subcommand() {
-		case "build", "install", "fetch", "test", "rustc":
-		default:
-			continue
+	for _, c := range cargoUnlockedCommands(ctx) {
+		at, text := off(c.Call.End()), " --locked"
+		if cargoHasSeparator(c) {
+			sep := wordByValue(c, "--")
+			if sep == nil {
+				continue // written as an expansion: the finding stands
+			}
+			at, text = off(sep.Pos()), "--locked "
 		}
-		if c.HasArg("--locked") || c.HasArg("--frozen") || c.HasArg("--offline") {
-			continue
-		}
-		at := off(c.Call.End())
 		edits = append(edits, Edit{
 			Path:  c.Unit.Path,
 			Start: at,
 			End:   at,
-			New:   " --locked",
+			New:   text,
 			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  fmt.Sprintf("append --locked to `cargo %s`", c.Subcommand()),
+			Desc:  fmt.Sprintf("add --locked to `cargo %s`", c.Subcommand()),
 		})
 	}
 	return edits
@@ -959,14 +971,15 @@ func flagCut(raw []byte, start, end int) (int, int) {
 // hands the compiler on the far side.
 //
 // Two shapes are declined rather than guessed at. A command whose words do not
-// all render — `cargo build "${myflags[@]}"`, the way a PKGBUILD collects
-// flags it reuses — may already select a profile in there, and cargo rejects
-// --release next to --profile outright, so inserting one would break the build
-// the fix means to improve. And a PKGBUILD that reaches into a debug/
-// directory is reading the artifact this flag moves: cargo writes the dev
-// profile to target/debug and the release one to target/release, so the flag
-// alone would leave package() copying a path that no longer exists. Repointing
-// it is a rewrite of package(), not a flag insertion, so the finding stands.
+// all render — `cargo build --features "${myfeatures[@]}"` — is one the rule
+// reports (cargoDevProfileBuilds has already stood down where the unreadable
+// word could be a profile flag) but the fix will not rewrite: an argument list
+// pkglint cannot read in full is not one to edit blind. And a PKGBUILD that
+// reaches into a debug/ directory is reading the artifact this flag moves:
+// cargo writes the dev profile to target/debug and the release one to
+// target/release, so the flag alone would leave package() copying a path that
+// no longer exists. Repointing it is a rewrite of package(), not a flag
+// insertion, so the finding stands.
 func fixCargoBuildRelease(ctx *Context, _ *FixEnv) []Edit {
 	var edits []Edit
 	for _, c := range cargoDevProfileBuilds(ctx) {
@@ -988,18 +1001,6 @@ func fixCargoBuildRelease(ctx *Context, _ *FixEnv) []Edit {
 		})
 	}
 	return edits
-}
-
-// hasOpaqueArg reports whether any of the command's arguments still carries an
-// expansion after rendering, which is pkglint saying it does not know what the
-// command is being told to do.
-func hasOpaqueArg(c Command) bool {
-	for i, a := range c.Args {
-		if hasVarRef(a) || (i < len(c.ArgDyn) && c.ArgDyn[i]) {
-			return true
-		}
-	}
-	return false
 }
 
 // devArtifactRe matches a reference to a debug/ directory, which in a Rust

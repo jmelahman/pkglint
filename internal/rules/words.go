@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jmelahman/pkglint/internal/pkgbuild"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -27,6 +28,59 @@ func hasPrefixAny(s string, prefixes ...string) bool {
 // variable or dynamic marker.
 func hasVarRef(s string) bool {
 	return strings.ContainsAny(s, "$\x00")
+}
+
+// argOpaque reports whether the command's i'th argument still carries an
+// expansion after rendering, which is pkglint saying it does not know what
+// that word tells the command.
+func argOpaque(c Command, i int) bool {
+	return hasVarRef(c.Args[i]) || (i < len(c.ArgDyn) && c.ArgDyn[i])
+}
+
+// varRefName returns the name of the variable a word is nothing but a
+// reference to — `$flags`, `${flags}`, `"$flags"`, `"${flags[@]}"` — and ""
+// for anything else. Only a whole reference stands for what the variable
+// holds: `--root="$pkgdir/usr"` is text of its own around a value, and
+// `${flags:-…}`, `${flags[0]}` or `${#flags[@]}` are operations on one that
+// may hand the command something quite different from what was assigned.
+func varRefName(w *syntax.Word) string {
+	if w == nil || len(w.Parts) != 1 {
+		return ""
+	}
+	part := w.Parts[0]
+	if dq, ok := part.(*syntax.DblQuoted); ok {
+		if len(dq.Parts) != 1 {
+			return ""
+		}
+		part = dq.Parts[0]
+	}
+	pe, ok := part.(*syntax.ParamExp)
+	if !ok || pe.Param == nil || pe.Excl || pe.Length || pe.Width ||
+		pe.Slice != nil || pe.Repl != nil || pe.Exp != nil || pe.Names != 0 {
+		return ""
+	}
+	if pe.Index != nil {
+		iw, isWord := pe.Index.(*syntax.Word)
+		if !isWord {
+			return ""
+		}
+		idx, dyn := pkgbuild.RenderWord(iw, nil)
+		if dyn || (idx != "@" && idx != "*") {
+			return ""
+		}
+	}
+	return pe.Param.Value
+}
+
+// hasOpaqueArg reports whether any of the command's arguments is opaque, so a
+// fix that rewrites the argument list has nothing solid to rewrite against.
+func hasOpaqueArg(c Command) bool {
+	for i := range c.Args {
+		if argOpaque(c, i) {
+			return true
+		}
+	}
+	return false
 }
 
 var assignWordRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)

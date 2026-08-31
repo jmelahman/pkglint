@@ -37,7 +37,9 @@ var hermeticRules = []Rule{
 		Severity: Warn,
 		Doc: "cargo without --locked (or --frozen/--offline) may resolve and fetch dependency " +
 			"versions that differ from the committed Cargo.lock, so the built artifact is not " +
-			"reproducible and unreviewed code can enter the build.",
+			"reproducible and unreviewed code can enter the build. Flags kept in a variable count " +
+			"as passed wherever the PKGBUILD assigns it; a command whose flags come from outside " +
+			"the file is left alone, since the lockfile flag may be in there.",
 		Check: checkCargoLocked,
 		// --locked hard-fails when the source ships no Cargo.lock (or one out
 		// of sync with Cargo.toml), so the rewrite can break a working build —
@@ -300,17 +302,35 @@ func checkPipHashes(ctx *Context) []Finding {
 	return out
 }
 
-func checkCargoLocked(ctx *Context) []Finding {
-	var out []Finding
+// cargoUnlockedCommands returns the cargo invocations that resolve dependencies
+// without being pinned to Cargo.lock: the commands PB203 reports, and the ones
+// its fix appends --locked to, so rule and fix cannot drift apart.
+//
+// The lockfile flags are read through cargoWords, so a PKGBUILD that keeps them
+// in a variable and expands it at every call site has passed them. A command
+// carrying a word pkglint cannot read at all (cargoFlagsHidden) is left out
+// entirely: --locked may be inside it. That is only about words that could be
+// flags — the `--target "$CARCH-unknown-linux-gnu"` of the guidelines' own
+// `cargo fetch` is a value, and the command stays reportable.
+func cargoUnlockedCommands(ctx *Context) []Command {
+	var out []Command
 	for _, c := range ctx.CommandsNamed("cargo") {
 		switch c.Subcommand() {
 		case "build", "install", "fetch", "test", "rustc":
 		default:
 			continue
 		}
-		if c.HasArg("--locked") || c.HasArg("--frozen") || c.HasArg("--offline") {
+		if cargoHasFlag(c, "--locked", "--frozen", "--offline") || cargoFlagsHidden(c) {
 			continue
 		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func checkCargoLocked(ctx *Context) []Finding {
+	var out []Finding
+	for _, c := range cargoUnlockedCommands(ctx) {
 		out = append(out, c.finding("PB203", Warn,
 			"cargo %s without --locked: dependency resolution may diverge from Cargo.lock", c.Subcommand()))
 	}

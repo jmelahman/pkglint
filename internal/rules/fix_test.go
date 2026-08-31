@@ -557,17 +557,47 @@ func TestFixInsecureSignatureTransport(t *testing.T) {
 const gitCommit = "3f2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a"
 
 func TestFixCargoLocked(t *testing.T) {
-	body := `
+	t.Run("appended", func(t *testing.T) {
+		body := `
 build() {
   cargo build --release
 }`
-	// --locked fails outright when the source ships no Cargo.lock, so the
-	// rewrite is behavior-changing and must not run at the safe level.
-	if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
-		t.Errorf("FixSafe should not apply the unsafe PB203 fix, got:\n%s", got["PKGBUILD"])
-	}
-	got := fixPKGBUILD(t, body, FixUnsafe, nil)
-	mustContain(t, got, "cargo build --release --locked")
+		// --locked fails outright when the source ships no Cargo.lock, so the
+		// rewrite is behavior-changing and must not run at the safe level.
+		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixSafe, nil); len(got) != 0 {
+			t.Errorf("FixSafe should not apply the unsafe PB203 fix, got:\n%s", got["PKGBUILD"])
+		}
+		got := fixPKGBUILD(t, body, FixUnsafe, nil)
+		mustContain(t, got, "cargo build --release --locked")
+	})
+	t.Run("written in front of the separator", func(t *testing.T) {
+		// The end of the line belongs to rustc, which has no --locked and
+		// stops the build when handed one.
+		got := fixPKGBUILD(t, `
+build() {
+  cargo rustc --release -- -C target-cpu=native
+}`, FixUnsafe, nil)
+		mustContain(t, got, "cargo rustc --release --locked -- -C target-cpu=native")
+		if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got}))["PB203"]; n != 0 {
+			t.Errorf("fixed PKGBUILD still has %d PB203 finding(s):\n%s", n, got)
+		}
+	})
+	t.Run("a separator behind an expansion declines the fix", func(t *testing.T) {
+		// The separator is real but no argument spells it, so there is no
+		// place in the text the flag is known to land in front of.
+		body := `
+_args='-- -C target-cpu=native'
+build() {
+  cargo rustc --release $_args
+}`
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		if n := ruleIDs(lint(t, files))["PB203"]; n != 1 {
+			t.Errorf("PB203 fired %d times on an unlocked build, want exactly 1", n)
+		}
+		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("nothing may be written past a separator pkglint cannot point at, got:\n%s", got["PKGBUILD"])
+		}
+	})
 }
 
 func TestFixCargoCheckRelease(t *testing.T) {
@@ -680,16 +710,53 @@ build() {
 			t.Errorf("`cargo build -r` already builds --release, got:\n%s", got["PKGBUILD"])
 		}
 	})
-	t.Run("flags behind an expansion declined", func(t *testing.T) {
-		// The array may already name a profile, and cargo refuses --release
-		// beside --profile, so the fix cannot insert into what it cannot read.
+	t.Run("a release flag in the array is read, not rewritten", func(t *testing.T) {
+		// The array holds the --release this would otherwise insert, so the
+		// rule has nothing to report and the fix has nothing to add.
 		body := `
 build() {
   _myflags=(--release --features extras)
   cargo build --locked "${_myflags[@]}"
 }`
-		if got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", body)}, FixUnsafe, nil); len(got) != 0 {
-			t.Errorf("flags reached through an expansion must not be added to, got:\n%s", got["PKGBUILD"])
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("a build that already asks for --release must not be edited, got:\n%s", got["PKGBUILD"])
+		}
+		if n := ruleIDs(lint(t, files))["PB942"]; n != 0 {
+			t.Errorf("a build whose array carries --release got %d PB942 finding(s)", n)
+		}
+	})
+	t.Run("an array without it keeps the finding but declines the fix", func(t *testing.T) {
+		// Reading the array is what tells the rule the profile is cargo's
+		// default; the fix still refuses to edit an argument list whose words
+		// it cannot all see in the command itself.
+		body := `
+build() {
+  _myflags=(--features extras)
+  cargo build --locked "${_myflags[@]}"
+}`
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		if n := ruleIDs(lint(t, files))["PB942"]; n != 1 {
+			t.Errorf("PB942 fired %d times on a dev-profile build, want exactly 1", n)
+		}
+		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("an argument list with an expansion in it must not be edited, got:\n%s", got["PKGBUILD"])
+		}
+	})
+	t.Run("an unreadable value keeps the finding but declines the fix", func(t *testing.T) {
+		// A feature array is not a profile flag, so the finding stands; the
+		// fix still will not edit an argument list it cannot read in full.
+		body := `
+_features=(cli gui)
+build() {
+  cargo build --locked --features "${_features[@]}"
+}`
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		if n := ruleIDs(lint(t, files))["PB942"]; n != 1 {
+			t.Errorf("PB942 fired %d times on a dev-profile build, want exactly 1", n)
+		}
+		if got := fixAll(t, files, FixUnsafe, nil); len(got) != 0 {
+			t.Errorf("an argument list with an expansion in it must not be edited, got:\n%s", got["PKGBUILD"])
 		}
 	})
 	t.Run("a dev-profile artifact path declines the fix", func(t *testing.T) {

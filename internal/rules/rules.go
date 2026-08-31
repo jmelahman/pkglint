@@ -174,6 +174,7 @@ type Command struct {
 	Dynamic bool   // command name contains unresolvable constructs
 	Args    []string
 	ArgDyn  []bool
+	ArgWord []*syntax.Word // the word each argument was rendered from
 }
 
 // NewContext precomputes shared state for rules.
@@ -419,6 +420,7 @@ func (ctx *Context) newCommand(u *pkgbuild.Unit, fn string, stmt *syntax.Stmt, c
 		s, dyn := pkgbuild.RenderWord(w, vars)
 		cmd.Args = append(cmd.Args, s)
 		cmd.ArgDyn = append(cmd.ArgDyn, dyn)
+		cmd.ArgWord = append(cmd.ArgWord, w)
 	}
 	return cmd
 }

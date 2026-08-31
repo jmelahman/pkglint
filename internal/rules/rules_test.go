@@ -802,6 +802,46 @@ build() {
   cargo build --release --locked
 }`)})
 	})
+	t.Run("PB203 --locked inside a variable counts", func(t *testing.T) {
+		expectNoRule(t, "PB203", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_cargo_flags="--release --locked"
+build() {
+  cargo build $_cargo_flags
+}`)})
+	})
+	t.Run("PB203 --frozen inside an array counts", func(t *testing.T) {
+		// The lib32-rav1e shape: one array of options per phase, expanded into
+		// every cargo command the phase runs.
+		expectNoRule(t, "PB203", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  _flags=(--release --frozen)
+  cargo build "${_flags[@]}"
+}`)})
+	})
+	t.Run("PB203 a variable holding no lockfile flag still reports", func(t *testing.T) {
+		// Reading the variable has to work in both directions, or the rule
+		// would stand down for every command that expands one.
+		expectRule(t, "PB203", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  _cargoflags="-Zbuild-std=std,panic_abort"
+  cargo build --release $_cargoflags
+}`)})
+	})
+	t.Run("PB203 flags pkglint cannot read stand down", func(t *testing.T) {
+		// Nothing in the file assigns it, so --locked may well be in there.
+		expectNoRule(t, "PB203", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  cargo build $CARGO_ARGS
+}`)})
+	})
+	t.Run("PB203 an unreadable target is a value, not a flag", func(t *testing.T) {
+		// The guidelines' own prepare(): the target triple is computed, but
+		// nothing about it could be the missing lockfile flag.
+		expectRule(t, "PB203", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  cargo fetch --target "$CARCH-unknown-linux-gnu"
+}`)})
+	})
 	t.Run("PB204 bare go build", func(t *testing.T) {
 		expectRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {

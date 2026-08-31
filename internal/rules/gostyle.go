@@ -42,8 +42,57 @@ func assignmentsTo(ctx *Context, name string, c Command) []string {
 // them); own names the CallExpr whose environment prefix belongs to the
 // caller, if any.
 func assignmentsInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.CallExpr) []string {
+	var out []string
+	scanAssignments(u, name, fn, at, own, false, func(as *syntax.Assign) {
+		if as.Value == nil {
+			return
+		}
+		s, _ := renderPlain(as.Value)
+		out = append(out, s)
+	})
+	return out
+}
+
+// wordsInScope is assignmentsInScope for a name that holds words rather than
+// one environment value: `_cargo_flags="--locked --release"` and the
+// `_cargo_flags=(--locked --release)` array spelling both hand a command two
+// words, and an array assignment is an assignment like any other here.
+//
+// found separates a name the file never assigns — where the words really are
+// unknown — from one it assigns nothing, and the words keep their expansions
+// ("$CARGO_ARGS", "\x00") so a caller can see which of them it still cannot
+// read. A value is split the way bash splits an unquoted expansion; an array
+// element is one word, quoted or not, which is the point of the spelling.
+//
+// A plain `_cargo_flags=…` statement counts, unlike in assignmentsInScope: it
+// sets a shell variable the next line expands, which is the whole point here,
+// even though it exports nothing to a child process's environment.
+func wordsInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.CallExpr) (words []string, found bool) {
+	scanAssignments(u, name, fn, at, own, true, func(as *syntax.Assign) {
+		found = true
+		if as.Value != nil {
+			s, _ := pkgbuild.RenderWord(as.Value, nil)
+			words = append(words, strings.Fields(s)...)
+		}
+		if as.Array == nil {
+			return
+		}
+		for _, el := range as.Array.Elems {
+			s, _ := pkgbuild.RenderWord(el.Value, nil)
+			words = append(words, s)
+		}
+	})
+	return words, found
+}
+
+// scanAssignments calls visit for every assignment to name in scope, in the
+// order described on assignmentsInScope. standalone additionally counts a
+// `name=value` statement of its own, which the parser reports as a command
+// with no arguments and which sets a shell variable rather than a child
+// process's environment.
+func scanAssignments(u *pkgbuild.Unit, name, fn string, at int, own *syntax.CallExpr, standalone bool, visit func(*syntax.Assign)) {
 	if u == nil || u.Scriptlet {
-		return nil
+		return
 	}
 	visible := map[string]bool{}
 	for _, p := range precedingPhases(fn) {
@@ -57,7 +106,6 @@ func assignmentsInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.C
 			ownAssigns[as] = true
 		}
 	}
-	var out []string
 	// A subtree contributes every assignment to name except another command's
 	// environment prefix. syntax.Walk is pre-order, so a CallExpr is seen
 	// before its own assignments and can disown them first.
@@ -67,21 +115,20 @@ func assignmentsInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.C
 		}
 		foreign := map[*syntax.Assign]bool{}
 		syntax.Walk(n, func(node syntax.Node) bool {
-			if ce, ok := node.(*syntax.CallExpr); ok && ce != own {
+			if ce, ok := node.(*syntax.CallExpr); ok && ce != own && !(standalone && len(ce.Args) == 0) {
 				for _, as := range ce.Assigns {
 					foreign[as] = true
 				}
 				return true
 			}
 			as, ok := node.(*syntax.Assign)
-			if !ok || as.Name == nil || as.Name.Value != name || as.Value == nil || foreign[as] {
+			if !ok || as.Name == nil || as.Name.Value != name || foreign[as] {
 				return true
 			}
 			if before >= 0 && off(as.Pos()) >= before && !ownAssigns[as] {
 				return true
 			}
-			s, _ := renderPlain(as.Value)
-			out = append(out, s)
+			visit(as)
 			return true
 		})
 	}
@@ -109,7 +156,6 @@ func assignmentsInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.C
 			scan(u.Functions[n].Body, -1)
 		}
 	}
-	return out
 }
 
 // makepkgPhase reports whether fn is a function makepkg calls itself, and so

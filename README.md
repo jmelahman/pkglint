@@ -179,7 +179,7 @@ PKGBUILDs on every commit:
 ```yaml
 repos:
   - repo: https://github.com/jmelahman/pkglint
-    rev: v1.4.0
+    rev: v1.5.0
     hooks:
       - id: pkglint
 ```

@@ -1,5 +1,5 @@
 # bundled OFL text is upstream's verbatim (the whitespace hooks rewrite it).
-exclude: ^(docs|data|testdata)/|^site/assets/fonts/
+exclude: ^testdata/|^site/assets/fonts/
 
 repos:
   - repo: builtin

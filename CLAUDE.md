@@ -30,11 +30,22 @@ git's `ext::` "run this command" transport out. Keep it that way.)
 
 ## Report-card site
 
-`docs/` is generated output — never hand-edit. `.github/workflows/site.yml`
-rebuilds and commits it nightly, or on demand: `gh workflow run site.yml`.
-Local preview: `go run ./site -maintainer Jamison -since-days 90 -top 500 -budget 200 -state data/state.jsonl -out /tmp/site-preview`.
+No generated output lives on master. `.github/workflows/site.yml` rebuilds the
+site nightly — or on demand: `gh workflow run site.yml` — and force-pushes the
+`site` branch as a single root commit holding `docs/`, which Pages serves from
+that branch's `/docs`, beside the `data/state.jsonl` that produced it. Keep it
+that way: 48 nightly `docs/` snapshots on master are what made a 2MB source
+tree a 157MB clone, and a branch that is always one commit deep cannot repeat
+it. `docs/` and `data/` are gitignored so a local run cannot re-add them.
 
-`data/state.jsonl` caches findings per base, keyed on LastModified plus a rule
+Local preview, with the published state as a starting point:
+
+```shell
+curl -sfLo /tmp/state.jsonl https://raw.githubusercontent.com/jmelahman/pkglint/site/data/state.jsonl
+go run ./site -maintainer Jamison -since-days 90 -top 500 -budget 200 -state /tmp/state.jsonl -out /tmp/site-preview
+```
+
+`state.jsonl` caches findings per base, keyed on LastModified plus a rule
 registry fingerprint, so registry changes re-lint the corpus automatically over
 a few nightly runs. Changing rule *logic* without changing the registry shape
 needs a `stateEpoch` bump in `site/state.go`.

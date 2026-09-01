@@ -20,6 +20,25 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false # no push token while parsing untrusted AUR content
+      # The scan state lives on the `site` branch with the pages it produced,
+      # not on master: master carries source only, so checking it out costs a
+      # couple of megabytes instead of the 350MB the generated tree weighs.
+      # Sparse and cone-mode, so this pulls data/ and leaves docs/ on the
+      # server.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: site
+          sparse-checkout: data
+          path: .site
+          persist-credentials: false
+      - name: Restore scan state
+        run: |
+          mkdir -p data
+          if [ -f .site/data/state.jsonl ]; then
+            cp .site/data/state.jsonl data/state.jsonl
+          else
+            echo "No prior state on the site branch; scanning from empty."
+          fi
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
@@ -33,7 +52,7 @@ jobs:
       # window is a one-line change and the state carries over, so this can
       # grow later — a year is ~47,600 bases.
       #
-      # data/state.jsonl carries the previous scan, so a base whose
+      # The restored state.jsonl carries the previous scan, so a base whose
       # LastModified has not moved is served from it without a fetch, and
       # -budget caps the rest. 8000 comes from the request throttle rather than
       # the runner: fetches are spaced 500ms apart globally, so the ceiling is
@@ -65,8 +84,9 @@ jobs:
           -out docs
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          # Both paths, so their least common ancestor is the workspace root and
-          # the publish job can restore them where they belong.
+          # Both paths, so their least common ancestor is the workspace root
+          # and the publish job can restore them side by side, laid out the way
+          # the site branch wants them.
           path: |
             docs
             data/state.jsonl
@@ -81,32 +101,27 @@ jobs:
     permissions:
       contents: write
     steps:
-      # TODO: pin actions by SHA with ratchet before enabling branch protection.
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # default token persists — needed for git push ratchet:actions/checkout@v6
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
         with:
           name: report-card-docs
-          path: . # the artifact holds docs/ and data/ already
-      - name: Commit refreshed site
+          path: out # the artifact holds docs/ and data/ already
+      # The site branch is generated output only — docs/ for Pages to serve
+      # (its source is this branch's /docs) and the state.jsonl that produced
+      # it, which the next scan reads back. It is rebuilt here as a fresh root
+      # commit and force-pushed, never appended to: 48 nightly snapshots on
+      # master are what made the repo 157MB, and a branch that is always one
+      # commit deep cannot repeat that. Nothing merges into it and no human
+      # commit touches it, so there is nothing to rebase onto and no reason to
+      # retry the push.
+      - name: Publish the site branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: out
         run: |
+          git init -q -b site
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # The state must be committed alongside the pages it produced, or the
-          # next run rescans everything this one just did.
-          git add docs data
-          if git diff --cached --quiet; then
-            echo "No changes to the report card."
-          else
-            git commit -m "Regenerate report card site"
-            # master may have moved during the hour-long scan. This commit
-            # only touches generated files (docs/, data/) that no human
-            # commit does, so rebasing onto whatever landed is conflict-free
-            # — and losing the push means losing the scan's state, which the
-            # next run would then redo.
-            pushed=""
-            for _ in 1 2 3; do
-              if git push; then pushed=1; break; fi
-              git pull --rebase
-            done
-            [ -n "$pushed" ]
-          fi
+          git add -A
+          git commit -q -m "Report card site $(date -u +%Y-%m-%d)"
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" site

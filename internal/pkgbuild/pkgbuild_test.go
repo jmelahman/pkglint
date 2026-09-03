@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -664,5 +665,83 @@ func TestParseDirective(t *testing.T) {
 		if d, ok := ParseDirective(line); ok {
 			t.Errorf("ParseDirective(%q) = %+v, want no directive", line, d)
 		}
+	}
+}
+
+func restoreMaxSourceFile(t *testing.T, limit int64) func() {
+	t.Helper()
+	prev := maxSourceFile
+	maxSourceFile = limit
+	return func() { maxSourceFile = prev }
+}
+
+// TestLoadRefusesNonRegularSources pins that a source file which resolves to
+// something other than a regular file is never read: a bare name in the
+// package directory can be a symlink to a device, and reading /dev/zero would
+// hang the linter. /dev/null stands in for the device here so a regression
+// fails an assertion instead of hanging the suite.
+func TestLoadRefusesNonRegularSources(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks are not portable on windows")
+	}
+	dir := t.TempDir()
+	content := "pkgname=demo\npkgver=1\npkgrel=1\ninstall=demo.install\n"
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{".SRCINFO", "demo.install"} {
+		if err := os.Symlink("/dev/null", filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pkg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if pkg.SrcInfo != nil {
+		t.Errorf("SrcInfo = %+v, want nil (non-regular .SRCINFO must be skipped)", pkg.SrcInfo)
+	}
+	if len(pkg.Scriptlets) != 0 {
+		t.Errorf("Scriptlets = %+v, want none (non-regular scriptlet must be skipped)", pkg.Scriptlets)
+	}
+
+	// The PKGBUILD itself: a non-regular file is a load error, not a hang.
+	other := t.TempDir()
+	if err := os.Symlink("/dev/null", filepath.Join(other, "PKGBUILD")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(other); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Errorf("Load(non-regular PKGBUILD) error = %v, want one mentioning \"not a regular file\"", err)
+	}
+}
+
+// TestLoadRefusesOversizedSources pins the size ceiling on the package's own
+// files, so a huge (or unbounded) file cannot exhaust memory.
+func TestLoadRefusesOversizedSources(t *testing.T) {
+	defer restoreMaxSourceFile(t, 64)()
+
+	big := t.TempDir()
+	oversized := "pkgname=demo\npkgver=1\npkgrel=1\n# " + strings.Repeat("x", 200) + "\n"
+	if err := os.WriteFile(filepath.Join(big, "PKGBUILD"), []byte(oversized), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(big); err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Errorf("Load(oversized PKGBUILD) error = %v, want one mentioning \"larger than\"", err)
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte("pkgname=d\npkgver=1\npkgrel=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcinfo := "pkgbase = d\n\tpkgver = 1\n" + strings.Repeat("\t# pad\n", 20)
+	if err := os.WriteFile(filepath.Join(dir, ".SRCINFO"), []byte(srcinfo), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if pkg.SrcInfo != nil {
+		t.Errorf("SrcInfo = %+v, want nil (oversized .SRCINFO must be skipped)", pkg.SrcInfo)
 	}
 }

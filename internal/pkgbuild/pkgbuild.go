@@ -8,6 +8,7 @@ package pkgbuild
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -144,6 +145,39 @@ func newParser() *syntax.Parser {
 	return syntax.NewParser(syntax.KeepComments(true), syntax.Variant(syntax.LangBash))
 }
 
+// maxSourceFile bounds a PKGBUILD, .SRCINFO, or install scriptlet. The
+// largest real PKGBUILDs in the AUR are well under 1 MiB; the ceiling exists
+// so a checkout that points one of these names at a device or a huge file
+// fails to load instead of hanging the linter. A var so tests can lower it.
+var maxSourceFile int64 = 8 << 20
+
+// readSourceFile reads one of the package's own files, refusing anything that
+// is not a regular file (a device, a FIFO, a directory) and anything past
+// maxSourceFile. Symlinks to regular files are followed; the check is on what
+// the name resolves to.
+func readSourceFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s: not a regular file", path)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxSourceFile+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxSourceFile {
+		return nil, fmt.Errorf("%s: larger than %d bytes", path, maxSourceFile)
+	}
+	return data, nil
+}
+
 // Load reads the PKGBUILD at path (a file or a directory containing one),
 // plus any install scriptlets referenced by install= or living next to it.
 func Load(path string) (*Package, error) {
@@ -158,7 +192,7 @@ func Load(path string) (*Package, error) {
 	}
 	pkgPath := filepath.Join(dir, file)
 
-	raw, err := os.ReadFile(pkgPath)
+	raw, err := readSourceFile(pkgPath)
 	if err != nil {
 		return nil, err
 	}
@@ -177,13 +211,13 @@ func Load(path string) (*Package, error) {
 	}
 	pkg.extractTopLevel()
 
-	if data, err := os.ReadFile(filepath.Join(dir, ".SRCINFO")); err == nil {
+	if data, err := readSourceFile(filepath.Join(dir, ".SRCINFO")); err == nil {
 		pkg.SrcInfo = ParseSrcInfo(data)
 	}
 
 	for _, name := range pkg.installFiles() {
 		p := filepath.Join(dir, name)
-		data, err := os.ReadFile(p)
+		data, err := readSourceFile(p)
 		if err != nil {
 			continue // missing scriptlet is reported by a rule
 		}
@@ -578,6 +612,18 @@ func (p *Package) Expand(s string) string {
 	return s
 }
 
+// ValidInstallName reports whether an install= value names a plain file in
+// the package directory: not "." or "..", no path separator, and equal to its
+// own basename (which rules out parent traversal and absolute paths). It is
+// the loader's boundary — a hostile value cannot steer pkglint into reading a
+// file outside the package (traversal) or an unbounded device like /dev/zero
+// (DoS) — and the rule that reports a missing scriptlet applies the same test
+// so it never probes a path the loader would refuse.
+func ValidInstallName(name string) bool {
+	return name != "" && name != "." && name != ".." &&
+		name == filepath.Base(name) && !strings.ContainsAny(name, `/\`)
+}
+
 // installFiles returns the scriptlet filenames referenced by install= or
 // declared per split package, deduplicated.
 func (p *Package) installFiles() []string {
@@ -588,12 +634,7 @@ func (p *Package) installFiles() []string {
 		if name == "" || seen[name] {
 			return
 		}
-		// An install scriptlet must be a plain file in the package directory.
-		// Reject "."/".."; any path separator; and anything whose basename
-		// differs from itself (parent traversal, absolute paths) so a hostile
-		// install= value cannot steer pkglint into reading files outside the
-		// package (traversal) or an unbounded device like /dev/zero (DoS).
-		if name == "." || name == ".." || name != filepath.Base(name) || strings.ContainsAny(name, `/\`) {
+		if !ValidInstallName(name) {
 			return
 		}
 		seen[name] = true

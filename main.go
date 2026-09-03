@@ -670,13 +670,46 @@ func refuseInternalAddr(_, address string, _ syscall.RawConn) error {
 	return nil
 }
 
-// writeFixed writes data to path, preserving the file's existing permissions.
+// writeFixed replaces the file at path with data, preserving the file's
+// existing permissions. The bytes go to a temp file in the same directory
+// first and land by rename, so a crash or a full disk mid-write leaves the
+// PKGBUILD the user had rather than a truncated one. A symlinked PKGBUILD is
+// written through to its target, as the plain write did.
 func writeFixed(path string, data []byte) error {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
 	mode := os.FileMode(0o644)
 	if fi, err := os.Stat(path); err == nil {
 		mode = fi.Mode().Perm()
 	}
-	return os.WriteFile(path, data, mode)
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	fail := func(err error) error {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	// CreateTemp opens 0600 regardless of umask; the chmod is what carries
+	// the original mode across the rename.
+	if err := f.Chmod(mode); err != nil {
+		return fail(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		return fail(err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // rel shortens path relative to the working directory for display.

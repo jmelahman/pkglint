@@ -269,6 +269,54 @@ func TestFixWritesInPlace(t *testing.T) {
 	}
 }
 
+// TestWriteFixedLeavesNoTempAndKeepsMode pins that writeFixed lands by
+// rename: after a successful write the directory holds only the PKGBUILD
+// (no scratch file left behind), the new bytes are in place, and the file's
+// own mode survived the temp-file detour.
+func TestWriteFixedLeavesNoTempAndKeepsMode(t *testing.T) {
+	dir := writeFixture(t, "pkgname=old\n", 0o640)
+	path := filepath.Join(dir, "PKGBUILD")
+	if err := writeFixed(path, []byte("pkgname=new\n")); err != nil {
+		t.Fatalf("writeFixed: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "pkgname=new\n" {
+		t.Errorf("content after writeFixed = %q", got)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o640 {
+		t.Errorf("mode after writeFixed = %o, want 640 preserved", fi.Mode().Perm())
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "PKGBUILD" {
+		names := []string{}
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("directory after writeFixed holds %v, want only PKGBUILD", names)
+	}
+
+	// A write that cannot complete must not disturb the original. The
+	// parent of this path is a regular file, so the temp file cannot be
+	// created at all.
+	bad := filepath.Join(path, "PKGBUILD")
+	if err := writeFixed(bad, []byte("x")); err == nil {
+		t.Error("writeFixed under a regular file returned nil error")
+	}
+	if got, _ := os.ReadFile(path); string(got) != "pkgname=new\n" {
+		t.Errorf("failed write changed the original: %q", got)
+	}
+}
+
 func TestUnsafeFixEscalates(t *testing.T) {
 	dir := writeFixture(t, fixablePKGBUILD, 0o644)
 	var buf bytes.Buffer

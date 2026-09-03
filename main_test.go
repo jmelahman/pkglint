@@ -851,3 +851,60 @@ func TestRewriteModesRefusePackageArchives(t *testing.T) {
 		}
 	}
 }
+
+// TestNewLocalDBReportsUnreadableRoot pins the difference between a database
+// that is not there (most hosts; silent nil) and one that cannot be read
+// (a real problem; said once, then nil). The unreadable root is a regular
+// file, which os.ReadDir refuses on every platform without needing to drop
+// privileges.
+func TestNewLocalDBReportsUnreadableRoot(t *testing.T) {
+	t.Run("missing root is silent", func(t *testing.T) {
+		var warn bytes.Buffer
+		db := newLocalDB(filepath.Join(t.TempDir(), "absent"), &warn)
+		if db() != nil {
+			t.Error("missing root should yield a nil DB")
+		}
+		if warn.Len() != 0 {
+			t.Errorf("missing root should not warn, got: %q", warn.String())
+		}
+	})
+
+	t.Run("unreadable root warns once", func(t *testing.T) {
+		root := filepath.Join(t.TempDir(), "not-a-dir")
+		if err := os.WriteFile(root, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var warn bytes.Buffer
+		db := newLocalDB(root, &warn)
+		if db() != nil || db() != nil {
+			t.Error("unreadable root should yield a nil DB")
+		}
+		out := warn.String()
+		if !strings.HasPrefix(out, "pkglint: ") || !strings.Contains(out, "PB8xx") {
+			t.Errorf("warning should carry the pkglint prefix and name the disabled rules, got: %q", out)
+		}
+		if n := strings.Count(out, "\n"); n != 1 {
+			t.Errorf("warning should be printed once across two calls, got %d lines:\n%s", n, out)
+		}
+	})
+
+	t.Run("readable root loads", func(t *testing.T) {
+		root := t.TempDir()
+		dir := filepath.Join(root, "zlib-1.3-1")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		desc := "%NAME%\nzlib\n\n%VERSION%\n1.3-1\n\n%PROVIDES%\nlibz.so=1-64\n\n"
+		if err := os.WriteFile(filepath.Join(dir, "desc"), []byte(desc), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var warn bytes.Buffer
+		db := newLocalDB(root, &warn)
+		if db() == nil {
+			t.Fatal("readable root with one package should load")
+		}
+		if warn.Len() != 0 {
+			t.Errorf("successful load should not warn, got: %q", warn.String())
+		}
+	})
+}

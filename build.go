@@ -209,7 +209,7 @@ func runBuild(paths []string, ro reportOpts, bo buildOpts, stdout io.Writer) int
 		ignored: ignoreSet(ro.ignore),
 		gate:    refusalGate(ro.failOn),
 		bo:      bo,
-		localDB: newLocalDB(),
+		localDB: newLocalDB(alpmdb.DefaultRoot, os.Stderr),
 	}
 	// Resolved once: which runtime to use cannot differ between paths, and
 	// finding out costs a $PATH search apiece otherwise. The error is deferred

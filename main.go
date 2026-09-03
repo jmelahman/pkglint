@@ -187,7 +187,7 @@ func lint(paths []string, o reportOpts, noInline bool, stdout io.Writer) int {
 		paths = []string{"."}
 	}
 
-	localDB := newLocalDB()
+	localDB := newLocalDB(alpmdb.DefaultRoot, os.Stderr)
 
 	var reports []report.PackageReport
 	for _, path := range paths {
@@ -215,17 +215,25 @@ func lint(paths []string, o reportOpts, noInline bool, stdout io.Writer) int {
 	return renderReports(stdout, reports, o)
 }
 
-// newLocalDB defers loading the pacman local database until a rule that needs
-// it actually runs — it backs the dependency-inference rules, which only fire
-// over a built package archive. A missing database (a non-Arch host) yields
-// nil, which disables just those rules.
-func newLocalDB() func() *alpmdb.DB {
+// newLocalDB defers loading the pacman local database at root until a rule
+// that needs it actually runs — it backs the dependency-inference rules,
+// which only fire over a built package archive. A missing database (a
+// non-Arch host) yields nil, which disables just those rules, silently: that
+// is the expected state of most machines. A database that is there but
+// cannot be read is a different thing — the rules would be disabled on a
+// host where they should work — so that is said once, on warn, and the
+// rules are disabled visibly rather than quietly.
+func newLocalDB(root string, warn io.Writer) func() *alpmdb.DB {
 	var db *alpmdb.DB
 	loaded := false
 	return func() *alpmdb.DB {
 		if !loaded {
 			loaded = true
-			db, _ = alpmdb.Load(alpmdb.DefaultRoot)
+			var err error
+			db, err = alpmdb.Load(root)
+			if err != nil {
+				fmt.Fprintf(warn, "pkglint: %v; the dependency rules (PB8xx) are disabled\n", err)
+			}
 		}
 		return db
 	}

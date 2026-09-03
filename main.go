@@ -300,14 +300,83 @@ func colorEnabled(mode string, w io.Writer) (bool, error) {
 	}
 }
 
+// rewriteMode is one of the modes that rewrite a PKGBUILD on disk: --fix and
+// --add-ignores. Both load each path, run a transform, print every edit,
+// write the result unless --diff, and summarise per path. Only the transform
+// and the wording differ, and this keeps them from drifting apart.
+type rewriteMode struct {
+	// refuse is printed for a built package archive, which has no PKGBUILD
+	// to rewrite. It takes the display path.
+	refuse string
+	// transform computes the rewrites for one loaded package.
+	transform func(pkg *pkgbuild.Package) []rules.FixResult
+	// after runs once per path after the edits are printed and written and
+	// before the summary, with the loaded package and the number of edits
+	// applied; nil to skip. It is how --fix prints its manual nudges.
+	after func(path string, pkg *pkgbuild.Package, applied int)
+	// none, dryRun and applied are the per-path summaries. none takes the
+	// display path; dryRun and applied take the display path then the count.
+	none, dryRun, applied string
+}
+
+// run applies the mode to every path (the working directory when there are
+// none) and returns the exit code: 0, or 2 when a package failed to load or
+// a rewritten file could not be written.
+func (m rewriteMode) run(paths []string, diff bool, stdout io.Writer) int {
+	if len(paths) == 0 {
+		paths = []string{"."}
+	}
+	rc := 0
+	for _, path := range paths {
+		if pkgfile.IsPackagePath(path) {
+			fmt.Fprintf(stdout, m.refuse, rel(path))
+			continue
+		}
+		pkg, err := pkgbuild.Load(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pkglint: %s: %v\n", path, err)
+			rc = 2
+			continue
+		}
+		applied := 0
+		for _, r := range m.transform(pkg) {
+			if !r.Changed() {
+				continue
+			}
+			for _, e := range r.Applied {
+				applied++
+				fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", rel(e.Path), e.Line, e.RuleID, e.Desc)
+				if diff {
+					fmt.Fprint(stdout, editHunk(r.Original, e))
+				}
+			}
+			if !diff {
+				if err := writeFixed(r.Path, r.Fixed); err != nil {
+					fmt.Fprintf(os.Stderr, "pkglint: writing %s: %v\n", r.Path, err)
+					rc = 2
+				}
+			}
+		}
+		if m.after != nil {
+			m.after(path, pkg, applied)
+		}
+		switch {
+		case applied == 0:
+			fmt.Fprintf(stdout, m.none, rel(path))
+		case diff:
+			fmt.Fprintf(stdout, m.dryRun, rel(path), applied)
+		default:
+			fmt.Fprintf(stdout, m.applied, rel(path), applied)
+		}
+	}
+	return rc
+}
+
 // runFix applies auto-fixes at the given level, writing files in place (or,
 // with diff, printing the changes it would make). It also nudges toward the
 // manual follow-ups for findings that can't be rewritten mechanically.
 // noInline disregards inline-ignore directives, so suppressed fixes apply too.
 func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, offline, noInline bool, stdout io.Writer) int {
-	if len(paths) == 0 {
-		paths = []string{"."}
-	}
 	// LocalDigest is not gated on --offline: it only reads files that are
 	// already on disk, so there is no network access for --offline to skip.
 	env := &rules.FixEnv{LocalDigest: localDigest}
@@ -315,68 +384,38 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 		env.ResolveRef = resolveGitRef
 		env.ProbeHTTPS = probeHTTPS
 	}
-	rc := 0
-	for _, path := range paths {
-		if pkgfile.IsPackagePath(path) {
-			fmt.Fprintf(stdout, "%s: built packages have no auto-fixable findings; fix the PKGBUILD and rebuild\n", rel(path))
-			continue
-		}
-		pkg, err := pkgbuild.Load(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "pkglint: %s: %v\n", path, err)
-			rc = 2
-			continue
-		}
-		if noInline {
-			pkg.Suppressions = nil
-		}
-		applied := 0
-		for _, r := range rules.Fix(pkg, ignore, level, env) {
-			if !r.Changed() {
-				continue
+	return rewriteMode{
+		refuse: "%s: built packages have no auto-fixable findings; fix the PKGBUILD and rebuild\n",
+		transform: func(pkg *pkgbuild.Package) []rules.FixResult {
+			if noInline {
+				pkg.Suppressions = nil
 			}
-			for _, e := range r.Applied {
-				applied++
-				fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", rel(e.Path), e.Line, e.RuleID, e.Desc)
-				if diff {
-					fmt.Fprint(stdout, editHunk(r.Original, e))
+			return rules.Fix(pkg, ignore, level, env)
+		},
+		after: func(path string, pkg *pkgbuild.Package, applied int) {
+			// Nudge on what is *left*. Some fixes only sometimes apply — PB102's
+			// needs the sources on disk — so suggestions read from the pre-fix
+			// package would keep telling the user to run updpkgsums for a digest
+			// that has just been written. Re-reading what was actually saved is
+			// the only account of the remaining findings that cannot drift from
+			// the file; with --diff nothing was written, so the original stands.
+			residual := pkg
+			if !diff && applied > 0 {
+				if reloaded, err := pkgbuild.Load(path); err == nil {
+					if noInline {
+						reloaded.Suppressions = nil
+					}
+					residual = reloaded
 				}
 			}
-			if !diff {
-				if err := writeFixed(r.Path, r.Fixed); err != nil {
-					fmt.Fprintf(os.Stderr, "pkglint: writing %s: %v\n", r.Path, err)
-					rc = 2
-				}
+			for _, s := range manualSuggestions(residual, ignore) {
+				fmt.Fprintf(stdout, "%s: %s\n", rel(path), s)
 			}
-		}
-		// Nudge on what is *left*. Some fixes only sometimes apply — PB102's
-		// needs the sources on disk — so suggestions read from the pre-fix
-		// package would keep telling the user to run updpkgsums for a digest
-		// that has just been written. Re-reading what was actually saved is
-		// the only account of the remaining findings that cannot drift from
-		// the file; with --diff nothing was written, so the original stands.
-		residual := pkg
-		if !diff && applied > 0 {
-			if reloaded, err := pkgbuild.Load(path); err == nil {
-				if noInline {
-					reloaded.Suppressions = nil
-				}
-				residual = reloaded
-			}
-		}
-		for _, s := range manualSuggestions(residual, ignore) {
-			fmt.Fprintf(stdout, "%s: %s\n", rel(path), s)
-		}
-		switch {
-		case applied == 0:
-			fmt.Fprintf(stdout, "%s: no auto-fixable findings\n", rel(path))
-		case diff:
-			fmt.Fprintf(stdout, "%s: %d fix(es) would be applied (dry run)\n", rel(path), applied)
-		default:
-			fmt.Fprintf(stdout, "%s: applied %d fix(es)\n", rel(path), applied)
-		}
-	}
-	return rc
+		},
+		none:    "%s: no auto-fixable findings\n",
+		dryRun:  "%s: %d fix(es) would be applied (dry run)\n",
+		applied: "%s: applied %d fix(es)\n",
+	}.run(paths, diff, stdout)
 }
 
 // runAddIgnores inserts inline-ignore directives suppressing every finding the
@@ -384,50 +423,13 @@ func runFix(paths []string, ignore map[string]bool, level rules.FixLevel, diff, 
 // make). It is the reviewed-and-accepted counterpart to --fix: the findings
 // stay in the file as annotations instead of being repaired.
 func runAddIgnores(paths []string, ignore map[string]bool, diff bool, stdout io.Writer) int {
-	if len(paths) == 0 {
-		paths = []string{"."}
-	}
-	rc := 0
-	for _, path := range paths {
-		if pkgfile.IsPackagePath(path) {
-			fmt.Fprintf(stdout, "%s: built packages cannot carry ignore directives; annotate the PKGBUILD instead\n", rel(path))
-			continue
-		}
-		pkg, err := pkgbuild.Load(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "pkglint: %s: %v\n", path, err)
-			rc = 2
-			continue
-		}
-		applied := 0
-		for _, r := range rules.AddIgnores(pkg, ignore) {
-			if !r.Changed() {
-				continue
-			}
-			for _, e := range r.Applied {
-				applied++
-				fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", rel(e.Path), e.Line, e.RuleID, e.Desc)
-				if diff {
-					fmt.Fprint(stdout, editHunk(r.Original, e))
-				}
-			}
-			if !diff {
-				if err := writeFixed(r.Path, r.Fixed); err != nil {
-					fmt.Fprintf(os.Stderr, "pkglint: writing %s: %v\n", r.Path, err)
-					rc = 2
-				}
-			}
-		}
-		switch {
-		case applied == 0:
-			fmt.Fprintf(stdout, "%s: no findings to suppress\n", rel(path))
-		case diff:
-			fmt.Fprintf(stdout, "%s: %d ignore directive(s) would be added (dry run)\n", rel(path), applied)
-		default:
-			fmt.Fprintf(stdout, "%s: added %d ignore directive(s)\n", rel(path), applied)
-		}
-	}
-	return rc
+	return rewriteMode{
+		refuse:    "%s: built packages cannot carry ignore directives; annotate the PKGBUILD instead\n",
+		transform: func(pkg *pkgbuild.Package) []rules.FixResult { return rules.AddIgnores(pkg, ignore) },
+		none:      "%s: no findings to suppress\n",
+		dryRun:    "%s: %d ignore directive(s) would be added (dry run)\n",
+		applied:   "%s: added %d ignore directive(s)\n",
+	}.run(paths, diff, stdout)
 }
 
 // manualSuggestions returns one-line nudges for findings whose remediation is

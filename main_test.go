@@ -770,3 +770,36 @@ func TestRefuseInternalAddr(t *testing.T) {
 		}
 	}
 }
+
+// Both rewrite modes refuse a built package archive by name, before touching
+// the filesystem: there is no PKGBUILD in it to rewrite. The archive need not
+// exist — the refusal is on the path alone — and it is not an error.
+func TestRewriteModesRefusePackageArchives(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "demo-1.0.0-1-x86_64.pkg.tar.zst")
+	for _, tc := range []struct{ flag, want string }{
+		{"--fix", "built packages have no auto-fixable findings"},
+		{"--add-ignores", "built packages cannot carry ignore directives"},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			var buf bytes.Buffer
+			if code := run([]string{tc.flag, archive}, &buf); code != 0 {
+				t.Fatalf("%s on an archive path: got exit %d, want 0\n%s", tc.flag, code, buf.String())
+			}
+			if !strings.Contains(buf.String(), tc.want) {
+				t.Errorf("%s should refuse the archive, got:\n%s", tc.flag, buf.String())
+			}
+			if _, err := os.Stat(archive); !os.IsNotExist(err) {
+				t.Errorf("the refusal must not create the archive: %v", err)
+			}
+		})
+	}
+
+	// A missing path is an error in both modes, with the same exit code.
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	for _, flag := range []string{"--fix", "--add-ignores"} {
+		var buf bytes.Buffer
+		if code := run([]string{flag, missing}, &buf); code != 2 {
+			t.Errorf("%s on a missing path: got exit %d, want 2", flag, code)
+		}
+	}
+}

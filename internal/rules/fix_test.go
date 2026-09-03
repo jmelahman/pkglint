@@ -1223,6 +1223,57 @@ build() {
 	})
 }
 
+// The checker and the fixer of PB206–PB209 read one lockfileFlags table. For
+// every entry: each reported subcommand fires the finding, each satisfying
+// flag silences it, and each fixable subcommand is fixed to a command the
+// checker then accepts — so the two halves cannot drift apart.
+func TestLockfileFlagsCheckAndFixAgree(t *testing.T) {
+	for _, l := range lockfileFlags {
+		for _, name := range l.commands {
+			for _, sub := range l.subs {
+				cmd := strings.TrimSpace(name + " " + sub)
+				t.Run(cmd, func(t *testing.T) {
+					files := map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  "+cmd+"\n}")}
+					if n := ruleIDs(lint(t, files))[l.id]; n != 1 {
+						t.Fatalf("%s fired %d times for `%s`, want 1", l.id, n, cmd)
+					}
+					for _, f := range l.satisfied {
+						pinned := map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  "+cmd+" "+f+"\n}")}
+						if n := ruleIDs(lint(t, pinned))[l.id]; n != 0 {
+							t.Errorf("%s still fires for `%s %s`", l.id, cmd, f)
+						}
+					}
+					fixSubs := l.fixSubs
+					if fixSubs == nil {
+						fixSubs = l.subs
+					}
+					got := fixOnly(t, files, FixUnsafe, nil, l.id)
+					if !slices.Contains(fixSubs, sub) {
+						if len(got) != 0 {
+							t.Errorf("`%s` is not a fixable subcommand, got:\n%s", cmd, got["PKGBUILD"])
+						}
+						return
+					}
+					mustContain(t, got["PKGBUILD"], cmd+" "+l.flag)
+					if n := ruleIDs(lint(t, map[string]string{"PKGBUILD": got["PKGBUILD"]}))[l.id]; n != 0 {
+						t.Errorf("%s still fires after its own fix:\n%s", l.id, got["PKGBUILD"])
+					}
+				})
+			}
+		}
+	}
+
+	t.Run("a package argument keeps the finding and declines the fix", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  pnpm install left-pad\n}")}
+		if n := ruleIDs(lint(t, files))["PB206"]; n != 1 {
+			t.Fatalf("PB206 fired %d times, want 1", n)
+		}
+		if got := fixOnly(t, files, FixUnsafe, nil, "PB206"); len(got) != 0 {
+			t.Errorf("`pnpm install <pkg>` must not be frozen, got:\n%s", got["PKGBUILD"])
+		}
+	})
+}
+
 // PB208 covers two commands and only one of them is an edit. `gem install`
 // fetches from RubyGems with nothing pinning what it gets, and the remedy —
 // a committed Gemfile.lock, or local .gem files to install from — is not a

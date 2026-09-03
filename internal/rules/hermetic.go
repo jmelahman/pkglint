@@ -1,7 +1,9 @@
 package rules
 
 import (
+	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
@@ -94,7 +96,7 @@ var hermeticRules = []Rule{
 			"mean executing them, then run any needed build step explicitly.",
 		Check:    checkComposer,
 		FixLevel: FixUnsafe,
-		Fix:      fixComposer,
+		Fix:      lockfileFixer("PB207"),
 	},
 	{
 		ID:       "PB208",
@@ -106,7 +108,7 @@ var hermeticRules = []Rule{
 			"at all — it installs whatever RubyGems serves at build time.",
 		Check:    checkBundler,
 		FixLevel: FixUnsafe,
-		Fix:      fixBundler,
+		Fix:      lockfileFixer("PB208"),
 	},
 	{
 		ID:       "PB209",
@@ -118,7 +120,7 @@ var hermeticRules = []Rule{
 			"`poetry install` against the committed lock.",
 		Check:    checkUvPoetry,
 		FixLevel: FixUnsafe,
-		Fix:      fixUvFrozen,
+		Fix:      lockfileFixer("PB209"),
 	},
 }
 
@@ -500,6 +502,124 @@ func checkGoEnvWeakening(ctx *Context) []Finding {
 	return out
 }
 
+// lockfileFlag is one lockfile-enforcing flag as PB206–PB209 see it: the
+// commands that take it, which subcommands install from the lockfile, the
+// flags that already pin it, and the wording of the finding and the fix.
+// checkLockfileFlags and fixLockfileFlags read the same entry, so the checker
+// and the fixer cannot disagree about what counts as pinned.
+type lockfileFlag struct {
+	id       string
+	severity Severity
+	commands []string
+	// subs are the subcommands the checker reports; "" is the bare command.
+	subs []string
+	// fixSubs are the subcommands the fixer appends to. nil means the same
+	// as subs; a narrower list is a subcommand where a trailing flag would
+	// change the command's meaning or the fix is not wanted.
+	fixSubs []string
+	// satisfied lists the flags any one of which already pins the lockfile.
+	satisfied []string
+	flag      string
+	// unfixable, when set, declines the fix for an invocation the flag would
+	// change the meaning of; the finding stands.
+	unfixable func(Command) bool
+	// message and desc build the finding text and the fix description from
+	// the resolved command name and subcommand.
+	message func(name, sub string) string
+	desc    func(name, sub string) string
+}
+
+var lockfileFlags = []lockfileFlag{
+	{
+		id: "PB206", severity: Info,
+		commands: []string{"yarn"}, subs: []string{"install", ""},
+		satisfied: []string{"--immutable", "--frozen-lockfile"}, flag: "--immutable",
+		message: func(string, string) string {
+			return "yarn install without --immutable/--frozen-lockfile may rewrite the dependency tree"
+		},
+		desc: func(string, string) string { return "append --immutable to `yarn install`" },
+	},
+	{
+		id: "PB206", severity: Info,
+		commands: []string{"pnpm", "bun"}, subs: []string{"install", "i"},
+		satisfied: []string{"--frozen-lockfile", "--offline"}, flag: "--frozen-lockfile",
+		// With package args the command adds a dependency; freezing the
+		// lockfile is not equivalent.
+		unfixable: npmHasPackageArg,
+		message: func(name, sub string) string {
+			return fmt.Sprintf("%s %s without --frozen-lockfile may rewrite the dependency tree", name, sub)
+		},
+		desc: func(name, sub string) string {
+			return fmt.Sprintf("append --frozen-lockfile to `%s %s`", name, sub)
+		},
+	},
+	{
+		id: "PB207", severity: Warn,
+		commands: []string{"composer"}, subs: []string{"install"},
+		satisfied: []string{"--no-scripts"}, flag: "--no-scripts",
+		message: func(string, string) string {
+			return "composer install without --no-scripts executes hook scripts and plugins from the dependency tree"
+		},
+		desc: func(string, string) string { return "append --no-scripts to `composer install`" },
+	},
+	{
+		id: "PB208", severity: Info,
+		// Bare `bundle` runs install, so it is reported; the fix leaves it
+		// alone rather than turn `bundle` into `bundle --frozen`.
+		commands: []string{"bundle", "bundler"}, subs: []string{"install", ""}, fixSubs: []string{"install"},
+		satisfied: []string{"--frozen", "--deployment", "--local"}, flag: "--frozen",
+		message: func(string, string) string {
+			return "bundle install without --frozen may rewrite Gemfile.lock and fetch unreviewed versions"
+		},
+		desc: func(string, string) string { return "append --frozen to `bundle install`" },
+	},
+	{
+		id: "PB209", severity: Warn,
+		// Only `uv sync` is fixed: for `uv run` a trailing flag would land
+		// on the command being run, not on uv.
+		commands: []string{"uv"}, subs: []string{"sync", "run"}, fixSubs: []string{"sync"},
+		satisfied: []string{"--frozen", "--locked", "--offline", "--no-sync"}, flag: "--frozen",
+		message: func(_, sub string) string {
+			return fmt.Sprintf("uv %s without --frozen/--locked may re-resolve dependencies and rewrite uv.lock", sub)
+		},
+		desc: func(string, string) string { return "append --frozen to `uv sync`" },
+	},
+}
+
+// unpinned reports whether c is one of l's lockfile-installing subcommands
+// with none of the satisfying flags, and which subcommand it is.
+func (l lockfileFlag) unpinned(c Command) (sub string, ok bool) {
+	sub = c.Subcommand()
+	if !slices.Contains(l.subs, sub) {
+		return "", false
+	}
+	for _, f := range l.satisfied {
+		if c.HasArg(f) {
+			return "", false
+		}
+	}
+	return sub, true
+}
+
+// checkLockfileFlags reports every unpinned invocation of the lockfileFlags
+// entries registered under id.
+func checkLockfileFlags(ctx *Context, id string) []Finding {
+	var out []Finding
+	for _, l := range lockfileFlags {
+		if l.id != id {
+			continue
+		}
+		for _, c := range ctx.CommandsNamed(l.commands...) {
+			sub, ok := l.unpinned(c)
+			if !ok {
+				continue
+			}
+			out = append(out, c.finding(l.id, l.severity, "%s", l.message(c.Name, sub)))
+		}
+	}
+	return out
+}
+
 func checkNpmCI(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.CommandsNamed("npm") {
@@ -509,25 +629,7 @@ func checkNpmCI(ctx *Context) []Finding {
 				"npm %s may rewrite the dependency tree; prefer `npm ci` against the committed lockfile", sub))
 		}
 	}
-	for _, c := range ctx.CommandsNamed("yarn") {
-		if sub := c.Subcommand(); sub == "install" || sub == "" {
-			if !c.HasArg("--immutable") && !c.HasArg("--frozen-lockfile") {
-				out = append(out, c.finding("PB206", Info,
-					"yarn install without --immutable/--frozen-lockfile may rewrite the dependency tree"))
-			}
-		}
-	}
-	for _, name := range []string{"pnpm", "bun"} {
-		for _, c := range ctx.CommandsNamed(name) {
-			if sub := c.Subcommand(); sub == "install" || sub == "i" {
-				if !c.HasArg("--frozen-lockfile") && !c.HasArg("--offline") {
-					out = append(out, c.finding("PB206", Info,
-						"%s %s without --frozen-lockfile may rewrite the dependency tree", name, sub))
-				}
-			}
-		}
-	}
-	return out
+	return append(out, checkLockfileFlags(ctx, "PB206")...)
 }
 
 func checkComposer(ctx *Context) []Finding {
@@ -537,29 +639,13 @@ func checkComposer(ctx *Context) []Finding {
 		case "update", "upgrade":
 			out = append(out, c.finding("PB207", Warn,
 				"composer %s re-resolves dependencies away from the committed composer.lock; use `composer install`", sub))
-		case "install":
-			if !c.HasArg("--no-scripts") {
-				out = append(out, c.finding("PB207", Warn,
-					"composer install without --no-scripts executes hook scripts and plugins from the dependency tree"))
-			}
 		}
 	}
-	return out
+	return append(out, checkLockfileFlags(ctx, "PB207")...)
 }
 
 func checkBundler(ctx *Context) []Finding {
 	var out []Finding
-	for _, c := range ctx.CommandsNamed("bundle", "bundler") {
-		sub := c.Subcommand()
-		if sub != "install" && sub != "" { // bare `bundle` runs install
-			continue
-		}
-		if c.HasArg("--frozen") || c.HasArg("--deployment") || c.HasArg("--local") {
-			continue
-		}
-		out = append(out, c.finding("PB208", Info,
-			"bundle install without --frozen may rewrite Gemfile.lock and fetch unreviewed versions"))
-	}
 	for _, c := range ctx.CommandsNamed("gem") {
 		if !gemInstallFetches(c) {
 			continue
@@ -567,22 +653,11 @@ func checkBundler(ctx *Context) []Finding {
 		out = append(out, c.finding("PB208", Warn,
 			"gem install fetches from RubyGems with no lockfile or checksum pinning; install local .gem files (--local) or use bundler against a committed Gemfile.lock"))
 	}
-	return out
+	return append(out, checkLockfileFlags(ctx, "PB208")...)
 }
 
 func checkUvPoetry(ctx *Context) []Finding {
 	var out []Finding
-	for _, c := range ctx.CommandsNamed("uv") {
-		sub := c.Subcommand()
-		if sub != "sync" && sub != "run" {
-			continue
-		}
-		if c.HasArg("--frozen") || c.HasArg("--locked") || c.HasArg("--offline") || c.HasArg("--no-sync") {
-			continue
-		}
-		out = append(out, c.finding("PB209", Warn,
-			"uv %s without --frozen/--locked may re-resolve dependencies and rewrite uv.lock", sub))
-	}
 	for _, c := range ctx.CommandsNamed("poetry") {
 		sub := c.Subcommand()
 		if sub != "update" && sub != "add" {
@@ -591,5 +666,5 @@ func checkUvPoetry(ctx *Context) []Finding {
 		out = append(out, c.finding("PB209", Warn,
 			"poetry %s re-resolves dependencies away from the committed poetry.lock; use `poetry install`", sub))
 	}
-	return out
+	return append(out, checkLockfileFlags(ctx, "PB209")...)
 }

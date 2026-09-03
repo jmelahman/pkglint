@@ -390,6 +390,46 @@ func hiddenFlagWords(c Command) bool {
 	return false
 }
 
+// fixLockfileFlags appends the lockfile flag to every unpinned invocation of
+// the lockfileFlags entries registered under id, declining where the flag
+// could already be hiding in a variable, where it would change the command's
+// meaning, or where there is no place in the text to put it.
+func fixLockfileFlags(ctx *Context, id string) []Edit {
+	var edits []Edit
+	for _, l := range lockfileFlags {
+		if l.id != id {
+			continue
+		}
+		fixSubs := l.fixSubs
+		if fixSubs == nil {
+			fixSubs = l.subs
+		}
+		for _, c := range ctx.CommandsNamed(l.commands...) {
+			sub, ok := l.unpinned(c)
+			if !ok || !slices.Contains(fixSubs, sub) {
+				continue
+			}
+			if l.unfixable != nil && l.unfixable(c) {
+				continue
+			}
+			if hiddenFlagWords(c) {
+				continue
+			}
+			edit, ok := appendFlagEdit(c, l.flag, l.desc(c.Name, sub))
+			if !ok {
+				continue
+			}
+			edits = append(edits, edit)
+		}
+	}
+	return edits
+}
+
+// lockfileFixer is the Fixer for a rule whose only fix is fixLockfileFlags.
+func lockfileFixer(id string) Fixer {
+	return func(ctx *Context, _ *FixEnv) []Edit { return fixLockfileFlags(ctx, id) }
+}
+
 // replaceWordTailEdit rewrites the trailing occurrence of old inside a word,
 // leaving the rest of the word — a `-D` prefix, a `:STRING` type, the quotes
 // around the whole thing — exactly as written. It reports false when old is
@@ -1821,113 +1861,7 @@ func fixNpmCI(ctx *Context, _ *FixEnv) []Edit {
 			Desc:  fmt.Sprintf("replace `npm %s` with `npm ci` (installs exactly the committed lockfile)", sub),
 		})
 	}
-	for _, c := range ctx.CommandsNamed("yarn") {
-		if sub := c.Subcommand(); sub != "install" && sub != "" {
-			continue
-		}
-		if c.HasArg("--immutable") || c.HasArg("--frozen-lockfile") {
-			continue
-		}
-		if hiddenFlagWords(c) {
-			continue
-		}
-		edit, ok := appendFlagEdit(c, "--immutable", "append --immutable to `yarn install`")
-		if !ok {
-			continue
-		}
-		edits = append(edits, edit)
-	}
-	for _, name := range []string{"pnpm", "bun"} {
-		for _, c := range ctx.CommandsNamed(name) {
-			sub := c.Subcommand()
-			if sub != "install" && sub != "i" {
-				continue
-			}
-			// With package args the command adds a dependency; freezing the
-			// lockfile is not equivalent.
-			if c.HasArg("--frozen-lockfile") || c.HasArg("--offline") || npmHasPackageArg(c) {
-				continue
-			}
-			if hiddenFlagWords(c) {
-				continue
-			}
-			edit, ok := appendFlagEdit(c, "--frozen-lockfile",
-				fmt.Sprintf("append --frozen-lockfile to `%s %s`", name, sub))
-			if !ok {
-				continue
-			}
-			edits = append(edits, edit)
-		}
-	}
-	return edits
-}
-
-// --- PB207: composer without --no-scripts ----------------------------------
-
-func fixComposer(ctx *Context, _ *FixEnv) []Edit {
-	var edits []Edit
-	for _, c := range ctx.CommandsNamed("composer") {
-		if c.Subcommand() != "install" || c.HasArg("--no-scripts") {
-			continue
-		}
-		if hiddenFlagWords(c) {
-			continue
-		}
-		edit, ok := appendFlagEdit(c, "--no-scripts", "append --no-scripts to `composer install`")
-		if !ok {
-			continue
-		}
-		edits = append(edits, edit)
-	}
-	return edits
-}
-
-// --- PB208: bundle install without --frozen --------------------------------
-
-func fixBundler(ctx *Context, _ *FixEnv) []Edit {
-	var edits []Edit
-	for _, c := range ctx.CommandsNamed("bundle", "bundler") {
-		if c.Subcommand() != "install" { // leave bare `bundle` alone
-			continue
-		}
-		if c.HasArg("--frozen") || c.HasArg("--deployment") || c.HasArg("--local") {
-			continue
-		}
-		if hiddenFlagWords(c) {
-			continue
-		}
-		edit, ok := appendFlagEdit(c, "--frozen", "append --frozen to `bundle install`")
-		if !ok {
-			continue
-		}
-		edits = append(edits, edit)
-	}
-	return edits
-}
-
-// --- PB209: uv sync without --frozen ----------------------------------------
-
-func fixUvFrozen(ctx *Context, _ *FixEnv) []Edit {
-	var edits []Edit
-	for _, c := range ctx.CommandsNamed("uv") {
-		// Only `uv sync`: for `uv run` a trailing flag would land on the
-		// command being run, not on uv.
-		if c.Subcommand() != "sync" {
-			continue
-		}
-		if c.HasArg("--frozen") || c.HasArg("--locked") || c.HasArg("--offline") || c.HasArg("--no-sync") {
-			continue
-		}
-		if hiddenFlagWords(c) {
-			continue
-		}
-		edit, ok := appendFlagEdit(c, "--frozen", "append --frozen to `uv sync`")
-		if !ok {
-			continue
-		}
-		edits = append(edits, edit)
-	}
-	return edits
+	return append(edits, fixLockfileFlags(ctx, "PB206")...)
 }
 
 func npmHasPackageArg(c Command) bool {

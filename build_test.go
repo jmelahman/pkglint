@@ -545,6 +545,25 @@ func TestBuildIgnoresInlineSuppressions(t *testing.T) {
 	}
 }
 
+// TestBuildReportsStaleIgnores is the other half of the previous test: the
+// gate disregards the file's directives, but the report must not be a filtered
+// copy of that unsuppressed run. PB913 (stale ignore directive) exists only
+// when directives are honoured, so a filter could never surface it and
+// `pkglint build` would silently switch off the one rule that audits the
+// suppression trail.
+func TestBuildReportsStaleIgnores(t *testing.T) {
+	stubExec(t, []string{"makepkg"}, dropArchive("suppressed-1.0.0-1-x86_64.pkg.tar"))
+	var buf bytes.Buffer
+	run([]string{"build", "--fail-on=never", "testdata/suppressed"}, &buf)
+	if !strings.Contains(buf.String(), "PB913") {
+		t.Errorf("the stale `ignore=PB203` directive went unreported:\n%s", buf.String())
+	}
+	// The honoured directive still suppresses its finding on this path.
+	if strings.Contains(buf.String(), "PB204") {
+		t.Errorf("the report should still respect the file's directives, got:\n%s", buf.String())
+	}
+}
+
 // TestBuildRefusesUnbuiltFile covers the other way to gate one file and run
 // another: makepkg builds ./PKGBUILD in its working directory, so a file
 // argument that is not a PKGBUILD would be linted and then ignored.

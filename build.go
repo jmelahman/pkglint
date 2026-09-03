@@ -25,7 +25,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -289,12 +288,11 @@ func (b *builder) build(ctx context.Context, path string) []report.PackageReport
 	pkg.Suppressions = nil
 	gating := rules.Run(pkg, b.ignored)
 	pkg.Suppressions = suppressions
-	shown := gating
-	if len(suppressions) > 0 {
-		shown = slices.DeleteFunc(slices.Clone(gating), func(f rules.Finding) bool {
-			return pkg.Suppressed(f.RuleID, f.Path, f.Line)
-		})
-	}
+	// A second pass, not a filter of the first: PB913 (stale ignore) only
+	// exists when directives are honoured, so filtering the unsuppressed set
+	// would never show it. Run is deterministic, so every other finding is the
+	// same one the gate saw, minus what the directives waive.
+	shown := rules.Run(pkg, b.ignored)
 	out := []report.PackageReport{report.New(path, shown)}
 
 	if blocked, worst := blocking(gating, b.gate); blocked > 0 && !b.bo.force {

@@ -116,6 +116,13 @@ func Read(r io.Reader, name string) (*Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
+	// The zstd decoder holds its block buffers until Close; the walk below
+	// is the whole life of this reader, so release them on the way out.
+	// gzip's Close is a no-op on the source and harmless; the rest are not
+	// closers.
+	if c, ok := dec.(io.Closer); ok {
+		defer c.Close()
+	}
 
 	pkg := &Package{Path: name, names: map[string]int{}}
 	tr := tar.NewReader(dec)

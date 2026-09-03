@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jmelahman/pkglint/internal/pkgfile/pkgtest"
+	"github.com/klauspost/compress/zstd"
 )
 
 func read(t *testing.T, data []byte) *Package {
@@ -36,6 +37,29 @@ func TestReadParsesPkgInfo(t *testing.T) {
 	}
 	if pkg.Info.IsDebug() {
 		t.Error("regular package classified as debug")
+	}
+}
+
+// TestReadZstdArchive pins the format pacman actually ships: the archive is
+// compressed with zstd, read through the concurrency-1 decoder, and parsed
+// like a plain tar. The fuzz seeds cover this path too, but a named test is
+// what a reviewer looks for.
+func TestReadZstdArchive(t *testing.T) {
+	plain := pkgtest.Tar(pkgtest.Info("demo", "x86_64", "depend = zlib"))
+	var zst bytes.Buffer
+	zw, err := zstd.NewWriter(&zst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zw.Write(plain); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	pkg := read(t, zst.Bytes())
+	if pkg.Info.Name != "demo" || len(pkg.Info.Depends) != 1 {
+		t.Errorf("zstd archive parsed wrong: %+v", pkg.Info)
 	}
 }
 

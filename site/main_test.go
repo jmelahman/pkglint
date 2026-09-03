@@ -262,6 +262,17 @@ func TestScanAllRescansOnRuleChange(t *testing.T) {
 // budget must not be fetched, must keep their last known grade if they have
 // one, and must keep their old LastModified so a later run picks them up.
 func TestScanAllBudget(t *testing.T) {
+	// The one fetch the budget allows is served here, not by the AUR: a 404
+	// so get returns without retrying, and a counter so the budget's "one"
+	// is an observed number rather than an inference.
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	defer restoreSnapshotURL(t, srv.URL+"/%s.tar.gz")()
+
 	seed := []metaPackage{
 		{PackageBase: "unchanged", NumVotes: 30, LastModified: 1000},
 		{PackageBase: "known", NumVotes: 20, LastModified: 2000},
@@ -277,7 +288,7 @@ func TestScanAllBudget(t *testing.T) {
 	// One fetch allowed against two candidates. "unchanged" is not a candidate
 	// at all — it is reused — so the slot goes to "known", the more-voted of
 	// the two, and "new" waits for a later run.
-	results, next := scanAll(seed, filepath.Join(t.TempDir(), "absent"), 1, 1, prev, time.Time{}, nil)
+	results, next := scanAll(seed, t.TempDir(), 1, 1, prev, time.Time{}, nil)
 	got := map[string]string{}
 	for _, r := range results {
 		got[r.Name] = r.Grade
@@ -285,8 +296,8 @@ func TestScanAllBudget(t *testing.T) {
 	if got["unchanged"] != "A" {
 		t.Errorf("unchanged base was not reused: %v", got)
 	}
-	// "known" was the one scan the budget allowed; the fetch fails against an
-	// absent cache, which is the recorded outcome.
+	// "known" was the one scan the budget allowed; the fetch 404s, which is
+	// the recorded outcome.
 	if _, ok := got["known"]; !ok {
 		t.Errorf("budgeted base was dropped: %v", got)
 	}
@@ -297,6 +308,9 @@ func TestScanAllBudget(t *testing.T) {
 	// failure as this snapshot's answer and never retry it.
 	if next["known"].LastModified != 1 {
 		t.Errorf("failed scan overwrote the record: %+v", next["known"])
+	}
+	if n := hits.Load(); n != 1 {
+		t.Errorf("budget of one allowed %d fetches, want exactly 1", n)
 	}
 }
 

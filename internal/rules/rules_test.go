@@ -437,6 +437,31 @@ sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`
 	t.Run("PB107 missing install script", func(t *testing.T) {
 		expectRule(t, "PB107", map[string]string{"PKGBUILD": pkgbuildWith("", `install=demo.install`)})
 	})
+	// A name with a separator must be reported without ever stat-ing the path
+	// it points at: the joined path would leave the package directory, and the
+	// finding is republished, so a bare stat is an existence oracle.
+	t.Run("PB107 traversal name", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `install=../evil.install`)}
+		expectRule(t, "PB107", files)
+		var msg string
+		for _, f := range lint(t, files) {
+			if f.RuleID == "PB107" {
+				msg = f.Message
+			}
+		}
+		if !strings.Contains(msg, "plain file name") {
+			t.Errorf("PB107 message = %q, want one mentioning \"plain file name\"", msg)
+		}
+	})
+	t.Run("PB107 absolute path to an existing host file", func(t *testing.T) {
+		expectRule(t, "PB107", map[string]string{"PKGBUILD": pkgbuildWith("", `install=/etc/passwd`)})
+	})
+	t.Run("PB107 present scriptlet stays silent", func(t *testing.T) {
+		expectNoRule(t, "PB107", map[string]string{
+			"PKGBUILD":     pkgbuildWith("", `install=demo.install`),
+			"demo.install": "post_install() {\n  :\n}\n",
+		})
+	})
 	t.Run("PB108 command-executing makepkg.conf override", func(t *testing.T) {
 		expectRule(t, "PB108", map[string]string{"PKGBUILD": pkgbuildWith("",
 			`VCSCLIENTS=('git::/tmp/evil-git')`)})

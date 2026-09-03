@@ -748,6 +748,14 @@ func checkMissingInstall(ctx *Context) []Finding {
 		if name == "" || strings.ContainsAny(name, "$\x00") {
 			continue
 		}
+		// Only ever stat a name the loader itself would read, so the joined
+		// path cannot escape ctx.Pkg.Dir and the report cannot become an
+		// existence oracle for arbitrary host paths.
+		if !pkgbuild.ValidInstallName(name) {
+			out = append(out, findingAt("PB107", Warn, ctx.Pkg.PKGBUILD.Path, v.Pos,
+				"install scriptlet %q must be a plain file name next to the PKGBUILD (no path separators)", name))
+			continue
+		}
 		if _, err := os.Stat(filepath.Join(ctx.Pkg.Dir, name)); err != nil {
 			out = append(out, findingAt("PB107", Warn, ctx.Pkg.PKGBUILD.Path, v.Pos,
 				"install scriptlet %q referenced but not found next to the PKGBUILD", name))

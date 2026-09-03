@@ -434,6 +434,13 @@ func restoreEmptyBodyBackoff(t *testing.T, backoff []time.Duration) func() {
 	return func() { emptyBodyBackoff = prev }
 }
 
+func restoreGetBackoff(t *testing.T, backoff []time.Duration) func() {
+	t.Helper()
+	prev := getBackoff
+	getBackoff = backoff
+	return func() { getBackoff = prev }
+}
+
 func restoreSnapshotURL(t *testing.T, url string) func() {
 	t.Helper()
 	prev := snapshotURL
@@ -857,4 +864,33 @@ func TestScanAllKeepsPriorGradeOnFetchFailure(t *testing.T) {
 			t.Errorf("a base with nothing to fall back on must show the failure: %+v", results[0])
 		}
 	})
+}
+
+// TestGetRetriesTransientStatus pins that a 5xx is a hiccup, not a verdict:
+// cgit builds snapshots on request and sheds load under a nightly sweep, so a
+// run that gave up on the first 503 would blank grades for no reason.
+func TestGetRetriesTransientStatus(t *testing.T) {
+	defer restoreGetBackoff(t, []time.Duration{0, 0, 0, 0})()
+
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte("body"))
+	}))
+	defer srv.Close()
+
+	resp, err := get(srv.URL)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %s, want 200", resp.Status)
+	}
+	if n := hits.Load(); n != 3 {
+		t.Errorf("server saw %d requests, want 3", n)
+	}
 }

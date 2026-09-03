@@ -459,9 +459,11 @@ func renderTo(tmpl *template.Template, name, path string, data any) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	if err := tmpl.ExecuteTemplate(f, name, data); err != nil {
+		f.Close()
 		return fmt.Errorf("render %s: %w", name, err)
 	}
-	return nil
+	// Closed explicitly, not deferred: a write that fails at flush time would
+	// otherwise publish a truncated page as a success.
+	return f.Close()
 }

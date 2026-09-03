@@ -45,10 +45,15 @@ func writeRoster(out string, results []siteResult) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	// Compact, unindented: this file is read by a program, and indenting it
 	// would add a megabyte of whitespace to every visitor's download.
-	return json.NewEncoder(f).Encode(rows)
+	if err := json.NewEncoder(f).Encode(rows); err != nil {
+		f.Close()
+		return err
+	}
+	// Closed explicitly, not deferred: a write that fails at flush time would
+	// otherwise publish a truncated roster as a success.
+	return f.Close()
 }
 
 // shardKey buckets a package by its first character: a single letter, or
@@ -210,9 +215,15 @@ func writeXML(path string, body func(io.Writer) error) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	if _, err := fmt.Fprint(f, xml.Header); err != nil {
+		f.Close()
 		return err
 	}
-	return body(f)
+	if err := body(f); err != nil {
+		f.Close()
+		return err
+	}
+	// Closed explicitly, not deferred: a write that fails at flush time would
+	// otherwise publish a truncated document as a success.
+	return f.Close()
 }

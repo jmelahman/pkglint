@@ -730,11 +730,14 @@ func downloadOnce(url, path string) error {
 	return os.Rename(tmp, path)
 }
 
+// getBackoff paces get's retries of 429s, 5xxs and transport errors. A var so
+// tests need not sleep.
+var getBackoff = []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second}
+
 // get issues a throttled GET, retrying transient failures (429s and
 // transport hiccups) with growing backoff and honoring Retry-After.
 func get(url string) (*http.Response, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	backoff := []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second}
 	var lastErr error
 	for attempt := 0; ; attempt++ {
 		<-throttle.C
@@ -751,7 +754,7 @@ func get(url string) (*http.Response, error) {
 			return resp, nil
 		case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500:
 			lastErr = fmt.Errorf("GET %s: %s", url, resp.Status)
-			if wait, err := time.ParseDuration(resp.Header.Get("Retry-After") + "s"); err == nil && attempt < len(backoff) {
+			if wait, err := time.ParseDuration(resp.Header.Get("Retry-After") + "s"); err == nil && attempt < len(getBackoff) {
 				resp.Body.Close()
 				// Honor Retry-After, but bounded: an outlandish value would
 				// otherwise park a fetch worker — and its concurrency slot —
@@ -768,11 +771,11 @@ func get(url string) (*http.Response, error) {
 			resp.Body.Close()
 			return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
 		}
-		if attempt >= len(backoff) {
+		if attempt >= len(getBackoff) {
 			return nil, lastErr
 		}
-		log.Printf("%v; retrying in %s", lastErr, backoff[attempt])
-		time.Sleep(backoff[attempt])
+		log.Printf("%v; retrying in %s", lastErr, getBackoff[attempt])
+		time.Sleep(getBackoff[attempt])
 	}
 }
 
@@ -781,10 +784,15 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		f.Close()
+		return err
+	}
+	// Closed explicitly, not deferred: a write that fails at flush time would
+	// otherwise publish truncated JSON as a success.
+	return f.Close()
 }
 
 // badgeSVG renders a flat badge for a grade, in the site's grade ramp so a

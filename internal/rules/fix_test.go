@@ -1163,6 +1163,66 @@ build() {
 	mustContain(t, got, "uv sync --frozen")
 }
 
+// The lockfile fixers append their flag through appendFlagEdit and decline on
+// hiddenFlagWords, the same primitives the cmake/meson fixers use. These pin
+// what that shares: nothing is written into a command whose flags pkglint
+// cannot read, nothing lands past a `--`, and a word that merely *contains* an
+// expansion is still fixed.
+func TestFixLockfileManagersShareFlagPlacement(t *testing.T) {
+	lockfileIDs := []string{"PB206", "PB207", "PB208", "PB209"}
+
+	t.Run("hidden flags decline", func(t *testing.T) {
+		body := `
+_bundle_flags='--frozen'
+build() {
+  bundle install $_bundle_flags
+  composer install "$_composer_flags"
+  uv sync $_uv
+  yarn install $_yarn
+  pnpm install $_pnpm
+}`
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		// The checkers are untouched: `bundle install $_bundle_flags` reads
+		// its --frozen through the variable, so PB208 never fired here.
+		if n := ruleIDs(lint(t, files))["PB208"]; n != 0 {
+			t.Errorf("PB208 fired %d times, want 0 (the checker must not change)", n)
+		}
+		if got := fixOnly(t, files, FixUnsafe, nil, lockfileIDs...); len(got) != 0 {
+			t.Errorf("a flag may not be inserted beside one pkglint cannot read, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	t.Run("flag lands before a literal separator", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+build() {
+  composer install -- extra
+}`, FixUnsafe, nil)
+		mustContain(t, got, "composer install --no-scripts -- extra")
+	})
+
+	t.Run("a separator behind an expansion declines", func(t *testing.T) {
+		// Declined by hiddenFlagWords, since `$_rest` is a bare reference to
+		// a value pkglint cannot read — which is the outcome the separator
+		// check wants too: no text is written past a `--` it cannot point at.
+		body := `
+build() {
+  composer install $_rest
+}`
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
+		if got := fixOnly(t, files, FixUnsafe, nil, lockfileIDs...); len(got) != 0 {
+			t.Errorf("nothing may be written past a separator pkglint cannot point at, got:\n%s", got["PKGBUILD"])
+		}
+	})
+
+	t.Run("value expansions are still fixed", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+build() {
+  uv sync --project "$srcdir/app"
+}`, FixUnsafe, nil)
+		mustContain(t, got, `uv sync --project "$srcdir/app" --frozen`)
+	})
+}
+
 // PB208 covers two commands and only one of them is an edit. `gem install`
 // fetches from RubyGems with nothing pinning what it gets, and the remedy —
 // a committed Gemfile.lock, or local .gem files to install from — is not a

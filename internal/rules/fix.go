@@ -1361,22 +1361,19 @@ func sumsArrayText(name string, vals []string) string {
 func fixCargoLocked(ctx *Context, _ *FixEnv) []Edit {
 	var edits []Edit
 	for _, c := range cargoUnlockedCommands(ctx) {
-		at, text := off(c.Call.End()), " --locked"
-		if cargoHasSeparator(c) {
-			sep := wordByValue(c, "--")
-			if sep == nil {
-				continue // written as an expansion: the finding stands
-			}
-			at, text = off(sep.Pos()), "--locked "
+		// cargoHasSeparator sees a `--` that arrives through a variable;
+		// appendFlagAt only sees one written out. A separator with no word
+		// spelling it has nowhere in the text to write in front of, so the
+		// finding stands.
+		if cargoHasSeparator(c) && wordByValue(c, "--") == nil {
+			continue
 		}
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   text,
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  fmt.Sprintf("add --locked to `cargo %s`", c.Subcommand()),
-		})
+		edit, ok := appendFlagEdit(c, "--locked",
+			fmt.Sprintf("add --locked to `cargo %s`", c.Subcommand()))
+		if !ok {
+			continue
+		}
+		edits = append(edits, edit)
 	}
 	return edits
 }
@@ -1831,15 +1828,14 @@ func fixNpmCI(ctx *Context, _ *FixEnv) []Edit {
 		if c.HasArg("--immutable") || c.HasArg("--frozen-lockfile") {
 			continue
 		}
-		at := off(c.Call.End())
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   " --immutable",
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  "append --immutable to `yarn install`",
-		})
+		if hiddenFlagWords(c) {
+			continue
+		}
+		edit, ok := appendFlagEdit(c, "--immutable", "append --immutable to `yarn install`")
+		if !ok {
+			continue
+		}
+		edits = append(edits, edit)
 	}
 	for _, name := range []string{"pnpm", "bun"} {
 		for _, c := range ctx.CommandsNamed(name) {
@@ -1852,15 +1848,15 @@ func fixNpmCI(ctx *Context, _ *FixEnv) []Edit {
 			if c.HasArg("--frozen-lockfile") || c.HasArg("--offline") || npmHasPackageArg(c) {
 				continue
 			}
-			at := off(c.Call.End())
-			edits = append(edits, Edit{
-				Path:  c.Unit.Path,
-				Start: at,
-				End:   at,
-				New:   " --frozen-lockfile",
-				Line:  int(c.Stmt.Pos().Line()),
-				Desc:  fmt.Sprintf("append --frozen-lockfile to `%s %s`", name, sub),
-			})
+			if hiddenFlagWords(c) {
+				continue
+			}
+			edit, ok := appendFlagEdit(c, "--frozen-lockfile",
+				fmt.Sprintf("append --frozen-lockfile to `%s %s`", name, sub))
+			if !ok {
+				continue
+			}
+			edits = append(edits, edit)
 		}
 	}
 	return edits
@@ -1874,15 +1870,14 @@ func fixComposer(ctx *Context, _ *FixEnv) []Edit {
 		if c.Subcommand() != "install" || c.HasArg("--no-scripts") {
 			continue
 		}
-		at := off(c.Call.End())
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   " --no-scripts",
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  "append --no-scripts to `composer install`",
-		})
+		if hiddenFlagWords(c) {
+			continue
+		}
+		edit, ok := appendFlagEdit(c, "--no-scripts", "append --no-scripts to `composer install`")
+		if !ok {
+			continue
+		}
+		edits = append(edits, edit)
 	}
 	return edits
 }
@@ -1898,15 +1893,14 @@ func fixBundler(ctx *Context, _ *FixEnv) []Edit {
 		if c.HasArg("--frozen") || c.HasArg("--deployment") || c.HasArg("--local") {
 			continue
 		}
-		at := off(c.Call.End())
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   " --frozen",
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  "append --frozen to `bundle install`",
-		})
+		if hiddenFlagWords(c) {
+			continue
+		}
+		edit, ok := appendFlagEdit(c, "--frozen", "append --frozen to `bundle install`")
+		if !ok {
+			continue
+		}
+		edits = append(edits, edit)
 	}
 	return edits
 }
@@ -1924,15 +1918,14 @@ func fixUvFrozen(ctx *Context, _ *FixEnv) []Edit {
 		if c.HasArg("--frozen") || c.HasArg("--locked") || c.HasArg("--offline") || c.HasArg("--no-sync") {
 			continue
 		}
-		at := off(c.Call.End())
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   " --frozen",
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  "append --frozen to `uv sync`",
-		})
+		if hiddenFlagWords(c) {
+			continue
+		}
+		edit, ok := appendFlagEdit(c, "--frozen", "append --frozen to `uv sync`")
+		if !ok {
+			continue
+		}
+		edits = append(edits, edit)
 	}
 	return edits
 }

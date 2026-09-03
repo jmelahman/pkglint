@@ -331,11 +331,14 @@ func wordByValue(c Command, val string) *syntax.Word {
 // handed to the wrong process; it goes in front of the separator instead. A
 // separator that arrived through an expansion has no place in the text to
 // insert before, and the caller then emits nothing so the finding stands.
+// That holds for a variable pkglint can read as much as one it cannot: an
+// argument's rendered value is split into the words bash would make of it,
+// the way cargoWords does, so `_rest='-- extra'` is a separator too.
 //
 // Generalized from fixCargoLocked, which asks exactly this question of cargo.
 func appendFlagAt(c Command) (at int, beforeSep bool, ok bool) {
 	for _, a := range c.Args {
-		if a != "--" {
+		if !slices.Contains(strings.Fields(a), "--") {
 			continue
 		}
 		w := wordByValue(c, "--")

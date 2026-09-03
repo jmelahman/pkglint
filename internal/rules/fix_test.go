@@ -1214,6 +1214,29 @@ build() {
 		}
 	})
 
+	t.Run("a separator inside a resolved variable declines", func(t *testing.T) {
+		// `$_rest` resolves, so hiddenFlagWords passes it; the separator
+		// check is what must catch the `--` inside the value. cmake goes
+		// through the same primitive, so it is pinned alongside.
+		got := fixPKGBUILD(t, `
+_rest='-- extra'
+build() {
+  composer install $_rest
+  cmake -B build $_rest
+}`, FixUnsafe, nil)
+		mustNotContain(t, got, "--no-scripts")
+		mustNotContain(t, got, "-DCMAKE_INSTALL_PREFIX")
+	})
+
+	t.Run("a resolved variable without a separator is still fixed", func(t *testing.T) {
+		got := fixPKGBUILD(t, `
+_flags='--prefer-dist'
+build() {
+  composer install $_flags
+}`, FixUnsafe, nil)
+		mustContain(t, got, "composer install $_flags --no-scripts")
+	})
+
 	t.Run("value expansions are still fixed", func(t *testing.T) {
 		got := fixPKGBUILD(t, `
 build() {

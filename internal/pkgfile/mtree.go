@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// maxMTreeBytes bounds the decompressed .MTREE text. A real .MTREE is one
+// line per file — a few KiB for most packages, single-digit MiB for the
+// largest — while the gzip member it arrives in is capped at 64 MiB of
+// compressed bytes, which could expand a thousandfold. Past the ceiling the
+// map is dropped rather than truncated: a partial map would silently exempt
+// every file after the cut from the rules that read it.
+const maxMTreeBytes = 64 << 20
+
 // parseMTree extracts per-file mtimes from a .MTREE member (gzip-compressed
 // BSD mtree text). Only the time attribute is kept; everything else the rules
 // need is already on the tar headers.
@@ -18,8 +26,8 @@ func parseMTree(data []byte) map[string]time.Time {
 		if err != nil {
 			return nil
 		}
-		plain, err := io.ReadAll(gz)
-		if err != nil {
+		plain, err := io.ReadAll(io.LimitReader(gz, maxMTreeBytes+1))
+		if err != nil || len(plain) > maxMTreeBytes {
 			return nil
 		}
 		data = plain

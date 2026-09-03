@@ -74,6 +74,9 @@ func FuzzParseMTree(f *testing.F) {
 		f.Fatal(err)
 	}
 	f.Add(gz.Bytes())
+	// A small gzip stream that expands past maxMTreeBytes: the ceiling must
+	// keep replaying under plain `go test`, not just under -fuzz.
+	f.Add(mtreeBomb(f))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_ = parseMTree(data)
 	})

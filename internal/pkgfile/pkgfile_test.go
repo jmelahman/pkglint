@@ -3,6 +3,7 @@ package pkgfile
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"debug/elf"
 	"io/fs"
 	"testing"
@@ -155,6 +156,76 @@ func TestMTreeParsing(t *testing.T) {
 	if got := pkg.MTree["usr/lib/with space"]; got.Unix() != 1700000100 {
 		t.Errorf("escaped-name time = %v", got)
 	}
+}
+
+// gzipMTree compresses text as a .MTREE member payload.
+func gzipMTree(t *testing.T, text string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	if _, err := w.Write([]byte(text)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// mtreeBomb builds a gzip stream that expands past maxMTreeBytes while staying
+// tiny on disk: the chunk is written repeatedly, so nothing near the ceiling is
+// ever held in memory here. Only the parser has to refuse it.
+func mtreeBomb(t testing.TB) []byte {
+	t.Helper()
+	chunk := bytes.Repeat([]byte("./usr/lib/padpadpadpad time=1700000000.0\n"), 1<<10)
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	for n := 0; n <= maxMTreeBytes; n += len(chunk) {
+		if _, err := w.Write(chunk); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// tarWithMTree wraps a .MTREE payload beside a minimal .PKGINFO.
+func tarWithMTree(t *testing.T, mtree []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	info := pkgtest.Info("demo", "any")
+	_ = tw.WriteHeader(&tar.Header{Name: ".PKGINFO", Size: int64(len(info)), Mode: 0o644, ModTime: time.Unix(1, 0)})
+	_, _ = tw.Write([]byte(info))
+	_ = tw.WriteHeader(&tar.Header{Name: ".MTREE", Size: int64(len(mtree)), Mode: 0o644, ModTime: time.Unix(1, 0)})
+	_, _ = tw.Write(mtree)
+	_ = tw.Close()
+	return buf.Bytes()
+}
+
+func TestMTreeBombIsDropped(t *testing.T) {
+	t.Run("over ceiling", func(t *testing.T) {
+		bomb := mtreeBomb(t)
+		if len(bomb) > 1<<20 {
+			t.Fatalf("bomb seed is %d bytes; it should stay small", len(bomb))
+		}
+		pkg := read(t, tarWithMTree(t, bomb))
+		if pkg.MTree != nil {
+			t.Errorf("over-limit .MTREE produced a map of %d entries; want nil", len(pkg.MTree))
+		}
+		if pkg.Info.Name != "demo" {
+			t.Errorf("archive should still load: name = %q", pkg.Info.Name)
+		}
+	})
+	t.Run("under ceiling", func(t *testing.T) {
+		mtree := "#mtree\n/set type=file time=1700000000.0\n./usr/lib/mod.py time=1700000123.0\n"
+		pkg := read(t, tarWithMTree(t, gzipMTree(t, mtree)))
+		if got := pkg.MTree["usr/lib/mod.py"]; got.Unix() != 1700000123 {
+			t.Errorf("gzip .MTREE under the ceiling should still parse: mod.py time = %v", got)
+		}
+	})
 }
 
 func TestIsPackagePath(t *testing.T) {

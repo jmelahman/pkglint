@@ -805,3 +805,56 @@ func TestExtractRefusesTooManyFiles(t *testing.T) {
 		t.Errorf("extract of %d files: err = %v, want too-many-files", maxSnapshotFiles+1, err)
 	}
 }
+
+// TestScanAllKeepsPriorGradeOnFetchFailure pins the policy the over-budget
+// path already follows: a snapshot fetch that fails tonight says nothing about
+// the PKGBUILD the last run graded, so the base keeps its real grade rather
+// than flipping its public badge to "?" for a day. The record is still left
+// unwritten, which is what makes the next run retry.
+func TestScanAllKeepsPriorGradeOnFetchFailure(t *testing.T) {
+	// 404 so get returns without retrying: a 429 or 5xx would sleep ~52s.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	defer restoreSnapshotURL(t, srv.URL+"/%s.tar.gz")()
+
+	// LastModified differs from the record's, so the base is scanned, not reused.
+	seed := []metaPackage{{PackageBase: "demo", Version: "2.0-1", NumVotes: 7, LastModified: 2000}}
+
+	t.Run("prior record", func(t *testing.T) {
+		prev := map[string]stateRecord{"demo": {
+			Base: "demo", LastModified: 1000, Grade: "B",
+			Findings: []rules.Finding{{RuleID: "PB101"}},
+			Rules:    rulesFingerprint(),
+		}}
+		results, next := scanAll(seed, t.TempDir(), 1, 0, prev, time.Time{}, nil)
+		if len(results) != 1 {
+			t.Fatalf("expected one result, got %d", len(results))
+		}
+		r := results[0]
+		if r.Grade != "B" || len(r.Findings) != 1 {
+			t.Errorf("failed fetch blanked the prior grade: %+v", r)
+		}
+		if r.Err != "" {
+			t.Errorf("a result carrying a real grade must not also carry an error: %q", r.Err)
+		}
+		// Metadata is free every run, so it refreshes even when the lint does not.
+		if r.Votes != 7 || r.Version != "2.0-1" {
+			t.Errorf("kept result has stale metadata: %+v", r)
+		}
+		if next["demo"].LastModified != 1000 {
+			t.Errorf("failed scan was persisted, so the next run will not retry: %+v", next["demo"])
+		}
+	})
+
+	t.Run("never scanned", func(t *testing.T) {
+		results, _ := scanAll(seed, t.TempDir(), 1, 0, map[string]stateRecord{}, time.Time{}, nil)
+		if len(results) != 1 {
+			t.Fatalf("expected one result, got %d", len(results))
+		}
+		if results[0].Grade != "?" || results[0].Err == "" {
+			t.Errorf("a base with nothing to fall back on must show the failure: %+v", results[0])
+		}
+	})
+}

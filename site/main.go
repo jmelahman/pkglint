@@ -486,8 +486,9 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
-				results[i], states[i] = scanOne(seed[i], cache, prev)
-				if results[i].Err != "" {
+				var err error
+				results[i], states[i], err = scanOne(seed[i], cache, prev)
+				if err != nil {
 					failed.Add(1)
 				}
 				if n := done.Add(1); n%progressEvery == 0 {
@@ -542,7 +543,20 @@ func resultFrom(m metaPackage, rec stateRecord) siteResult {
 	return res
 }
 
-func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResult, *stateRecord) {
+// scanFailed shapes the result of a base that could not be scanned tonight.
+// Nothing is persisted, so the next run retries. The grade is shown from the
+// previous record when there is one, as the over-budget path does: a fetch
+// that failed tonight says nothing about the PKGBUILD the last run graded, and
+// a "?" badge for a day would.
+func scanFailed(m metaPackage, prev map[string]stateRecord, res siteResult, err error) (siteResult, *stateRecord, error) {
+	if rec, ok := prev[m.PackageBase]; ok && rec.Err == "" {
+		return resultFrom(m, rec), nil, err
+	}
+	res.Grade, res.Err = "?", err.Error()
+	return res, nil, err
+}
+
+func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResult, *stateRecord, error) {
 	res := siteResult{
 		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
 		Description: m.Description, CoMaintainers: m.CoMaintainers,
@@ -557,14 +571,12 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 	dir, err := fetchSnapshot(m, cache)
 	if err != nil {
 		log.Printf("scan %s: %v", m.PackageBase, err)
-		res.Grade, res.Err = "?", err.Error()
-		return res, nil
+		return scanFailed(m, prev, res, err)
 	}
 	pkg, err := pkgbuild.Load(dir)
 	if err != nil {
 		log.Printf("scan %s: %v", m.PackageBase, err)
-		res.Grade, res.Err = "?", err.Error()
-		return res, nil
+		return scanFailed(m, prev, res, err)
 	}
 	cur := extractState(pkg, m.LastModified)
 	res.Drift = driftNotes(prev[m.PackageBase].Fingerprint, cur)
@@ -585,7 +597,7 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 		Drift:        res.Drift,
 		Fingerprint:  cur,
 		Rules:        rulesFingerprint(),
-	}
+	}, nil
 }
 
 // fetchSnapshot downloads and extracts a package base's snapshot, cached by

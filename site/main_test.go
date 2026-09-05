@@ -70,7 +70,7 @@ func TestSelectSeedDropsUnsafeBases(t *testing.T) {
 		{PackageBase: ".hidden", NumVotes: 1, Maintainer: &who},
 		{PackageBase: "mine", NumVotes: 1, Maintainer: &who},
 	}
-	seed := selectSeed(meta, who, 100, 0, time.Now())
+	seed := selectSeed(meta, nil, who, 100, 0, time.Now())
 	got := map[string]bool{}
 	for _, m := range seed {
 		got[m.PackageBase] = true
@@ -94,7 +94,7 @@ func TestSelectSeedIncludesCoMaintained(t *testing.T) {
 		{PackageBase: "mine", NumVotes: 1, Maintainer: &who},
 	}
 	got := map[string]bool{}
-	for _, m := range selectSeed(meta, who, 0, 0, time.Now()) {
+	for _, m := range selectSeed(meta, nil, who, 0, 0, time.Now()) {
 		got[m.PackageBase] = true
 	}
 	if len(got) != 2 || !got["mine"] || !got["shared"] {
@@ -116,7 +116,7 @@ func TestSelectSeedIsDeterministic(t *testing.T) {
 	want := []string{"alpha", "bravo", "charlie"}
 	for i := 0; i < 32; i++ {
 		var got []string
-		for _, m := range selectSeed(meta, "", 3, 0, time.Now()) {
+		for _, m := range selectSeed(meta, nil, "", 3, 0, time.Now()) {
 			got = append(got, m.PackageBase)
 		}
 		if !slices.Equal(got, want) {
@@ -139,7 +139,7 @@ func TestSelectSeedWindow(t *testing.T) {
 	}
 
 	got := map[string]bool{}
-	for _, m := range selectSeed(meta, "", 0, 365, now) {
+	for _, m := range selectSeed(meta, nil, "", 0, 365, now) {
 		got[m.PackageBase] = true
 	}
 	if !got["fresh"] || !got["edge"] {
@@ -152,7 +152,7 @@ func TestSelectSeedWindow(t *testing.T) {
 	// -top is additive: the popular package returns even though nothing about
 	// it has changed inside the window.
 	got = map[string]bool{}
-	for _, m := range selectSeed(meta, "", 1, 365, now) {
+	for _, m := range selectSeed(meta, nil, "", 1, 365, now) {
 		got[m.PackageBase] = true
 	}
 	if !got["ancient-but-loved"] {
@@ -172,7 +172,7 @@ func TestSelectSeedWindowIsVotesOrdered(t *testing.T) {
 		})
 	}
 	var got []string
-	for _, m := range selectSeed(meta, "", 0, 365, now) {
+	for _, m := range selectSeed(meta, nil, "", 0, 365, now) {
 		got = append(got, m.PackageBase)
 	}
 	if want := []string{"many", "some", "few"}; !slices.Equal(got, want) {
@@ -577,7 +577,7 @@ func TestDecodeMetaCoMaintainers(t *testing.T) {
 }
 
 // gzJSON gzips a JSON document, in the shape of the cached AUR metadata dump.
-func gzJSON(t *testing.T, doc string) []byte {
+func gzJSON(t testing.TB, doc string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
@@ -633,7 +633,7 @@ func TestRunEndToEndOffline(t *testing.T) {
 	}
 
 	// top=1 pulls demo in regardless of its (ancient) LastModified.
-	if err := run(out, cache, statePath, "", 1, 0, 0, 1, 5, 0); err != nil {
+	if err := run(out, cache, statePath, "", nil, 1, 0, 0, 1, 5, 0); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 

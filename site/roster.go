@@ -28,7 +28,9 @@ import (
 //
 // Co-maintainers travel as one space-joined string, matching the row's
 // data-comaintainers attribute — AUR usernames cannot hold a space, and one
-// string is what site.js folds into its haystacks either way.
+// string is what site.js folds into its haystacks either way. The repository
+// and the packager follow: the repository has a column and a filter of its
+// own, and the packager is an official package's answer to the "@" query.
 //
 // Order is the index's order, so the client can render straight from it
 // without re-sorting to reproduce the default view.
@@ -39,7 +41,7 @@ func writeRoster(out string, results []siteResult) error {
 		if len(r.Drift) > 0 {
 			drift = 1
 		}
-		rows = append(rows, []any{r.Name, r.Grade, len(r.Findings), r.Votes, r.Description, r.Maintainer, drift, strings.Join(r.CoMaintainers, " ")})
+		rows = append(rows, []any{r.Name, r.Grade, len(r.Findings), r.Votes, r.Description, r.Maintainer, drift, strings.Join(r.CoMaintainers, " "), r.Repo, r.Packager})
 	}
 	f, err := os.Create(filepath.Join(out, "roster.json"))
 	if err != nil {
@@ -115,8 +117,8 @@ func renderShards(tmpl *template.Template, out string, page pageFunc, results []
 
 	for i, s := range shards {
 		data := page("roster/"+s.Key+".html",
-			fmt.Sprintf("Packages: %s — AUR Report Card", s.Key),
-			fmt.Sprintf("Every AUR package base beginning with %q graded by pkglint: %d packages.", s.Key, len(s.Results)),
+			fmt.Sprintf("Packages: %s — Arch Report Card", s.Key),
+			fmt.Sprintf("Every Arch Linux package base beginning with %q graded by pkglint: %d packages.", s.Key, len(s.Results)),
 			map[string]any{
 				"Results": s.Results,
 				"Shown":   len(s.Results),
@@ -136,8 +138,8 @@ func renderShards(tmpl *template.Template, out string, page pageFunc, results []
 		}
 	}
 
-	index := page("roster/", "All packages — AUR Report Card",
-		fmt.Sprintf("Every one of the %d AUR package bases pkglint grades, listed alphabetically.", len(results)),
+	index := page("roster/", "All packages — Arch Report Card",
+		fmt.Sprintf("Every one of the %d Arch Linux package bases pkglint grades, listed alphabetically.", len(results)),
 		// Key is empty rather than absent: shardnav compares it against every
 		// letter, and a missing map key would compare a string against nil.
 		map[string]any{"Shards": shards, "Keys": keys, "Total": len(results), "Key": ""})

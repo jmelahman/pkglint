@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          persist-credentials: false # no push token while parsing untrusted AUR content
+          persist-credentials: false # no push token while parsing untrusted PKGBUILDs
       # The scan state lives on the `site` branch with the pages it produced,
       # not on master: master carries source only, so checking it out costs a
       # couple of megabytes instead of the 350MB the generated tree weighs.
@@ -45,22 +45,32 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .cache
-          key: aur-snapshots-${{ github.run_id }}
-          restore-keys: aur-snapshots-
-      # The corpus is every base the AUR has seen a change to in the last 180
-      # days: ~35,000, still far more than one run can download. Widening the
-      # window is a one-line change and the state carries over, so this can
-      # grow later — a year is ~47,600 bases.
+          key: snapshots-${{ github.run_id }}
+          restore-keys: |
+            snapshots-
+            aur-snapshots-
+      # The corpus is two sources. The official repositories — core, extra,
+      # multilib, ~12,300 bases — are scanned whole, indexed from the pacman
+      # sync databases with each PKGBUILD tree fetched from its release tag on
+      # gitlab.archlinux.org. The AUR side is every base that has seen a
+      # change in the last 180 days: ~35,000. Together far more than one run
+      # can download, so the seed is ordered for a bounded night: the AUR
+      # window first, then the official fill, alphabetically within each
+      # repository, so a partial night is a contiguous slice that the next
+      # night continues. Widening the window is a one-line change and the
+      # state carries over, so this can grow later — a year is ~47,600 AUR
+      # bases.
       #
       # The restored state.jsonl carries the previous scan, so a base whose
-      # LastModified has not moved is served from it without a fetch, and
-      # -budget caps the rest. 8000 comes from the request throttle rather than
-      # the runner: fetches are spaced 500ms apart globally, so the ceiling is
-      # 2/s no matter what -jobs says, and measured throughput is nearer 1/s.
-      # That puts a full budget at roughly two hours, well inside the 6h job
-      # limit. From an empty state the corpus fills in about three nights;
-      # after that a run fetches only the bases that actually changed and
-      # finishes in minutes, with the budget never binding.
+      # LastModified (the build date, for an official package) has not moved
+      # is served from it without a fetch, and -budget caps the rest. 8000
+      # comes from the request throttles rather than the runner: AUR fetches
+      # are spaced 500ms apart and GitLab's 1.2s — its unauthenticated limit
+      # is 600 requests per ten minutes — so the ceiling is 2/s no matter what
+      # -jobs says, and measured throughput is nearer 1/s. That puts a full
+      # budget at roughly two hours, well inside the 6h job limit. Once the
+      # corpus has filled, a run fetches only the bases that actually changed
+      # and finishes in minutes, with the budget never binding.
       #
       # -deadline caps the run's wall clock: past it the run stops starting
       # fetches and finishes with what it has, so the site and state still
@@ -68,13 +78,15 @@ jobs:
       # uncommitted. Unfetched bases simply roll to the next run, same as
       # over-budget ones, so the state advances a little every night no matter
       # what. At 1h the deadline, not the budget, is what bounds a fill-in
-      # night (~3600 fetches at the throttle's pace), stretching a
-      # from-empty fill over about a week — the price of never tying up a
-      # runner for longer than an hour. The generator logs progress with a
-      # rate and ETA as it fetches, so a run that is merely slow is
-      # distinguishable from one that is stuck.
+      # night (~3600 AUR fetches, or ~3000 from GitLab, at the throttles'
+      # pace), stretching a from-empty fill over about a week for the AUR
+      # window and four or five nights more for the official repositories —
+      # the price of never tying up a runner for longer than an hour. The
+      # generator logs progress with a rate and ETA as it fetches, so a run
+      # that is merely slow is distinguishable from one that is stuck.
       - run: >
           go run ./site
+          -repos core,extra,multilib
           -maintainer Jamison
           -since-days 180
           -top 500

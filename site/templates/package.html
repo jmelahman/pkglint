@@ -13,14 +13,24 @@
     <div class="pkghead">
       <div class="stamp stamp-{{.R.Grade}}" title="grade {{.R.Grade}}">{{.R.Grade}}</div>
       <div>
-        <p class="eyebrow"><a href="{{.Root}}index.html">AUR report card</a></p>
+        <p class="eyebrow"><a href="{{.Root}}index.html">Arch report card</a></p>
         <h1>{{.R.Name}}</h1>
+        {{/* The facts are what the repository says about the package: the AUR
+             has maintainers and votes, an official repository a packager;
+             both have a page for the package and a place its PKGBUILD lives. */}}
         <p class="facts">
+          <span class="repo repo-{{.R.Repo}}">{{.R.Repo}}</span>
           <b>{{.R.Version}}</b>
+          {{if .R.Official}}
+          {{with .R.Packager}}<span>packaged by {{.}}</span>{{end}}
+          <a href="{{.R.PageURL}}">Arch Linux page</a>
+          <a href="{{.R.SourceURL}}">PKGBUILD</a>
+          {{else}}
           {{with .R.Maintainer}}<span>maintained by {{.}}</span>{{end}}
           {{with .R.CoMaintainers}}<span>co-maintained by {{join . ", "}}</span>{{end}}
           <span>{{.R.Votes}} votes</span>
-          <a href="https://aur.archlinux.org/pkgbase/{{.R.Base}}">AUR page</a>
+          <a href="{{.R.PageURL}}">AUR page</a>
+          {{end}}
           <a href="{{.Root}}badge/{{.R.Name}}.svg">badge</a>
         </p>
         {{with .R.Description}}<p>{{.}}</p>{{end}}

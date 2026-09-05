@@ -317,6 +317,39 @@ p { max-width: var(--measure); }
 .gkey b { font: 600 0.9375rem/1.35 var(--mono); font-variant-numeric: tabular-nums; }
 .gkey em { display: block; font-style: normal; font-size: 0.8125rem; color: var(--dim); }
 
+/* ── repositories ─────────────────────────────────────────────────────── */
+/* The repository chip says where a package comes from. It is deliberately
+   not a grade: a hairline box in the label face, the same shape for every
+   repository, so the eye reads the word and keeps colour for the grades.
+   Official repositories are set a step brighter than the AUR — on this site
+   they are the exception, and the roster's tail is where they sit. */
+.repo {
+  display: inline-block; padding: 0.05rem 0.4rem; border-radius: 2px; white-space: nowrap;
+  border: 1px solid var(--rule); color: var(--dim);
+  font: 600 0.6875rem/1.5 var(--cond); letter-spacing: 0.1em; text-transform: uppercase;
+}
+.repo-core, .repo-extra, .repo-multilib { color: var(--chalk); border-color: var(--dim); }
+/* A dash where a number is not: an official package has no votes, and a zero
+   would say it is unpopular. */
+.none { color: var(--dim); }
+
+/* The per-repository breakdown under the legend. Its repository names are
+   filters, styled as the legend's keys are: plain labels with no script,
+   controls with it. */
+.repos { width: auto; margin-top: 1.5rem; }
+.repos thead th { padding: 0.4rem 0.7rem; }
+.repos thead th .grade { min-width: 0; font-size: 0.6875rem; }
+.repos tbody td { padding: 0.35rem 0.7rem; border-bottom: 0; }
+.repos tbody tr:hover td { background: transparent; }
+.repos tbody td:first-child { padding-left: 0; }
+.rkey {
+  display: inline-block; padding: 0.35rem 0.5rem; border: 0; border-radius: 3px;
+  background: transparent; color: inherit; cursor: default; font: inherit;
+}
+.js .rkey { cursor: pointer; }
+.js .rkey:hover { background: var(--ink-2); }
+.rkey[aria-pressed="true"] { background: var(--accent-soft); }
+
 /* ── disclosure ───────────────────────────────────────────────────────── */
 /* The caveat about what a grade is worth has to be reachable without being
    permanently in the way. <details> does that with no script, so it still
@@ -417,6 +450,7 @@ td.gcell { padding-left: 0; }
 #roster { table-layout: fixed; }
 #roster .grade-h { width: 4.5rem; }
 #roster .pkg-h { width: 30%; }
+#roster .repo-h { width: 6.5rem; }
 #roster th.num { width: 6rem; }
 /* Description takes whatever is left, so only it reflows as the page resizes. */
 /* The drift glyph is the one severity-coloured thing that is text rather than a
@@ -660,7 +694,7 @@ td.rsev { width: 1%; white-space: nowrap; }
 @media (max-width: 34rem) {
   .pkghead { gap: 1rem; }
   .stamp { width: 3.5rem; height: 3.5rem; font-size: 1.75rem; }
-  .votes, th.votes-h { display: none; }
+  .votes, th.votes-h, .rcell, th.repo-h { display: none; }
   h1 { font-size: clamp(1.75rem, 9vw, 2.5rem); }
   .mark span { display: none; }
   /* On a phone the roster is down to grade, name, count; give the name the

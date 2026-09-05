@@ -1,11 +1,13 @@
-// Command site generates the static AUR report-card website.
+// Command site generates the static Arch report-card website.
 //
-// It downloads the AUR metadata dump, selects a seed set of packages (every
-// base modified recently, plus a maintainer's packages and the top-N by
-// votes), fetches each package base's snapshot tarball (cached by
-// LastModified), runs pkglint in-process, and renders a static site: an index,
-// a page per package, a page per rule, alphabetical roster pages, per-package
-// SVG badges, a sitemap, and results.json.
+// It downloads the AUR metadata dump and the official repositories' sync
+// databases, selects a seed set of packages (every AUR base modified recently,
+// plus a maintainer's packages and the top-N by votes, plus every base in the
+// official repositories), fetches each package base's snapshot tarball
+// (cached by LastModified: the AUR's cgit snapshot, or the release tag's
+// archive on GitLab — see official.go), runs pkglint in-process, and renders a
+// static site: an index, a page per package, a page per rule, alphabetical
+// roster pages, per-package SVG badges, a sitemap, and results.json.
 //
 // The seed runs to tens of thousands of bases, which is more than one run can
 // fetch: see state.go for the checked-in scan state that makes that tractable,
@@ -23,6 +25,7 @@ import (
 	"log"
 	"maps"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -67,6 +70,11 @@ var (
 // snapshotURL is a var, not a const, so tests can point it at a local server.
 var snapshotURL = "https://aur.archlinux.org/cgit/aur.git/snapshot/%s.tar.gz"
 
+// metaPackage is one package as its repository describes it. The exported
+// fields are the AUR metadata dump's; an official repository's sync database
+// is folded into the same shape by parseSyncDB, with the build date standing
+// in for LastModified — both say "the PKGBUILD behind this cannot have changed
+// while this stays put", which is all the scan state needs of them.
 type metaPackage struct {
 	Name        string
 	PackageBase string
@@ -80,30 +88,49 @@ type metaPackage struct {
 	NumVotes      int
 	Popularity    float64
 	LastModified  int64
+
+	// Repo is the repository the package came from, "" or aurRepo for the
+	// AUR. Packager is who built the official package, from its %PACKAGER%
+	// line; an AUR package has a maintainer instead. Neither is in the dump.
+	Repo     string `json:"-"`
+	Packager string `json:"-"`
+}
+
+// repo is the package's repository, spelling out the AUR for the zero value.
+func (m metaPackage) repo() string {
+	if m.Repo == "" {
+		return aurRepo
+	}
+	return m.Repo
 }
 
 type siteResult struct {
 	Name        string `json:"name"`
 	Base        string `json:"base"`
+	Repo        string `json:"repo"`
 	Version     string `json:"version"`
 	Description string `json:"description"`
 	Maintainer  string `json:"maintainer"`
 	// Co-maintainers can push to the package just as the maintainer can, so
 	// everywhere the site says or matches who maintains a package, they count.
-	CoMaintainers []string        `json:"co_maintainers,omitempty"`
-	Votes         int             `json:"votes"`
-	Grade         string          `json:"grade"`
-	Findings      []rules.Finding `json:"findings"`
-	Drift         []string        `json:"drift,omitempty"` // provenance drift vs. the previous scan
-	Err           string          `json:"error,omitempty"`
-	LastModified  int64           `json:"last_modified"`
+	CoMaintainers []string `json:"co_maintainers,omitempty"`
+	// Packager is who built an official package. It plays the maintainer's
+	// part everywhere the site says or matches who answers for a package.
+	Packager     string          `json:"packager,omitempty"`
+	Votes        int             `json:"votes"`
+	Grade        string          `json:"grade"`
+	Findings     []rules.Finding `json:"findings"`
+	Drift        []string        `json:"drift,omitempty"` // provenance drift vs. the previous scan
+	Err          string          `json:"error,omitempty"`
+	LastModified int64           `json:"last_modified"`
 }
 
 func main() {
 	out := flag.String("out", "public", "output directory for the generated site")
 	cache := flag.String("cache", ".cache", "cache directory for downloads")
 	state := flag.String("state", "data/state.jsonl", "checked-in scan state; bases unchanged since it was written are not refetched")
-	maintainer := flag.String("maintainer", "", "always include the packages this user maintains or co-maintains")
+	maintainer := flag.String("maintainer", "", "always include the AUR packages this user maintains or co-maintains")
+	reposFlag := flag.String("repos", "core,extra,multilib", "official repositories to include in full, comma-separated (empty = AUR only)")
 	top := flag.Int("top", 0, "also include the top-N packages by votes (0 = none)")
 	since := flag.Int("since-days", 90, "include every package base modified within the last N days (0 = none)")
 	budget := flag.Int("budget", 0, "max snapshot fetches this run (0 = no cap); bases past it keep their last known result")
@@ -112,12 +139,16 @@ func main() {
 	limit := flag.Int("limit", 0, "hard cap on packages scanned (0 = no cap), for smoke tests")
 	flag.Parse()
 
-	if err := run(*out, *cache, *state, *maintainer, *top, *since, *budget, *jobs, *limit, *deadline); err != nil {
+	repos, err := parseRepos(*reposFlag)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := run(*out, *cache, *state, *maintainer, repos, *top, *since, *budget, *jobs, *limit, *deadline); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(out, cache, statePath, maintainer string, top, since, budget, jobs, limit int, deadline time.Duration) error {
+func run(out, cache, statePath, maintainer string, repos []string, top, since, budget, jobs, limit int, deadline time.Duration) error {
 	// The deadline covers the whole run, metadata download included, because
 	// what it protects is the CI job's hard kill limit, which does too.
 	var stopAt time.Time
@@ -140,12 +171,16 @@ func run(out, cache, statePath, maintainer string, top, since, budget, jobs, lim
 		return err
 	}
 	log.Printf("metadata: %d packages", len(meta))
+	official, err := loadOfficial(cache, repos)
+	if err != nil {
+		return err
+	}
 
-	seed := selectSeed(meta, maintainer, top, since, time.Now())
+	seed := selectSeed(meta, official, maintainer, top, since, time.Now())
 	if limit > 0 && len(seed) > limit {
 		seed = seed[:limit]
 	}
-	log.Printf("seed: %d package bases (maintainer=%q top=%d since=%dd)", len(seed), maintainer, top, since)
+	log.Printf("seed: %d package bases (maintainer=%q top=%d since=%dd repos=%s)", len(seed), maintainer, top, since, strings.Join(repos, ","))
 
 	prev, err := loadState(statePath)
 	if err != nil {
@@ -172,9 +207,16 @@ func run(out, cache, statePath, maintainer string, top, since, budget, jobs, lim
 	// sorted by grade the head would be an unbroken run of Fs from packages
 	// nobody has heard of. Votes also move far more slowly than grades do,
 	// which keeps the committed output's nightly diff small.
+	//
+	// Official packages have no votes, so they follow every voted AUR package
+	// and, among the unvoted, lead the AUR: the base system before the long
+	// tail, and each repository together rather than shuffled by name.
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].Votes != results[j].Votes {
 			return results[i].Votes > results[j].Votes
+		}
+		if ri, rj := repoRank(results[i].Repo), repoRank(results[j].Repo); ri != rj {
+			return ri < rj
 		}
 		return results[i].Name < results[j].Name
 	})
@@ -250,11 +292,19 @@ func prune(dir, ext string, keep map[string]bool) error {
 	return nil
 }
 
+// fresh reports whether a cached download is recent enough to reuse: the
+// metadata sources are regenerated on the order of hours, and a nightly run
+// that finds yesterday's copy still in the cache should not read it.
+func fresh(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && time.Since(st.ModTime()) <= 20*time.Hour
+}
+
 // loadMeta downloads (or reuses a same-day cached copy of) the AUR metadata
 // dump.
 func loadMeta(cache string) ([]metaPackage, error) {
 	path := filepath.Join(cache, "packages-meta-ext-v1.json.gz")
-	if st, err := os.Stat(path); err != nil || time.Since(st.ModTime()) > 20*time.Hour {
+	if !fresh(path) {
 		if err := download(metaURL, path); err != nil {
 			return nil, fmt.Errorf("download metadata dump: %w", err)
 		}
@@ -296,25 +346,67 @@ func safeBase(name string) bool {
 	return name != ".." && baseRe.MatchString(name) && !strings.Contains(name, "..")
 }
 
-// selectSeed picks one representative per package base: everything maintainer
-// maintains or co-maintains, everything modified within the last sinceDays,
-// plus the top-N bases by votes. Bases with unsafe names are dropped here,
-// the single choke point, so no unsafe name reaches scanAll, results.json,
-// the rendered links, or any output filename.
+// selectSeed picks one representative per package base: from the AUR,
+// everything maintainer maintains or co-maintains, everything modified within
+// the last sinceDays, plus the top-N bases by votes; and every base in the
+// official repositories. Bases with unsafe names are dropped here, the single
+// choke point, so no unsafe name reaches scanAll, results.json, the rendered
+// links, or any output filename.
 //
 // The result is ordered by votes, which is what makes a partial run coherent:
 // -budget spends on the front of this slice, so an incomplete corpus is the
-// most-installed packages rather than an arbitrary sample.
-func selectSeed(meta []metaPackage, maintainer string, top, sinceDays int, now time.Time) []metaPackage {
+// most-installed packages rather than an arbitrary sample. The official
+// repositories come after the AUR's selection, in the order given: they change
+// a few hundred bases a night, as the AUR does, but they are filled from
+// nothing in one piece, and the AUR should not wait on that.
+//
+// Package bases share one namespace on the site, and a couple of dozen names
+// exist on both sides. The official package wins: it is the one an `-S` of
+// that name installs, and the AUR one is what it says it is only in the AUR.
+func selectSeed(meta, official []metaPackage, maintainer string, top, sinceDays int, now time.Time) []metaPackage {
+	var seed []metaPackage
+	seen := map[string]bool{}
+	add := func(m metaPackage) {
+		if !seen[m.PackageBase] {
+			seen[m.PackageBase] = true
+			seed = append(seed, m)
+		}
+	}
+
+	shadowed := map[string]string{}
+	for _, m := range official {
+		if !safeBase(m.PackageBase) {
+			log.Printf("skipping package base with unsafe name %q", m.PackageBase)
+			continue
+		}
+		if prev, ok := shadowed[m.PackageBase]; ok {
+			log.Printf("%s/%s also in %s; keeping the first", m.repo(), m.PackageBase, prev)
+			continue
+		}
+		shadowed[m.PackageBase] = m.repo()
+	}
+
 	byBase := map[string]metaPackage{}
 	for _, m := range meta {
 		if !safeBase(m.PackageBase) {
 			log.Printf("skipping package base with unsafe name %q", m.PackageBase)
 			continue
 		}
+		if repo, ok := shadowed[m.PackageBase]; ok {
+			if _, logged := byBase[m.PackageBase]; !logged {
+				log.Printf("aur/%s shadowed by %s/%s", m.PackageBase, repo, m.PackageBase)
+				byBase[m.PackageBase] = metaPackage{} // logged once; never selected
+			}
+			continue
+		}
 		cur, ok := byBase[m.PackageBase]
 		if !ok || m.NumVotes > cur.NumVotes {
 			byBase[m.PackageBase] = m
+		}
+	}
+	for base, m := range byBase {
+		if m.PackageBase == "" {
+			delete(byBase, base)
 		}
 	}
 	bases := make([]metaPackage, 0, len(byBase))
@@ -333,14 +425,6 @@ func selectSeed(meta []metaPackage, maintainer string, top, sinceDays int, now t
 		return bases[i].PackageBase < bases[j].PackageBase
 	})
 
-	var seed []metaPackage
-	seen := map[string]bool{}
-	add := func(m metaPackage) {
-		if !seen[m.PackageBase] {
-			seen[m.PackageBase] = true
-			seed = append(seed, m)
-		}
-	}
 	if maintainer != "" {
 		for _, m := range bases {
 			if maintains(m, maintainer) {
@@ -365,6 +449,14 @@ func selectSeed(meta []metaPackage, maintainer string, top, sinceDays int, now t
 	// even though nothing about it has changed inside the window.
 	for i := 0; i < len(bases) && i < top; i++ {
 		add(bases[i])
+	}
+	// The official repositories, whole. loadOfficial already sorted each by
+	// base, so the fill runs alphabetically within a repository and a partial
+	// night is a contiguous, reproducible slice.
+	for _, m := range official {
+		if shadowed[m.PackageBase] == m.repo() {
+			add(m)
+		}
 	}
 	return seed
 }
@@ -418,7 +510,7 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 	var reused, stale, omitted int
 
 	for i, m := range seed {
-		rec, ok := prev[m.PackageBase]
+		rec, ok := priorRecord(prev, m)
 		switch {
 		// A record carrying an error is not fresh: the failure may have been a
 		// transient fetch, and a base that is genuinely gone leaves the
@@ -462,7 +554,7 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 	for len(todo) > 0 {
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			for _, i := range todo {
-				if rec, ok := prev[seed[i].PackageBase]; ok {
+				if rec, ok := priorRecord(prev, seed[i]); ok {
 					results[i] = resultFrom(seed[i], rec)
 					stale++
 				} else {
@@ -524,21 +616,42 @@ func scanAll(seed []metaPackage, cache string, jobs, budget int, prev map[string
 	return kept, next
 }
 
+// priorRecord is what the state knows about m: its record, provided it came
+// from the same repository. A base that moves between the AUR and an official
+// repository — or that exists in both, where the official one wins the seed —
+// keeps its name but not its PKGBUILD, so the other side's grade, fingerprint
+// and LastModified say nothing about it.
+func priorRecord(prev map[string]stateRecord, m metaPackage) (stateRecord, bool) {
+	rec, ok := prev[m.PackageBase]
+	if !ok || rec.repo() != m.repo() {
+		return stateRecord{}, false
+	}
+	return rec, true
+}
+
 // resultFrom rebuilds a result from a state record, refreshing everything the
 // metadata dump carries. Votes and description are free on every run, so a
 // package whose PKGBUILD has not changed still shows a current vote count.
 func resultFrom(m metaPackage, rec stateRecord) siteResult {
+	res := newResult(m)
+	res.Grade, res.Findings, res.Drift, res.Err = rec.Grade, rec.Findings, rec.Drift, rec.Err
+	if res.Findings == nil {
+		res.Findings = []rules.Finding{}
+	}
+	return res
+}
+
+// newResult is a result holding everything the metadata says about m and
+// nothing a scan has to find out.
+func newResult(m metaPackage) siteResult {
 	res := siteResult{
-		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
-		Description: m.Description, CoMaintainers: m.CoMaintainers,
+		Name: m.PackageBase, Base: m.PackageBase, Repo: m.repo(), Version: m.Version,
+		Description: m.Description, CoMaintainers: m.CoMaintainers, Packager: m.Packager,
 		Votes: m.NumVotes, LastModified: m.LastModified,
-		Grade: rec.Grade, Findings: rec.Findings, Drift: rec.Drift, Err: rec.Err,
+		Findings: []rules.Finding{},
 	}
 	if m.Maintainer != nil {
 		res.Maintainer = *m.Maintainer
-	}
-	if res.Findings == nil {
-		res.Findings = []rules.Finding{}
 	}
 	return res
 }
@@ -549,7 +662,7 @@ func resultFrom(m metaPackage, rec stateRecord) siteResult {
 // that failed tonight says nothing about the PKGBUILD the last run graded, and
 // a "?" badge for a day would.
 func scanFailed(m metaPackage, prev map[string]stateRecord, res siteResult, err error) (siteResult, *stateRecord, error) {
-	if rec, ok := prev[m.PackageBase]; ok && rec.Err == "" {
+	if rec, ok := priorRecord(prev, m); ok && rec.Err == "" {
 		return resultFrom(m, rec), nil, err
 	}
 	res.Grade, res.Err = "?", err.Error()
@@ -557,15 +670,7 @@ func scanFailed(m metaPackage, prev map[string]stateRecord, res siteResult, err 
 }
 
 func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResult, *stateRecord, error) {
-	res := siteResult{
-		Name: m.PackageBase, Base: m.PackageBase, Version: m.Version,
-		Description: m.Description, CoMaintainers: m.CoMaintainers,
-		Votes: m.NumVotes, LastModified: m.LastModified,
-		Findings: []rules.Finding{},
-	}
-	if m.Maintainer != nil {
-		res.Maintainer = *m.Maintainer
-	}
+	res := newResult(m)
 	// A failed scan is recorded but not persisted: writing it would pin the
 	// record to this LastModified and stop the next run from retrying.
 	dir, err := fetchSnapshot(m, cache)
@@ -579,7 +684,12 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 		return scanFailed(m, prev, res, err)
 	}
 	cur := extractState(pkg, m.LastModified)
-	res.Drift = driftNotes(prev[m.PackageBase].Fingerprint, cur)
+	// A record from the other side of the AUR/official line is not a previous
+	// sighting of this PKGBUILD, so there is nothing for it to have drifted
+	// from: priorRecord's miss is the zero fingerprint, which driftNotes treats
+	// as a first scan.
+	prior, _ := priorRecord(prev, m)
+	res.Drift = driftNotes(prior.Fingerprint, cur)
 	res.Findings = rules.Run(pkg, nil)
 	if res.Findings == nil {
 		res.Findings = []rules.Finding{}
@@ -591,6 +701,7 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 	res.Grade = report.Grade(res.Findings)
 	return res, &stateRecord{
 		Base:         m.PackageBase,
+		Repo:         m.repo(),
 		LastModified: m.LastModified,
 		Grade:        res.Grade,
 		Findings:     res.Findings,
@@ -601,14 +712,24 @@ func scanOne(m metaPackage, cache string, prev map[string]stateRecord) (siteResu
 }
 
 // fetchSnapshot downloads and extracts a package base's snapshot, cached by
-// LastModified.
+// LastModified. AUR snapshots sit directly under snapshots/, where they
+// always have; an official repository's go under snapshots/<repo>/, so a base
+// that exists on both sides cannot be served the other side's tree.
 func fetchSnapshot(m metaPackage, cache string) (string, error) {
-	dir := filepath.Join(cache, "snapshots", fmt.Sprintf("%s@%d", m.PackageBase, m.LastModified))
+	url, err := snapshotSource(m)
+	if err != nil {
+		return "", fmt.Errorf("fetch snapshot: %w", err)
+	}
+	dir := filepath.Join(cache, "snapshots")
+	if m.repo() != aurRepo {
+		dir = filepath.Join(dir, m.repo())
+	}
+	dir = filepath.Join(dir, fmt.Sprintf("%s@%d", m.PackageBase, m.LastModified))
 	if _, err := os.Stat(filepath.Join(dir, "PKGBUILD")); err == nil {
 		return dir, nil
 	}
 	tarPath := dir + ".tar.gz"
-	if err := download(fmt.Sprintf(snapshotURL, m.PackageBase), tarPath); err != nil {
+	if err := download(url, tarPath); err != nil {
 		return "", fmt.Errorf("fetch snapshot: %w", err)
 	}
 	defer os.Remove(tarPath)
@@ -672,8 +793,28 @@ func extract(tarPath, dir string) error {
 	}
 }
 
-// throttle spaces out requests so the AUR's rate limiting stays happy.
+// throttle spaces out requests so the AUR's rate limiting stays happy. It is
+// the default for any host not named in throttles, the test servers included.
 var throttle = time.NewTicker(500 * time.Millisecond)
+
+// throttles paces the hosts with their own limits. GitLab allows an
+// unauthenticated client 600 web requests in ten minutes and counts an
+// archive download as one of them; 1.2s apart is 500, with room for the
+// retries. The tickers are shared across workers, so -jobs cannot raise the
+// rate at any host, only overlap one host's fetch with another's.
+var throttles = map[string]*time.Ticker{
+	"gitlab.archlinux.org": time.NewTicker(1200 * time.Millisecond),
+}
+
+// throttleFor is the ticker a request to url waits on.
+func throttleFor(url string) *time.Ticker {
+	if u, err := neturl.Parse(url); err == nil {
+		if t, ok := throttles[u.Host]; ok {
+			return t
+		}
+	}
+	return throttle
+}
 
 // errEmptyBody marks a 200 whose body carried no bytes. cgit builds snapshot
 // tarballs on request and under load sometimes answers exactly that; get()
@@ -702,6 +843,14 @@ func downloadOnce(url, path string) error {
 		return err
 	}
 	defer resp.Body.Close()
+	// Nothing this pipeline fetches is a web page. GitLab answers a request
+	// for a project that does not exist — or that a visitor may not see —
+	// with a 200 and its sign-in page, and the AUR's cgit has an error page
+	// of its own; either would otherwise be handed to the tar reader as a
+	// snapshot and fail there with a message that says nothing.
+	if ct := resp.Header.Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+		return fmt.Errorf("GET %s: got an HTML page (%s) instead of a file", url, ct)
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -738,9 +887,10 @@ var getBackoff = []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Sec
 // transport hiccups) with growing backoff and honoring Retry-After.
 func get(url string) (*http.Response, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
+	tick := throttleFor(url)
 	var lastErr error
 	for attempt := 0; ; attempt++ {
-		<-throttle.C
+		<-tick.C
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return nil, err

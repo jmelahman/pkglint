@@ -1,6 +1,7 @@
 // Roster controls for the report card index: text filter, grade filter (driven
-// by the corpus bar and its legend), and column sorting. No dependencies; the
-// table is fully readable with JavaScript off.
+// by the corpus bar and its legend), repository filter (driven by the
+// breakdown table), and column sorting. No dependencies; the table is fully
+// readable with JavaScript off.
 //
 // The index server-renders only the most-voted slice of the corpus — the whole
 // of it would be a quarter of a million DOM nodes — so this file also fetches
@@ -27,7 +28,9 @@
   var rest = document.getElementById("rest");
   var bar = document.querySelector(".bar");
   var keys = Array.prototype.slice.call(document.querySelectorAll(".band, .gkey"));
+  var rkeys = Array.prototype.slice.call(document.querySelectorAll(".rkey"));
   var grades = Object.create(null); // selected grades; empty means "all"
+  var repos = Object.create(null);  // selected repositories; empty means "all"
 
   // Where package pages sit relative to this one. The script renders rows the
   // server never sent, so it has to spell their links itself, and the shards
@@ -53,15 +56,20 @@
   // co-maintainer can push to the package just as the maintainer can, so a
   // query for who maintains it has to find them too. Both keep their own
   // haystack as well, for the "@" query, and their real casing for display.
-  function entry(name, grade, findings, votes, desc, maintainer, drift, comaint) {
+  // An official package has a packager where an AUR package has a
+  // maintainer, and the packager goes where the maintainer would.
+  function entry(name, grade, findings, votes, desc, maintainer, drift, comaint, repo, packager) {
     var m = maintainer || "";
     var co = comaint || "";
+    var r = repo || "aur";
+    var p = packager || "";
     return {
       name: name, grade: grade, findings: findings, votes: votes,
       desc: desc || "", maintainer: m, comaint: co, drift: !!drift,
-      mtext: (m + " " + co).toLowerCase(),
-      text: (grade + " " + name + " " + findings + " " + votes + " " +
-        (desc || "") + " " + m + " " + co).toLowerCase()
+      repo: r, packager: p, official: r !== "aur",
+      mtext: (m + " " + co + " " + p).toLowerCase(),
+      text: (grade + " " + name + " " + r + " " + findings + " " + votes + " " +
+        (desc || "") + " " + m + " " + co + " " + p).toLowerCase()
     };
   }
 
@@ -69,8 +77,9 @@
   // and keep working if it never does.
   var model = Array.prototype.map.call(body.rows, function (tr) {
     return entry(tr.dataset.name, tr.dataset.grade, +tr.dataset.findings,
-      +tr.dataset.votes, tr.cells[4] ? tr.cells[4].textContent : "",
-      tr.dataset.maintainer, tr.querySelector(".drift"), tr.dataset.comaintainers);
+      +tr.dataset.votes, tr.cells[5] ? tr.cells[5].textContent : "",
+      tr.dataset.maintainer, tr.querySelector(".drift"), tr.dataset.comaintainers,
+      tr.dataset.repo, tr.dataset.packager);
   });
   var loaded = false;   // roster.json has replaced the seeded model
   var sortCol = null;   // null means "the order it was served in"
@@ -87,6 +96,7 @@
   // a row matched on a handle say why, spelled once for the rows this script
   // builds exactly as the server spells it for the rows it sent.
   function maintainedBy(e) {
+    if (e.official) return e.packager ? "packaged by " + e.packager : "";
     var parts = [];
     if (e.maintainer) parts.push("maintained by " + e.maintainer);
     if (e.comaint) parts.push("co-maintained by " + e.comaint.split(" ").join(", "));
@@ -97,8 +107,10 @@
     var tr = document.createElement("tr");
     tr.dataset.grade = e.grade;
     tr.dataset.name = e.name;
+    tr.dataset.repo = e.repo;
     tr.dataset.maintainer = e.maintainer;
     tr.dataset.comaintainers = e.comaint;
+    tr.dataset.packager = e.packager;
     tr.dataset.findings = e.findings;
     tr.dataset.votes = e.votes;
 
@@ -126,13 +138,27 @@
       pkg.appendChild(warn);
     }
 
+    var rcell = document.createElement("td");
+    rcell.className = "rcell";
+    var repo = document.createElement("span");
+    repo.className = "repo repo-" + e.repo;
+    repo.textContent = e.repo;
+    rcell.appendChild(repo);
+
     var findings = document.createElement("td");
     findings.className = "num";
     findings.textContent = e.findings;
 
     var votes = document.createElement("td");
     votes.className = "num votes";
-    votes.textContent = e.votes;
+    if (e.official) {
+      var none = document.createElement("span");
+      none.className = "none";
+      none.textContent = "\u2013";
+      votes.appendChild(none);
+    } else {
+      votes.textContent = e.votes;
+    }
 
     var desc = document.createElement("td");
     desc.className = "desc";
@@ -141,6 +167,7 @@
 
     tr.appendChild(gcell);
     tr.appendChild(pkg);
+    tr.appendChild(rcell);
     tr.appendChild(findings);
     tr.appendChild(votes);
     tr.appendChild(desc);
@@ -156,9 +183,18 @@
   }
 
   var order = ["F", "D", "C", "B", "A", "?"];
+  // Repositories sort as the Go side ranks them (repoRank): the base system
+  // first, the AUR last, anything unfamiliar between.
+  var repoOrder = ["core", "extra", "multilib"];
+  function repoRank(r) {
+    if (r === "aur") return repoOrder.length + 1;
+    var i = repoOrder.indexOf(r);
+    return i < 0 ? repoOrder.length : i;
+  }
   var value = {
     grade: function (e) { return order.indexOf(e.grade); },
     name: function (e) { return e.name; },
+    repo: function (e) { return repoRank(e.repo); },
     findings: function (e) { return e.findings; },
     votes: function (e) { return e.votes; }
   };
@@ -175,12 +211,14 @@
     var byMaintainer = raw.charAt(0) === "@";
     var q = (byMaintainer ? raw.slice(1) : raw).toLowerCase();
     var picked = Object.keys(grades);
+    var rpicked = Object.keys(repos);
 
     var hits = [];
     for (var i = 0; i < model.length; i++) {
       var e = model[i];
       var hay = byMaintainer ? e.mtext : e.text;
-      if ((!q || hay.indexOf(q) !== -1) && (!picked.length || grades[e.grade])) {
+      if ((!q || hay.indexOf(q) !== -1) && (!picked.length || grades[e.grade]) &&
+        (!rpicked.length || repos[e.repo])) {
         hits.push(e);
       }
     }
@@ -198,7 +236,7 @@
     // Nothing is filtering or sorting and the served rows are still in place,
     // so they are already this exact slice — rebuilding them would be work
     // whose only effect is to throw away the HTML that was shipped.
-    if (!(asServed && !q && !picked.length && !sortCol)) render(hits, shown);
+    if (!(asServed && !q && !picked.length && !rpicked.length && !sortCol)) render(hits, shown);
 
     var of = loaded ? model.length : total || model.length;
     if (count) {
@@ -213,10 +251,13 @@
     if (empty) empty.hidden = hits.length !== 0;
     // raw, not q: a box holding just "@" filters nothing but is still not
     // empty, and Reset is what empties it.
-    if (clear) clear.hidden = !raw && !picked.length;
+    if (clear) clear.hidden = !raw && !picked.length && !rpicked.length;
     if (bar) bar.classList.toggle("filtered", picked.length > 0);
     keys.forEach(function (el) {
       el.setAttribute("aria-pressed", grades[el.dataset.grade] ? "true" : "false");
+    });
+    rkeys.forEach(function (el) {
+      el.setAttribute("aria-pressed", repos[el.dataset.repo] ? "true" : "false");
     });
   }
 
@@ -229,27 +270,49 @@
     });
   });
 
+  rkeys.forEach(function (el) {
+    el.addEventListener("click", function () {
+      var r = el.dataset.repo;
+      if (repos[r]) delete repos[r];
+      else repos[r] = true;
+      reflect();
+      apply();
+    });
+  });
+
   // The query lives in the URL as well as the box: ?search=@lone_wolf opens
   // the roster already narrowed, which is the only way a static site can hand
   // out a link to a filtered view — a maintainer pointing at their own
-  // packages being the case that pays for it. Typing mirrors the box back
-  // with replaceState, one entry, so the address bar always names the view on
-  // screen and Back still leaves the page rather than un-typing the query.
+  // packages being the case that pays for it. ?repo=core does the same for
+  // the repository filter, so "how does core look" is a link too. Typing
+  // mirrors the box back with replaceState, one entry, so the address bar
+  // always names the view on screen and Back still leaves the page rather
+  // than un-typing the query.
   function reflect() {
-    if (!search || !window.URLSearchParams || !window.history ||
-      !history.replaceState) return;
+    if (!window.URLSearchParams || !window.history || !history.replaceState) return;
     var params = new URLSearchParams(location.search);
-    var raw = search.value.trim();
+    var raw = search ? search.value.trim() : "";
     if (raw) params.set("search", raw);
     else params.delete("search");
+    var rs = Object.keys(repos);
+    if (rs.length) params.set("repo", rs.join(","));
+    else params.delete("repo");
     var qs = params.toString();
     history.replaceState(null, "",
       location.pathname + (qs ? "?" + qs : "") + location.hash);
   }
 
-  if (search && window.URLSearchParams) {
-    var seeded = new URLSearchParams(location.search).get("search");
-    if (seeded) search.value = seeded;
+  if (window.URLSearchParams) {
+    var params = new URLSearchParams(location.search);
+    var seeded = params.get("search");
+    if (search && seeded) search.value = seeded;
+    // Only repositories the page knows: an unknown one would select nothing
+    // and show an empty roster with no key to un-press.
+    var known = Object.create(null);
+    rkeys.forEach(function (el) { known[el.dataset.repo] = true; });
+    (params.get("repo") || "").split(",").forEach(function (r) {
+      if (known[r]) repos[r] = true;
+    });
   }
 
   if (search) {
@@ -263,6 +326,7 @@
     clear.addEventListener("click", function () {
       if (search) search.value = "";
       grades = Object.create(null);
+      repos = Object.create(null);
       reflect();
       apply();
       if (search) search.focus();
@@ -271,7 +335,7 @@
 
   // Sorting. Numeric columns sort high-to-low first, text columns A-to-Z; the
   // grade column sorts worst-first, which is the order worth seeing.
-  var firstDir = { grade: 1, name: 1, findings: -1, votes: -1 };
+  var firstDir = { grade: 1, name: 1, repo: 1, findings: -1, votes: -1 };
 
   Array.prototype.forEach.call(table.tHead.rows[0].cells, function (th) {
     var key = th.dataset.sort;
@@ -306,7 +370,7 @@
       .then(function (rows) {
         if (!rows || !rows.length) return;
         model = rows.map(function (r) {
-          return entry(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]);
+          return entry(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]);
         });
         loaded = true;
         rest.textContent = "Searching all " + model.length + " packages. ";

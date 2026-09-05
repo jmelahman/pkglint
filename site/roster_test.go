@@ -76,12 +76,12 @@ func TestGroupShardsCoversEveryPackage(t *testing.T) {
 func TestWriteRosterRowShape(t *testing.T) {
 	out := t.TempDir()
 	results := []siteResult{{
-		Name: "demo", Grade: "C", Votes: 42, Description: "a demo",
+		Name: "demo", Repo: "aur", Grade: "C", Votes: 42, Description: "a demo",
 		Maintainer: "someone", CoMaintainers: []string{"alice", "bob"},
 		Findings: []rules.Finding{{RuleID: "PB101"}, {RuleID: "PB102"}},
 		Drift:    []string{"a note"},
 	}, {
-		Name: "plain", Grade: "A",
+		Name: "plain", Repo: "extra", Grade: "A", Packager: "Somebody Else",
 	}}
 	if err := writeRoster(out, results); err != nil {
 		t.Fatal(err)
@@ -100,14 +100,17 @@ func TestWriteRosterRowShape(t *testing.T) {
 	// Co-maintainers are one space-joined string, the shape the row's
 	// data-comaintainers attribute uses, so site.js folds one value into its
 	// haystacks whichever way a row arrived.
-	want := []any{"demo", "C", 2.0, 42.0, "a demo", "someone", 1.0, "alice bob"}
+	// The repository and packager ride at the end, where an AUR row's
+	// packager is "" and an official row's maintainer is.
+	want := []any{"demo", "C", 2.0, 42.0, "a demo", "someone", 1.0, "alice bob", "aur", ""}
 	if !slices.Equal(rows[0], want) {
 		t.Errorf("row = %v, want %v", rows[0], want)
 	}
 	// Drift is 0 and co-maintainers "", not absent: the rows are positional,
 	// so an omitted field would shift or drop every later one.
-	if len(rows[1]) != 8 || rows[1][6] != 0.0 || rows[1][7] != "" {
-		t.Errorf("undrifted row = %v, want 8 elements ending in 0 and %q", rows[1], "")
+	want = []any{"plain", "A", 0.0, 0.0, "", "", 0.0, "", "extra", "Somebody Else"}
+	if !slices.Equal(rows[1], want) {
+		t.Errorf("official row = %v, want %v", rows[1], want)
 	}
 }
 

@@ -45,7 +45,7 @@ jobs:
           go-version-file: go.mod
       - name: Fuzz smoke
         run: |
-          for pkg in ./internal/pkgbuild ./internal/pkgfile ./internal/alpmdb ./internal/rules; do
+          for pkg in ./internal/pkgbuild ./internal/pkgfile ./internal/alpmdb ./internal/rules ./site; do
             for target in $(go test "$pkg" -list '^Fuzz' | grep '^Fuzz'); do
               go test "$pkg" -fuzz "^${target}\$" -fuzztime 15s
             done

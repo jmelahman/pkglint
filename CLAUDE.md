@@ -38,14 +38,29 @@ that way: 48 nightly `docs/` snapshots on master are what made a 2MB source
 tree a 157MB clone, and a branch that is always one commit deep cannot repeat
 it. `docs/` and `data/` are gitignored so a local run cannot re-add them.
 
-Local preview, with the published state as a starting point:
+The corpus has two sources, and the same gate covers both. The AUR is
+indexed from its metadata dump and fetched as cgit snapshots. The official
+repositories (`-repos`, default `core,extra,multilib`; `site/official.go`) are
+indexed from the pacman sync databases and each PKGBUILD tree is fetched as
+its release tag's archive from gitlab.archlinux.org, whose project names and
+tags follow devtools' rules (`gitlabProject`, `gitlabTag`) — a wrong name gets
+a 200 sign-in page, which is why `downloadOnce` refuses HTML. The site's
+namespace is flat: a base in both gets one page, graded from the official
+PKGBUILD, and the AUR copy is logged as shadowed. State records carry `repo`;
+blank means AUR, and a record only counts as prior for a base from the same
+repository. GitLab is throttled per host (`throttles`) under its unauthenticated
+600-per-ten-minutes limit; keep any new host's pacing there too.
+
+Local preview, with the published state as a starting point (`-repos ""` for
+an AUR-only run):
 
 ```shell
 curl -sfLo /tmp/state.jsonl https://raw.githubusercontent.com/jmelahman/pkglint/site/data/state.jsonl
 go run ./site -maintainer Jamison -since-days 90 -top 500 -budget 200 -state /tmp/state.jsonl -out /tmp/site-preview
 ```
 
-`state.jsonl` caches findings per base, keyed on LastModified plus a rule
-registry fingerprint, so registry changes re-lint the corpus automatically over
-a few nightly runs. Changing rule *logic* without changing the registry shape
-needs a `stateEpoch` bump in `site/state.go`.
+`state.jsonl` caches findings per base, keyed on LastModified (the build date,
+for an official package) plus a rule registry fingerprint, so registry changes
+re-lint the corpus automatically over a few nightly runs. Changing rule *logic*
+without changing the registry shape needs a `stateEpoch` bump in
+`site/state.go`.

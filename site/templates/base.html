@@ -1,5 +1,5 @@
 {{define "head"}}
-{{- $alt := "The AUR Report Card masthead over pkglint's grade ramp: A for no warnings through F for any critical finding." -}}
+{{- $alt := "The Arch Report Card masthead over pkglint's grade ramp: A for no warnings through F for any critical finding." -}}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
@@ -20,7 +20,7 @@
      text, which is the one thing a screen reader on that timeline needs. */}}
 <link rel="canonical" href="{{.URL}}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:site_name" content="Arch Report Card">
 <meta property="og:title" content="{{.Title}}">
 <meta property="og:description" content="{{.Desc}}">
 <meta property="og:url" content="{{.URL}}">
@@ -37,7 +37,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="topbar">
   <div>
-    <a class="mark" href="{{.Root}}index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <a class="mark" href="{{.Root}}index.html"><b>pkglint</b><span>Arch report card</span></a>
     <nav>
       <a href="{{.Root}}rules/index.html">Rules</a>
       <a href="{{.Root}}results.json">JSON</a>
@@ -62,6 +62,7 @@
     <tr>
       <th class="grade-h" data-sort="grade">Grade</th>
       <th class="pkg-h" data-sort="name"{{if eq .Sort "name"}} aria-sort="ascending"{{end}}>Package</th>
+      <th class="repo-h" data-sort="repo">Repo</th>
       <th class="num" data-sort="findings">Findings</th>
       <th class="num votes-h" data-sort="votes"{{if eq .Sort "votes"}} aria-sort="descending"{{end}}>Votes</th>
       <th class="desc-h">Description</th>
@@ -73,13 +74,19 @@
          own, so they ride in data attributes for the filter to match, and in
          the name cell's tooltip so a row that matched on one can still say
          why. Co-maintainers are space-joined into one attribute, the same
-         shape roster.json carries them in. */}}
-    <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-maintainer="{{.Maintainer}}" data-comaintainers="{{join .CoMaintainers " "}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
+         shape roster.json carries them in. An official package's packager
+         rides the same way, and its repository has a column, but the
+         attribute is what the repository filter reads.
+
+         Votes are the AUR's: an official package has none, and a dash says
+         so where a zero would say "unpopular". */}}
+    <tr data-grade="{{.Grade}}" data-name="{{.Name}}" data-repo="{{.Repo}}" data-maintainer="{{.Maintainer}}" data-comaintainers="{{join .CoMaintainers " "}}" data-packager="{{.Packager}}" data-findings="{{len .Findings}}" data-votes="{{.Votes}}">
       <td class="gcell"><span class="grade grade-{{.Grade}}">{{.Grade}}</span></td>
       <td class="pkg"{{with .MaintainedBy}} title="{{.}}"{{end}}><a href="{{$.Root}}package/{{.Name}}.html">{{.Name}}</a>{{if .Drift}}
         <span class="drift" title="source drift since the previous scan">&#9888;</span>{{end}}</td>
+      <td class="rcell"><span class="repo repo-{{.Repo}}">{{.Repo}}</span></td>
       <td class="num">{{len .Findings}}</td>
-      <td class="num votes">{{.Votes}}</td>
+      <td class="num votes">{{if .Official}}<span class="none">&ndash;</span>{{else}}{{.Votes}}{{end}}</td>
       <td class="desc" title="{{.Description}}">{{.Description}}</td>
     </tr>
   {{end}}

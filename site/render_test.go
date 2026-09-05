@@ -327,3 +327,119 @@ func TestClip(t *testing.T) {
 		})
 	}
 }
+
+// TestRenderRepositories covers what the official repositories add to the
+// pages: a repository column and breakdown the roster filters on, a packager
+// where the AUR has a maintainer, and package-page links to the repository
+// that carries the base — all wired through data attributes to a script in
+// another file, where a rename on either side ships quietly.
+func TestRenderRepositories(t *testing.T) {
+	results := []siteResult{
+		{Name: "demo", Base: "demo", Repo: "aur", Version: "1.0-1", Grade: "A", Votes: 7,
+			Maintainer: "dbermond", Findings: []rules.Finding{}},
+		{Name: "linux", Base: "linux", Repo: "core", Version: "6.1-2", Grade: "B",
+			Packager: "Jan Alexander Steffens (heftig)", Findings: []rules.Finding{}},
+	}
+	out := t.TempDir()
+	for _, sub := range []string{"rules", "package", "badge"} {
+		if err := os.MkdirAll(filepath.Join(out, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := renderSite(out, results); err != nil {
+		t.Fatalf("renderSite: %v", err)
+	}
+	read := func(rel string) string {
+		b, err := os.ReadFile(filepath.Join(out, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		return string(b)
+	}
+
+	index := read("index.html")
+	for _, want := range []string{
+		// The column, and the attribute the filter reads.
+		`<th class="repo-h" data-sort="repo">Repo</th>`,
+		`data-repo="core"`,
+		`data-repo="aur"`,
+		`<span class="repo repo-core">core</span>`,
+		// The packager rides the same way the maintainer does, and the tooltip
+		// says which it is.
+		`data-packager="Jan Alexander Steffens (heftig)"`,
+		`title="packaged by Jan Alexander Steffens (heftig)"`,
+		`data-packager=""`,
+		// Votes are an AUR notion; an official row shows none rather than 0.
+		`<span class="none">&ndash;</span>`,
+		// The per-repository breakdown, whose names are filters.
+		`<table class="repos">`,
+		`class="rkey" data-repo="core"`,
+		`class="rkey" data-repo="aur"`,
+		// The box admits to the field.
+		`Filter packages by name, maintainer, packager, or description`,
+	} {
+		if !strings.Contains(index, want) {
+			t.Errorf("index.html missing %s", want)
+		}
+	}
+	pkg := read(filepath.Join("package", "linux.html"))
+	for _, want := range []string{
+		`<span class="repo repo-core">core</span>`,
+		"packaged by",
+		`href="https://archlinux.org/pkgbase/linux/"`,
+		`href="` + gitlabPackages + `linux"`,
+	} {
+		if !strings.Contains(pkg, want) {
+			t.Errorf("linux.html missing %s", want)
+		}
+	}
+	for _, stray := range []string{"votes", "AUR page", "maintained by"} {
+		if strings.Contains(pkg, stray) {
+			t.Errorf("linux.html carries an AUR-only fact: %s", stray)
+		}
+	}
+	demo := read(filepath.Join("package", "demo.html"))
+	for _, want := range []string{`href="https://aur.archlinux.org/pkgbase/demo"`, "maintained by dbermond", "AUR page"} {
+		if !strings.Contains(demo, want) {
+			t.Errorf("demo.html missing %s", want)
+		}
+	}
+	if strings.Contains(demo, "packaged by") {
+		t.Error("demo.html names a packager for an AUR package")
+	}
+
+	js := read(filepath.Join("assets", "site.js"))
+	for _, want := range []string{"tr.dataset.repo", "tr.dataset.packager", `.get("repo")`, `"packaged by "`, `".rkey"`} {
+		if !strings.Contains(js, want) {
+			t.Errorf("site.js missing %s: the repository filter is not wired up", want)
+		}
+	}
+}
+
+// TestRenderSingleRepositoryHasNoBreakdown: with one source the per-repository
+// table would repeat the legend line for line, so it is left out.
+func TestRenderSingleRepositoryHasNoBreakdown(t *testing.T) {
+	results := []siteResult{
+		{Name: "demo", Base: "demo", Version: "1.0-1", Grade: "A", Findings: []rules.Finding{}},
+	}
+	out := t.TempDir()
+	for _, sub := range []string{"rules", "package", "badge"} {
+		if err := os.MkdirAll(filepath.Join(out, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := renderSite(out, results); err != nil {
+		t.Fatalf("renderSite: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `<table class="repos">`) {
+		t.Error("index.html shows a per-repository breakdown for a single repository")
+	}
+	// A result with no repository is an AUR one, and says so in the column.
+	if !strings.Contains(string(b), `data-repo="aur"`) {
+		t.Error("index.html does not default an unlabelled result to the AUR")
+	}
+}

@@ -31,7 +31,13 @@ import (
 // every run, and caching them would pin a package's vote count to whenever its
 // PKGBUILD last changed.
 type stateRecord struct {
-	Base         string          `json:"base"`
+	Base string `json:"base"`
+	// Repo is the repository the base was scanned from. Absent from records
+	// written before the official repositories joined the corpus, which were
+	// all AUR; see repo. The AUR's LastModified and a repository's build date
+	// are not on the same clock, so a record is fresh only against its own
+	// repository.
+	Repo         string          `json:"repo,omitempty"`
 	LastModified int64           `json:"last_modified"`
 	Grade        string          `json:"grade"`
 	Findings     []rules.Finding `json:"findings"`
@@ -46,6 +52,14 @@ type stateRecord struct {
 	// ruleset forever, since re-lints are otherwise keyed on LastModified
 	// alone.
 	Rules string `json:"rules,omitempty"`
+}
+
+// repo is the record's repository, spelling out the AUR for the zero value.
+func (r stateRecord) repo() string {
+	if r.Repo == "" {
+		return aurRepo
+	}
+	return r.Repo
 }
 
 // stateEpoch invalidates every state record when bumped. The registry

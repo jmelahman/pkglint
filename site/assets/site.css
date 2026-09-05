@@ -345,7 +345,9 @@ p { max-width: var(--measure); }
    every width, and its text opens across the full width beneath. Nothing
    already on the page moves when it is expanded, and on a narrow screen
    the button stays beside the toggles rather than dropping under them. */
-.keys .rkeys { grid-column: 1; grid-row: 1; min-height: 2.15rem; align-items: center; }
+/* The disclosure shares row 1 and is painted later, so without a stacking
+   order its box covers the toggles beside its button and takes their clicks. */
+.keys .rkeys { grid-column: 1; grid-row: 1; position: relative; z-index: 1; min-height: 2.15rem; align-items: center; }
 .keys .explain {
   grid-column: 1 / -1; grid-row: 1; margin-top: 0;
   display: grid; grid-template-columns: subgrid; column-gap: 1rem;

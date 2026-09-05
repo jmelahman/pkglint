@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sickchill-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/sickchill-git: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/sickchill-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="sickchill-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/sickchill-git: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/sickchill-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>sickchill-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>2024.3.1.r0.20260825.latest-1</b>
+          
+          <span>maintained by willemw</span>
+          
+          <span>12 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/sickchill-git">AUR page</a>
+          
+          <a href="../badge/sickchill-git.svg">badge</a>
+        </p>
+        <p>Automatic video library manager for TV shows</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;sickchill-git&#34; builds the same software as &#34;sickchill&#34; but declares neither provides=(sickchill) nor conflicts=(sickchill), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB963.html">PB963</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;sickchill-git&#34; has the -git suffix but no git source; the suffix promises a build from the repository tip
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB602.html">PB602</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          curl accesses the network inside pkgver(); derive the version from fetched sources instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 87</div>
+        <div class="rid"><a href="../rules/PB201.html">PB201</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pip downloads during build(); network access belongs in prepare() with pinned hashes
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 87</div>
+        <div class="rid"><a href="../rules/PB202.html">PB202</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pip install without --require-hashes: downloads are not verified against pinned digests
+          </div>
+      </div>
+      
+    </div>
+    
+    <p class="file">sickchill-git.install</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          systemd-sysusers is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keymux — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/keymux: 28 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/keymux.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="keymux — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/keymux: 28 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/keymux.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>keymux</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1.3.2-1</b>
+          
+          <span>maintained by fibsussy</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/keymux">AUR page</a>
+          
+          <a href="../badge/keymux.svg">badge</a>
+        </p>
+        <p>Keyboard middleware for gaming with low-level input interception</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 28</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;x86_64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 24</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 29</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;https://github.com/fibsussy/keymux/releases/download/v$pkgver/keymux-$pkgver-$_arch.tar.gz&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 30</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;LICENSE::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/LICENSE&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 31</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;keymux.service::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/systemd/keymux.service&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 32</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;keymux-niri.service::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/systemd/keymux-niri.service&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;keymux-hyprland.service::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/systemd/keymux-hyprland.service&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 34</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;keymux-sway.service::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/systemd/keymux-sway.service&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 35</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;keymux-i3.service::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/systemd/keymux-i3.service&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;keymux-bspwm.service::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/systemd/keymux-bspwm.service&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;openrc-keymux::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/openrc/keymux&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;openrc-keymux-niri::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/openrc/keymux-niri&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 39</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;openrc-keymux-hyprland::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/openrc/keymux-hyprland&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 40</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;openrc-keymux-sway::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/openrc/keymux-sway&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;openrc-keymux-i3::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/openrc/keymux-i3&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 42</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;openrc-keymux-bspwm::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/openrc/keymux-bspwm&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 43</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-log-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux/log/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 45</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-niri-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-niri/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 46</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-niri-log-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-niri/log/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-hyprland-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-hyprland/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 48</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-hyprland-log-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-hyprland/log/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 49</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-sway-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-sway/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 50</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-sway-log-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-sway/log/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 51</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-i3-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-i3/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 52</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-i3-log-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-i3/log/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 53</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-bspwm-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-bspwm/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 54</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;runit-keymux-bspwm-log-run::https://raw.githubusercontent.com/fibsussy/keymux/v$pkgver/runit/keymux-bspwm/log/run&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

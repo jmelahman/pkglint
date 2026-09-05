@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB501: network-in-scriptlet — AUR Report Card</title>
+<meta name="description" content="PB501 (network-in-scriptlet): Install scriptlets run as root during pacman transactions. A scriptlet that talks to the network executes unreviewable remote input at the worst possible moment — this…">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB501.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB501: network-in-scriptlet — AUR Report Card">
+<meta property="og:description" content="PB501 (network-in-scriptlet): Install scriptlets run as root during pacman transactions. A scriptlet that talks to the network executes unreviewable remote input at the worst possible moment — this…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB501.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB501</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">network-in-scriptlet</span></h1>
+    
+    <p class="lede">Install scriptlets run as root during pacman transactions. A scriptlet that talks to the network executes unreviewable remote input at the worst possible moment — this is how the 2018 acroread AUR compromise delivered its payload.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>post_install() {
+  curl -fsSL https://example.com/register?host=$(hostname)
+}</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>post_install() {
+  echo &#34;Run &#39;foo --setup&#39; to finish configuration.&#34;
+}</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB501</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB501</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB405.html">&larr; PB405 sensitive-file-write</a>
+      <a href="PB502.html">PB502 scriptlet-persistence &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rubrika-certificates — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/rubrika-certificates: 43 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/rubrika-certificates.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="rubrika-certificates — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/rubrika-certificates: 43 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/rubrika-certificates.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>rubrika-certificates</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1.0.0-1</b>
+          
+          <span>maintained by vencejo</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/rubrika-certificates">AUR page</a>
+          
+          <a href="../badge/rubrika-certificates.svg">badge</a>
+        </p>
+        <p>Certificados raíz del DNIe (DGP) y la FNMT para uso en Linux</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 43</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-error">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Raiz_FNMT-RCM_SHA256.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Raiz_FNMT-RCM_SHA256.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_FNMT_Usuarios.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_FNMT_Usuarios.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Representacion.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Representacion.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Sector_Publico.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Sector_Publico.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Raiz_FNMT-RCM_G2.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Raiz_FNMT-RCM_G2.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 42</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Usuarios_G2.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Usuarios_G2.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 42</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 43</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Representacion_G2.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Representacion_G2.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 43</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;AC_Sector_Publico_G2.cer::https://www.sede.fnmt.gob.es/documents/10445900/10526749/AC_Sector_Publico_G2.cer&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.sede.fnmt.gob.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;ACRAIZ-DNIE2.zip::https://www.dnielectronico.es/ZIP/ACRAIZ-DNIE2.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.dnielectronico.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 48</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;ACRAIZ-SHA2.zip::https://www.dnielectronico.es/ZIP/ACRAIZ-SHA2.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 48</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.dnielectronico.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 51</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;ACDNIE004.zip::https://www.dnielectronico.es/ZIP/ACDNIE004.crt.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 51</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.dnielectronico.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 52</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;ACDNIE005.zip::https://www.dnielectronico.es/ZIP/ACDNIE005.crt.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 52</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.dnielectronico.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 53</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;ACDNIE006.zip::https://www.dnielectronico.es/ZIP/ACDNIE006.crt.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 53</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.dnielectronico.es&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 75</div>
+        <div class="rid"><a href="../rules/PB106.html">PB106</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          DLAGENTS override replaces makepkg&#39;s download logic with custom commands
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 114</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 123</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 124</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 125</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 126</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 127</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 131</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 140</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 141</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 149</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 171</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 183</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 198</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 200</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 204</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 214</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

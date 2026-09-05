@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rust-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade F for aur/rust-git: 19 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/rust-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="rust-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade F for aur/rust-git: 19 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/rust-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-F" title="grade F">F</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>rust-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1:1.96.0.r1.g0312931-1</b>
+          
+          <span>maintained by kaolinite7</span>
+          
+          <span>28 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/rust-git">AUR page</a>
+          
+          <a href="../badge/rust-git.svg">badge</a>
+        </p>
+        <p>Systems programming language focused on safety, speed and concurrency (GIT VERSION)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 19</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB976.html">PB976</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          nothing selects the 32-bit ABI: without -m32 in CFLAGS/CXXFLAGS/LDFLAGS the build produces 64-bit objects and the lib32- name is a lie
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 26</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 32</div>
+        <div class="rid"><a href="../rules/PB975.html">PB975</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          lib32 package descriptions end with &#34;(32-bit)&#34; so the variant is visible everywhere pacman shows the one-line description
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 98</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;www.rust-lang.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 121</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;riscv64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 145</div>
+        <div class="rid"><a href="../rules/PB108.html">PB108</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          COMPRESSZST is set at the package level: makepkg runs the COMPRESS* command to package the build
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 225</div>
+        <div class="rid"><a href="../rules/PB203.html">PB203</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cargo build without --locked: dependency resolution may diverge from Cargo.lock
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 225</div>
+        <div class="rid"><a href="../rules/PB942.html">PB942</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          cargo build without --release ships an unoptimized debug binary; the Rust package guidelines build with --release
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 375</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;i686&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 380</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;i686&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 383</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 395</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 396</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 398</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 402</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 413</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 414</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 416</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;aarch64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

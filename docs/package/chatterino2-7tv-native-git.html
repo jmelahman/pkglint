@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chatterino2-7tv-native-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/chatterino2-7tv-native-git: 15 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/chatterino2-7tv-native-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="chatterino2-7tv-native-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/chatterino2-7tv-native-git: 15 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/chatterino2-7tv-native-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>chatterino2-7tv-native-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>7.5.5.r182.g26b39f3-1</b>
+          
+          <span>maintained by hekel</span>
+          
+          <span>2 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/chatterino2-7tv-native-git">AUR page</a>
+          
+          <a href="../badge/chatterino2-7tv-native-git.svg">badge</a>
+        </p>
+        <p>Chatterino2 fork with support for 7tv; Patched to use native system QT style</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 15</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 4</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;chatterino2-7tv-native-git&#34; builds the same software as &#34;chatterino2-7tv-native&#34; but declares neither provides=(chatterino2-7tv-native) nor conflicts=(chatterino2-7tv-native), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 42</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;chatterino&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 43</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;chatterino&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;chatterino&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 45</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;pajlada&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 46</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;pajlada&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;pajlada&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 48</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;neargye&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 49</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;mackron&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 50</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;lua&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 51</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;thephd&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 52</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;hekel&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 53</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;hekel&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 54</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;hekel&#34; on github.com but the project url is under &#34;seventv&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 96</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

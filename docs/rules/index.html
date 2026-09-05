@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rule reference — AUR Report Card</title>
+<meta name="description" content="Every check pkglint runs on a PKGBUILD, grouped by concern, with a flagged and preferred example for each.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="Rule reference — AUR Report Card">
+<meta property="og:description" content="Every check pkglint runs on a PKGBUILD, grouped by concern, with a flagged and preferred example for each.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row hero-row">
+  <div class="tag"></div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+    <h1>Rule<br>Reference</h1>
+    <p class="lede">Every check pkglint runs, grouped by what it protects. Each rule has a
+    page with a flagged and a preferred example.</p>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Grading</div>
+  <div>
+    <p>A package is graded by its worst finding, so one critical outweighs any number of
+    smaller notes. The severity beside each rule below is what it reports; a rule that
+    weighs what it found — an <code>eval</code> of a downloaded script is worse than an
+    <code>eval</code> — shows the range it spans.</p>
+    <div class="ladder">
+      <div class="rung"><span class="grade grade-F">F</span><span>any <b>critical</b> finding</span></div>
+      <div class="rung"><span class="grade grade-D">D</span><span>any <b>error</b></span></div>
+      <div class="rung"><span class="grade grade-C">C</span><span><b>3 or more warnings</b></span></div>
+      <div class="rung"><span class="grade grade-B">B</span><span><b>1 or 2 warnings</b></span></div>
+      <div class="rung"><span class="grade grade-A">A</span><span><b>no warnings</b>, only info</span></div>
+    </div>
+    <p>Rules tagged <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span> are rewritten in place by
+    <code>pkglint --fix</code>, which never changes what the build does. Rules tagged
+    <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span> are mechanical too, but they do change it, so read the
+    diff. Adding <code># pkglint: ignore=PB123</code> above a line suppresses a case you have
+    already reviewed.</p>
+  </div>
+</section>
+
+
+<section class="row">
+  <div class="tag">PB1xx<small>n = 14</small></div>
+  <div>
+    <h2>Integrity &amp; provenance</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB101.html">PB101</a></td>
+        <td class="rname">skipped-checksum</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Every remote, non-VCS source should carry a real checksum. <code>SKIP</code> means makepkg performs no integrity verification at all: if the upstream file or the connection is tampered with, nothing notices. Pin the artifact with a sha256 or stronger digest. Detached signature files and the artifacts they verify are exempt — there the PGP machinery does the verifying, and PB111 flags it when that machinery is unanchored.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB102.html">PB102</a></td>
+        <td class="rname">weak-checksum</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">md5 and sha1 are broken for collision resistance. When they are the only digests present, an attacker able to produce collisions can substitute the source artifact. Add sha256sums, sha512sums or b2sums. --fix adds them for sources already downloaded into the package directory or makepkg&#39;s source cache, and only after re-checking the weak digest against those same bytes; it never downloads a source to do so, so a package whose sources are not present keeps the finding and <code>updpkgsums</code> remains the way to close it.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB103.html">PB103</a></td>
+        <td class="rname">unpinned-vcs-source</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">A VCS source without <code>#commit=</code> pins to a mutable reference: branches move and tags can be re-pointed by anyone with push access (or a compromised forge account). Pinning the exact commit hash makes the fetched tree tamper-evident. Packages named for the VCS they track (<code>foo-git</code>, <code>foo-hg</code>, …) are exempt while they follow a branch: building whatever upstream&#39;s tip points at today is what such a package is for, and pinning it would make it a different package. A mutable <code>#tag=</code> is still reported there — a tag is not the tip, and it can be re-pointed.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB104.html">PB104</a></td>
+        <td class="rname">insecure-transport</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">Sources fetched over http://, git:// or ftp:// can be modified in transit. Pinned to a strong digest the download is still verified, so an attacker in the path can break the build but not change what it produces — a warning. With SKIP, a weak sum, or no sum at all — which includes every git:// clone — nothing checks what arrives, and it is a working man-in-the-middle vector: an error. Use https:// (or git+https://) either way. Signature files fetched insecurely are PB112&#39;s concern. --unsafe-fix rewrites the scheme (http and ftp to https, bare git:// to git+https://), but only after checking that the https URL answers — a headers-only request, or <code>git ls-remote</code> for a git remote — so a host that does not serve it keeps the finding instead of getting a broken build. It stays unsafe because reachable is not identical: only the checksum can say the https URL serves the same bytes, so rebuild after applying it. --offline skips it.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB105.html">PB105</a></td>
+        <td class="rname">source-url-mismatch</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A source hosted on a different domain than the project&#39;s <code>url</code> is worth a second look: repackaged or &#39;mirrored&#39; artifacts are a common way to slip in modified binaries. Often legitimate (CDNs, release mirrors) — hence only informational.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB106.html">PB106</a></td>
+        <td class="rname">dlagents-override</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Overriding DLAGENTS replaces makepkg&#39;s download logic with arbitrary commands, which run before any checksum is verified. Legitimate uses exist but are rare enough that every override deserves review.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB107.html">PB107</a></td>
+        <td class="rname">missing-install-script</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">The PKGBUILD references an install scriptlet that is not present next to it, so its contents cannot be reviewed or linted.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB108.html">PB108</a></td>
+        <td class="rname">makepkg-config-override</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Assigning a makepkg.conf variable at the top level reconfigures makepkg itself. VCSCLIENTS and the COMPRESS* arrays are executed as commands, so overriding them injects code into the fetch and packaging steps; PACKAGER/GPGKEY spoof package identity and BUILDENV/INTEGRITY_CHECK can silently disable verification. Like DLAGENTS (PB106), these belong in makepkg.conf, never in a package.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB109.html">PB109</a></td>
+        <td class="rname">forge-owner-mismatch</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A source hosted on the same forge as the project url but under a different owner is a common repackaging vector: recent AUR compromises kept github.com and changed only the account in the path, which a host-only comparison (PB105) misses. Often a legitimate fork or mirror — hence a warning, not an error.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB110.html">PB110</a></td>
+        <td class="rname">checksum-count-mismatch</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">makepkg pairs each source with the checksum at the same index, so a sums array of the wrong length means some sources are unverified (or verified against the wrong digest). makepkg errors on this; regenerate with updpkgsums.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB111.html">PB111</a></td>
+        <td class="rname">signature-without-key</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A detached signature (.sig/.asc) or a ?signed VCS source is only as strong as the key it is checked against. With validpgpkeys empty, makepkg accepts any key already present in the builder&#39;s keyring — whatever the user was last told to import — instead of a maintainer-pinned fingerprint, so the strongest verification the PKGBUILD declares is never actually anchored. Pin the upstream signing key&#39;s full fingerprint in validpgpkeys.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB112.html">PB112</a></td>
+        <td class="rname">insecure-signature-transport</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">This signature file is fetched over an unencrypted transport. With validpgpkeys pinned the signature still verifies cryptographically — hence a warning where PB104 errors for ordinary sources — but a man-in-the-middle can strip or swap the file to break builds, and combined with an unpinned key (PB111) it is a working bypass. Use https://. --unsafe-fix rewrites the scheme once it has confirmed the https URL answers, with PB104&#39;s caveat: a reachable signature is not necessarily the same signature.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB113.html">PB113</a></td>
+        <td class="rname">unused-validpgpkeys</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">validpgpkeys pins signing keys, but no source carries a detached signature (.sig/.asc) and no VCS source requests ?signed verification, so nothing is ever checked against the keys. Either dead configuration or a signature source was dropped — confusing at review time either way.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB114.html">PB114</a></td>
+        <td class="rname">malformed-checksum</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A checksum with the wrong length for its algorithm or with non-hex characters can never match any download, so verification is guaranteed to fail — usually a truncated paste or a digest computed with a different algorithm than the array names.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB2xx<small>n = 9</small></div>
+  <div>
+    <h2>Hermeticity</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB201.html">PB201</a></td>
+        <td class="rname">network-in-build</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Downloads during build(), check() or package() bypass makepkg&#39;s checksum verification and make the build non-hermetic: what gets compiled depends on network state at build time. Move fetching to prepare() (or better, the source array) where artifacts are pinned by lockfiles or checksums.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB202.html">PB202</a></td>
+        <td class="rname">pip-without-hashes</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc"><code>pip install</code> without --require-hashes will happily fetch whatever the index serves. With hash-pinned requirements, pip verifies every downloaded artifact against a digest recorded in the requirements file.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB203.html">PB203</a></td>
+        <td class="rname">cargo-unlocked</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">cargo without --locked (or --frozen/--offline) may resolve and fetch dependency versions that differ from the committed Cargo.lock, so the built artifact is not reproducible and unreviewed code can enter the build. Flags kept in a variable count as passed wherever the PKGBUILD assigns it; a command whose flags come from outside the file is left alone, since the lockfile flag may be in there.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB204.html">PB204</a></td>
+        <td class="rname">go-implicit-downloads</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc"><code>go build</code> fetches modules on demand unless they were vendored or pre-downloaded. That download happens inside build() with no makepkg-level verification (go.sum verifies content, but resolution still depends on network state). Vendor the modules, or run <code>go mod download</code> in prepare(). <code>go install pkg@latest</code> is worse still: the ref is mutable, so what gets built depends on whatever upstream published most recently.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB205.html">PB205</a></td>
+        <td class="rname">go-verification-disabled</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">GOFLAGS/GONOSUMCHECK/GOSUMDB/GOINSECURE settings that disable Go&#39;s module checksum database or allow insecure transports remove the only integrity verification Go downloads get inside a build.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB206.html">PB206</a></td>
+        <td class="rname">npm-install-unlocked</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc"><code>npm install</code> may rewrite the dependency tree; <code>npm ci</code> (and yarn --immutable, pnpm/bun --frozen-lockfile) installs exactly what the committed lockfile specifies and fails otherwise.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB207.html">PB207</a></td>
+        <td class="rname">composer-unlocked</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc"><code>composer update</code> re-resolves and fetches dependency versions, abandoning the committed composer.lock — use <code>composer install</code>, which installs exactly what the lock pins. And either way, composer runs hook scripts and plugins from composer.json and the dependency tree during install; pass --no-scripts so fetching packages does not also mean executing them, then run any needed build step explicitly.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB208.html">PB208</a></td>
+        <td class="rname">bundler-unlocked</td>
+        <td class="rsev"><span class="sev info">info</span><span class="sevto">–</span><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc"><code>bundle install</code> without --frozen (or deployment mode) silently rewrites Gemfile.lock when it drifts from the Gemfile, fetching versions nobody reviewed; --frozen makes the committed lock authoritative and fails otherwise. Plain <code>gem install</code> has no lockfile at all — it installs whatever RubyGems serves at build time.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB209.html">PB209</a></td>
+        <td class="rname">uv-poetry-unlocked</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">uv and poetry re-resolve dependencies unless told the committed lockfile is authoritative: <code>uv sync</code>/<code>uv run</code> without --frozen or --locked may rewrite uv.lock, and <code>poetry update</code>/<code>poetry add</code> abandon poetry.lock outright. Pass --frozen, and prefer <code>poetry install</code> against the committed lock.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB3xx<small>n = 9</small></div>
+  <div>
+    <h2>Execution &amp; obfuscation</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB301.html">PB301</a></td>
+        <td class="rname">top-level-execution</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Commands outside any function run the moment the PKGBUILD is sourced — including by tools that only wanted metadata (<code>makepkg --printsrcinfo</code>, AUR helpers rendering a preview). Top-level code should be limited to variable assignments.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB302.html">PB302</a></td>
+        <td class="rname">eval</td>
+        <td class="rsev"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">eval executes a string as code, defeating static review: what actually runs is assembled at build time. Almost every legitimate use has a plain-bash equivalent.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB303.html">PB303</a></td>
+        <td class="rname">decode-and-execute</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Decoding embedded data (base64, xxd, openssl enc) and piping it into an interpreter is the canonical way to smuggle a payload past human review. There is no legitimate reason for a PKGBUILD to execute decoded blobs.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB304.html">PB304</a></td>
+        <td class="rname">download-and-execute</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Piping a download straight into an interpreter executes whatever the server chooses to send, with no checksum, no review, and no record. This includes <code>eval &#34;$(curl ...)&#34;</code>, <code>sh -c &#34;$(wget ...)&#34;</code> and <code>source &lt;(curl ...)</code> variants.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB305.html">PB305</a></td>
+        <td class="rname">dev-tcp</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">/dev/tcp and /dev/udp redirections are bash&#39;s built-in network sockets — in a PKGBUILD they are typically reverse shells or exfiltration, never packaging.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB306.html">PB306</a></td>
+        <td class="rname">unresolvable-command</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A command whose name comes from indirection (${!var}) or command substitution cannot be statically reviewed. In a PKGBUILD, hiding *which program runs* is itself a signal: obfuscation is what this rule flags.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB307.html">PB307</a></td>
+        <td class="rname">obfuscated-payload</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Long hex-escape sequences or large base64-looking literals embedded in a build script are how encoded payloads look at rest. Flagged for human review.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB308.html">PB308</a></td>
+        <td class="rname">makepkg-function-override</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">makepkg sources the PKGBUILD after defining its own internal functions, so a top-level function that reuses an internal name (download_sources, verify_integrity_one, create_package, …) silently replaces makepkg&#39;s implementation — a way to disable integrity checks or tamper with fetching and packaging. Package functions are prepare/build/check/package/package_*/pkgver only.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB309.html">PB309</a></td>
+        <td class="rname">hidden-unicode</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Bidirectional-override and invisible/zero-width characters can make the rendered source differ from what the shell executes (the &#34;Trojan Source&#34; class of attacks). A PKGBUILD is ASCII shell; these controls have no legitimate place in it.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB4xx<small>n = 5</small></div>
+  <div>
+    <h2>Filesystem &amp; privilege</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB401.html">PB401</a></td>
+        <td class="rname">write-outside-builddir</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A build must only write beneath $srcdir and $pkgdir. Writes to $HOME or absolute system paths either corrupt the builder&#39;s machine or hint at persistence being installed outside the package manager&#39;s tracking.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB402.html">PB402</a></td>
+        <td class="rname">privilege-escalation</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">makepkg builds must never escalate: sudo/su/doas/pkexec in a PKGBUILD runs arbitrary commands as root on the build machine. Anything needing privileges belongs in the package&#39;s install step, executed and tracked by pacman.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB403.html">PB403</a></td>
+        <td class="rname">setuid-file</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">chmod u+s/g+s (or 4xxx/2xxx modes), and <code>install -m</code> with such a mode, create setuid/setgid binaries, and <code>setcap</code> grants file capabilities (cap_setuid, cap_net_raw, …) — the capability-based equivalent of setuid. Each is a privilege boundary that deserves explicit review whenever a package ships one. The auto-fix drops setuid/setgid mode bits; capability grants are never rewritten automatically.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB404.html">PB404</a></td>
+        <td class="rname">install-without-destdir</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A build system&#39;s install step in package() must be redirected into $pkgdir (via DESTDIR, --root, --prefix, or --destdir). Without it, <code>make install</code> and friends write into the builder&#39;s live filesystem instead of the staging directory — untracked by pacman and often run with escalated privileges.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB405.html">PB405</a></td>
+        <td class="rname">sensitive-file-write</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Writing to pacman&#39;s configuration (SigLevel/repos control package trust), the dynamic linker&#39;s preload/search config, or sudoers — or running pacman-key — reconfigures the system&#39;s trust and privilege boundaries. In a PKGBUILD or scriptlet this is a persistence and privilege-escalation vector.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB5xx<small>n = 4</small></div>
+  <div>
+    <h2>Install scriptlets</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB501.html">PB501</a></td>
+        <td class="rname">network-in-scriptlet</td>
+        <td class="rsev"><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Install scriptlets run as root during pacman transactions. A scriptlet that talks to the network executes unreviewable remote input at the worst possible moment — this is how the 2018 acroread AUR compromise delivered its payload.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB502.html">PB502</a></td>
+        <td class="rname">scriptlet-persistence</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev critical">critical</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Files a package ships belong in package(), tracked and removed by pacman. A scriptlet that edits crontabs, systemd units, shell profiles or autostart entries, or creates login-capable users, is installing untracked persistence — a classic backdoor pattern.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB503.html">PB503</a></td>
+        <td class="rname">unparseable-scriptlet</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">An install scriptlet pkglint cannot parse is analyzed by no rule, yet its code still runs as root at install time. A parse failure usually means the file is malformed or deliberately obfuscated to defeat static analysis; either way it must be reviewed by hand.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB504.html">PB504</a></td>
+        <td class="rname">hook-covered-command</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pacman has run update-desktop-database, gtk-update-icon-cache, fc-cache and friends automatically via alpm hooks since version 5.0. Calling them from a scriptlet is dead code at best and shadows the hook&#39;s transaction-wide batching at worst; usually the whole scriptlet can be deleted.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB6xx<small>n = 3</small></div>
+  <div>
+    <h2>Metadata consistency</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB601.html">PB601</a></td>
+        <td class="rname">srcinfo-mismatch</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">.SRCINFO is what the AUR web interface and helpers display; the PKGBUILD is what executes. A mismatch means reviewers saw different metadata than the build uses — sometimes a stale regeneration, sometimes deliberate misdirection.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB602.html">PB602</a></td>
+        <td class="rname">network-in-pkgver</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pkgver() should derive a version from the already-fetched sources (git describe, cat VERSION). Downloading inside pkgver() executes network-dependent code on every makepkg invocation, including ones the user thought were offline.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB603.html">PB603</a></td>
+        <td class="rname">core-package-claim</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A provides, replaces or conflicts entry naming a core system package hijacks the dependency graph: installing the package silently satisfies dependencies meant for the real pacman/glibc/systemd, or removes the real one outright. Variant packages (foo-git, foo-bin) legitimately provide their parent, so those are exempt — anything else claiming a core identity deserves a hard look.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB7xx<small>n = 11</small></div>
+  <div>
+    <h2>Correctness &amp; metadata</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB701.html">PB701</a></td>
+        <td class="rname">invalid-pkgname</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pkgname and pkgbase may only contain the characters makepkg allows ([A-Za-z0-9@._+-]), must be ASCII, and must not start with a hyphen or dot. makepkg refuses to build a package whose name breaks these rules.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB702.html">PB702</a></td>
+        <td class="rname">invalid-pkgver</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pkgver must not be empty and may not contain colons, forward slashes, hyphens or whitespace — those characters have meaning in pacman&#39;s version syntax (epoch:, -pkgrel), so makepkg rejects them. makepkg lints the literal value before any pkgver() function runs, so even VCS packages need a valid placeholder.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB703.html">PB703</a></td>
+        <td class="rname">invalid-pkgrel</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pkgrel must be of the form &#39;integer[.integer]&#39; (e.g. 1 or 1.5). makepkg errors otherwise.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB704.html">PB704</a></td>
+        <td class="rname">invalid-epoch</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">epoch, when set, must be a non-negative integer; makepkg refuses any other value.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB705.html">PB705</a></td>
+        <td class="rname">backup-leading-slash</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">backup entries are paths relative to the filesystem root, so a leading slash is an error makepkg rejects. Drop it: <code>etc/foo.conf</code>, not <code>/etc/foo.conf</code>.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB706.html">PB706</a></td>
+        <td class="rname">unknown-option</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">The options array only accepts makepkg&#39;s known toggles (strip, debug, lto, staticlibs, emptydirs, …), each optionally prefixed with &#39;!&#39;. An unrecognized entry is usually a typo that silently does nothing; makepkg flags it as an error.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB707.html">PB707</a></td>
+        <td class="rname">provides-comparison</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">provides entries may pin an exact version with &#39;=&#39; but must not use &#39;&lt;&#39; or &#39;&gt;&#39; comparisons — a provide is a concrete capability, not a range. makepkg errors on comparison operators.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB708.html">PB708</a></td>
+        <td class="rname">variable-type</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">makepkg requires list fields (depends, source, sums, license, options, …) to be arrays and scalar fields (pkgver, url, pkgdesc, …) to be plain strings. A bare <code>depends=foo</code> builds by luck at best and errors under makepkg; wrap it: <code>depends=(foo)</code>.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB709.html">PB709</a></td>
+        <td class="rname">package-function-variable</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A package_*() function may only override packaging metadata (pkgdesc, depends, optdepends, provides, backup, install, …). Setting pkgver, source, makedepends, or the checksums there is an error: those are resolved before packaging runs.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB710.html">PB710</a></td>
+        <td class="rname">invalid-arch</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">arch must be set and non-empty, must not combine &#39;any&#39; with concrete architectures, must not repeat a value, and each entry may only contain [A-Za-z0-9_]. makepkg rejects a PKGBUILD that violates any of these.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB711.html">PB711</a></td>
+        <td class="rname">missing-vcs-makedepends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">A VCS source (git+…, hg+…) is fetched by the corresponding client, which makepkg does not install for you: without the tool in makedepends the build fails on any machine that doesn&#39;t happen to have it — which is every clean chroot. The auto-fix adds the client to makedepends.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB8xx<small>n = 38</small></div>
+  <div>
+    <h2>Built package</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB801.html">PB801</a></td>
+        <td class="rname">package-arch-mismatch</td>
+        <td class="rsev"><span class="sev info">info</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">arch=(&#39;any&#39;) promises the package works on every architecture, so an ELF binary or static archive inside one is machine code that will crash everywhere else — usually a vendored blob the build slipped in. The mirror image, an architecture-specific package containing no binary at all, is only a hint that arch=(&#39;any&#39;) would save mirror space.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB802.html">PB802</a></td>
+        <td class="rname">elf-nonstandard-location</td>
+        <td class="rsev"><span class="sev info">info</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Executables and libraries belong under /usr/bin and /usr/lib. An ELF file anywhere else (usr/share, etc, var) escapes ldconfig, striping and the linker&#39;s default search path, and usually means a Makefile installed something to the wrong place. /opt is noted informationally: self-contained vendor trees legitimately keep binaries there.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB803.html">PB803</a></td>
+        <td class="rname">elf-executable-stack</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A PT_GNU_STACK header requesting an executable stack disables a decades-old exploit mitigation for the whole process: any buffer overflow on the stack becomes directly runnable shellcode. Almost always caused by hand-written assembly missing a .note.GNU-stack section, and fixed by -Wl,-z,noexecstack.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB804.html">PB804</a></td>
+        <td class="rname">elf-text-relocation</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">DT_TEXTREL means the loader must patch the code segment at runtime, so the text pages can&#39;t stay read-only and shared — a security and memory cost. Usually non-PIC assembly in a shared library; rebuild with -fPIC.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB805.html">PB805</a></td>
+        <td class="rname">elf-missing-relro</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Full RELRO (PT_GNU_RELRO plus BIND_NOW) makes the GOT read-only after startup, closing the classic GOT-overwrite exploit path. Arch&#39;s default LDFLAGS include -Wl,-z,relro,-z,now, so a binary without both usually overrode the distribution&#39;s hardening flags.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB806.html">PB806</a></td>
+        <td class="rname">elf-not-pie</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A position-dependent executable loads at a fixed address, so ASLR cannot randomize its layout and every gadget sits at a known offset. Arch builds executables as PIE by default; a non-PIE binary here means upstream&#39;s build system overrode it (common in prebuilt -bin packages).</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB807.html">PB807</a></td>
+        <td class="rname">elf-unstripped</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">An ELF file still carrying its .symtab was not stripped: makepkg does this automatically unless options=(!strip) or a manual install bypassed it. Debug symbols belong in the -debug split package, not in the shipping binary.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB808.html">PB808</a></td>
+        <td class="rname">insecure-rpath</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">An RPATH/RUNPATH pointing at a writable or nonexistent directory (/tmp, a build directory, a relative path) lets anyone who can write there hijack the library load of every user running the binary. Only /usr/lib, /usr/lib32, /lib and $ORIGIN-relative entries are safe to ship.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB809.html">PB809</a></td>
+        <td class="rname">missing-library-dependency</td>
+        <td class="rsev"><span class="sev info">info</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Every DT_NEEDED library must be reachable from depends, or the binary fails to start on a system with exactly the declared dependencies installed. Reported as an error when no depends entry pulls the owning package in even transitively, a warning when only an optdepends does, and informationally when coverage is transitive (it breaks silently when the middleman drops its own dependency) or the library cannot be resolved on this system. Needs the pacman local database.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB810.html">PB810</a></td>
+        <td class="rname">unused-linked-library</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">The binary lists a library in DT_NEEDED but imports none of its symbols, so the dependency is pure startup cost and an extra package pulled onto every user&#39;s system. Usually a build system linking everything it found; -Wl,--as-needed (in Arch&#39;s default LDFLAGS) removes these. Judged statically from the dynamic symbol tables — pkglint never executes the inspected binary the way <code>ldd -u</code> would — and informational because some toolchains (GHC notably) link whole dependency sets by design.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB811.html">PB811</a></td>
+        <td class="rname">stale-soname-declaration</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Soname-style entries in depends and provides (libfoo.so=2-64) must match what the binaries actually link and ship: a leftover entry pins pacman&#39;s dependency resolution to a library nothing uses, and an unversioned <code>libfoo.so</code> matches every future ABI, defeating the versioned-provides mechanism entirely.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB812.html">PB812</a></td>
+        <td class="rname">script-interpreter-dependency</td>
+        <td class="rsev"><span class="sev info">info</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Every shebang line is a runtime dependency: a script starting #!/usr/bin/python needs python installed, whether or not any library is linked. Reported as an error when the interpreter&#39;s owning package is not reachable from depends, and informationally when the interpreter can&#39;t be resolved on this system. Needs the pacman local database.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB813.html">PB813</a></td>
+        <td class="rname">unneeded-dependency</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">No binary links against this dependency and no script names it as interpreter, so as far as static analysis can see nothing requires it at runtime. Data files, dlopen and IPC dependencies are invisible to this check — hence informational — but a stale entry from a dropped feature is the common case. Needs the pacman local database and a package with at least one binary or script.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB814.html">PB814</a></td>
+        <td class="rname">implicit-path-dependency</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Some files only work when another package is present: GSettings schemas need dconf, GIO modules need glib2, hicolor icons need hicolor-icon-theme (or the icon directory is orphaned), and Java bytecode needs a java-runtime provider. Shipping the file without the dependency breaks it quietly at runtime.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB815.html">PB815</a></td>
+        <td class="rname">hook-covered-dependency</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">desktop-file-utils and shared-mime-info are only needed for their update commands, which pacman&#39;s own hooks run since 5.0 regardless of what this package depends on. A package that just ships .desktop or MIME files can drop the dependency.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB816.html">PB816</a></td>
+        <td class="rname">pkgconfig-dependency</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A shipped .pc file whose Requires: names modules this package neither ships nor reaches through depends breaks <code>pkg-config --cflags</code> for everything built against it. The requirement belongs in depends of the -devel consumer chain. Needs the pacman local database.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB817.html">PB817</a></td>
+        <td class="rname">package-metadata</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">url and pkgdesc are required by Arch packaging standards — without them pacman -Qi shows blanks — and package names are lowercase by convention. These are the .PKGINFO-side counterparts of the PKGBUILD checks, for auditing archives whose PKGBUILD is not at hand.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB820.html">PB820</a></td>
+        <td class="rname">filesystem-layout</td>
+        <td class="rsev"><span class="sev info">info</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Packages may only install into the FHS directories pacman manages (usr/bin, usr/lib, usr/share, etc, opt, var/lib, …). Files under tmp, run or var/run sit on tmpfs and vanish at boot — an error. usr/local is reserved for the administrator, usr/man and usr/info were retired decades ago, and a stray &#39;man&#39; or &#39;info&#39; path component is usually a mis-installed page.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB821.html">PB821</a></td>
+        <td class="rname">file-permissions</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A world-writable file in a package is a system-wide backdoor invitation — any local user can replace its contents. Setuid/setgid bits deserve review every time, files the world cannot read break non-root users, and static libraries should be plain 644.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB822.html">PB822</a></td>
+        <td class="rname">file-ownership</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">makepkg packages every file as root:root (remapped at install time). Any other owner in the archive means the build wrote user-owned files into the package — on install they&#39;d hand a login user ownership of system files.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB823.html">PB823</a></td>
+        <td class="rname">empty-directory</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">An empty directory is usually build-system residue; makepkg&#39;s purge step removes them unless options=(emptydirs) asked to keep them. Intentional mount points and spool directories are the exception — hence informational.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB824.html">PB824</a></td>
+        <td class="rname">invalid-filename</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Filenames containing control characters or non-ASCII bytes break scripts, terminals and some filesystems, and are a favorite spot to hide lookalike files. Almost always an encoding accident in upstream&#39;s tarball.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB825.html">PB825</a></td>
+        <td class="rname">cross-directory-hardlink</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A hard link whose two names live in different directories breaks when the filesystem boundary between them differs on the user&#39;s machine, and pacman&#39;s extraction order makes no guarantees across directories. Use a symlink.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB826.html">PB826</a></td>
+        <td class="rname">dangling-symlink</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A symlink pointing at a path that neither this package nor anything reachable from its depends ships is broken the moment it is installed. Usually a target renamed during packaging, or a dependency that should have been declared. Needs the pacman local database.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB827.html">PB827</a></td>
+        <td class="rname">libtool-archive</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">.la files are libtool bookkeeping that modern linkers never read; shipping them makes other packages&#39; libtool builds embed stale paths. Arch policy is to delete them (makepkg&#39;s !libtool option once did this automatically).</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB828.html">PB828</a></td>
+        <td class="rname">perllocal-pod</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">perllocal.pod is perl&#39;s global install log: every perl module build appends to the same file, so two packages shipping it conflict on install. Delete it in package().</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB829.html">PB829</a></td>
+        <td class="rname">info-directory-file</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">usr/share/info/dir is the info reader&#39;s generated index — shared by every package and rebuilt by pacman&#39;s texinfo hook. A package shipping its own copy conflicts with every other package that does. Delete it in package().</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB830.html">PB830</a></td>
+        <td class="rname">stale-python-bytecode</td>
+        <td class="rsev"><span class="sev warn">warn</span><span class="sevto">–</span><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A .pyc older than its .py source is invalid: python either recompiles it into __pycache__ litter it can&#39;t write as non-root, or (pre-compileall hashes) silently serves stale bytecode. Happens when package() touches .py files after compileall ran.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB831.html">PB831</a></td>
+        <td class="rname">python-tests-directory</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A bare &#39;tests&#39; directory directly under site-packages squats a generic top-level module name: every package that makes this packaging mistake collides with every other, and <code>import tests</code> resolves to whichever won. Exclude it in package().</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB832.html">PB832</a></td>
+        <td class="rname">systemd-unit-in-etc</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">/etc/systemd/system is the administrator&#39;s override directory; packaged units belong in /usr/lib/systemd/system. A package writing to etc shadows the admin&#39;s namespace and fights local overrides.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB833.html">PB833</a></td>
+        <td class="rname">dbus-policy-in-etc</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">/etc/dbus-1/system.d is for local administrator overrides; packaged D-Bus system bus policies belong in /usr/share/dbus-1/system.d (supported since dbus 1.10).</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB834.html">PB834</a></td>
+        <td class="rname">missing-license-file</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">license=() must be declared, and licenses that aren&#39;t distributed system-wide (custom, LicenseRef-*, and any SPDX identifier not shipped in /usr/share/licenses/spdx) must install their text under usr/share/licenses/$pkgname/. Without it the package distributes software whose license terms the user can&#39;t read.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB835.html">PB835</a></td>
+        <td class="rname">missing-backup-file</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Every backup=() entry must name a file the package actually ships; an entry for a nonexistent path does nothing except mask the typo that broke the config-preservation it was meant to provide.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB836.html">PB836</a></td>
+        <td class="rname">docs-heavy-package</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">More than half of this package&#39;s bytes are documentation under usr/share/doc. Consider a -docs split package so users who just want the software don&#39;t carry the manuals. Packages named *-doc/-docs are exempt — being the manuals is their job.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB837.html">PB837</a></td>
+        <td class="rname">sphinx-build-cache</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">environment.pickle is sphinx-build&#39;s incremental-build cache, not documentation: it embeds absolute build paths and pickled Python objects. Its presence means the whole .doctrees cache directory was installed by accident.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB838.html">PB838</a></td>
+        <td class="rname">generated-mime-cache</td>
+        <td class="rsev"><span class="sev error">error</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">mimeinfo.cache and the usr/share/mime databases (globs, magic, aliases, …) are generated on the user&#39;s machine by pacman&#39;s hooks from every installed package&#39;s MIME declarations. Shipping a build-time copy conflicts with other packages and freezes the database at build state.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB839.html">PB839</a></td>
+        <td class="rname">scrollkeeper-directory</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">scrollkeeper&#39;s catalog directories are relics of a documentation system GNOME retired in 2008; a package creating var/lib/scrollkeeper ran an ancient documentation hook that should be disabled (--disable-scrollkeeper).</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB842.html">PB842</a></td>
+        <td class="rname">java-jar-location</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">The Java package guidelines put every .jar under usr/share/java (usually in a per-package subdirectory) so other packages can find libraries by convention and wrapper scripts share one classpath root; an application that insists on its own layout gets symlinks into its tree, not private copies of the jars.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">PB9xx<small>n = 56</small></div>
+  <div>
+    <h2>Style &amp; conventions</h2>
+    <div class="scroll">
+    <table class="ruletable">
+      
+      <thead><tr><th>Rule</th><th class="rname-h">Name<span class="colsizer rname-sizer">vcs-missing-provides-conflicts</span></th><th>Severity<span class="colsizer"><span class="sev error">error</span><span class="sevto">–</span><span class="sev critical">critical</span></span></th><th>Fix<span class="colsizer"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></span></th><th>Description</th></tr></thead>
+      <tbody>
+      
+      <tr>
+        <td class="rid"><a href="PB901.html">PB901</a></td>
+        <td class="rname">specific-host-arch</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Hardcoding an architecture name (x86_64, aarch64, …) in sources, flags or paths ties the PKGBUILD to one machine type; $CARCH expands to the architecture being built for. Assignments to arch=() and to already arch-suffixed fields (source_x86_64=…) are exempt — those are the places an explicit architecture belongs — as are constructs that dispatch on $CARCH and names of foreign cross-compilation targets (x86_64-w64-mingw32, arm-none-eabi-gcc), which are not the host at all.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB902.html">PB902</a></td>
+        <td class="rname">unprefixed-custom-variable</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">Custom variables must start with an underscore (_commit, _pyname) so they can never collide with a current or future makepkg field. A bare custom name is silently shipped to any tool that parses PKGBUILD metadata and may change meaning under a newer pacman.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB903.html">PB903</a></td>
+        <td class="rname">startdir-reference</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">$startdir is a makepkg implementation detail from before $srcdir and $pkgdir existed. Paths built from it ($startdir/pkg, $startdir/src) break under makepkg&#39;s BUILDDIR/PKGDEST redirection; use $srcdir and $pkgdir, which are always correct.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB904.html">PB904</a></td>
+        <td class="rname">redundant-makedepends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">Everything in depends is installed during the build too, so repeating a package in makedepends adds nothing and misleads readers about the build&#39;s real extra requirements. An entry is only kept when its version constraint differs. The auto-fix deletes the makedepends entry.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB905.html">PB905</a></td>
+        <td class="rname">sourceforge-mirror-url</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">SourceForge URLs pinned to a specific mirror (heanet.dl.sourceforge.net, dl.sf.net, …) break when that mirror retires. downloads.sourceforge.net picks a working mirror automatically and is the form Arch packaging guidelines ask for.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB906.html">PB906</a></td>
+        <td class="rname">pkgname-in-pkgdesc</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pkgdesc is displayed next to the package name everywhere pacman shows it, so repeating the name inside the description wastes the one line that should say what the software does.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB907.html">PB907</a></td>
+        <td class="rname">makepkg-internal-function</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">msg, msg2, warning, error and plain are makepkg&#39;s private output helpers, not an API: they vanish when the PKGBUILD is parsed by anything other than makepkg itself and their behavior changes between pacman releases. Use echo or printf.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB908.html">PB908</a></td>
+        <td class="rname">missing-maintainer-comment</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">AUR convention puts a &#39;# Maintainer: Name &lt;email&gt;&#39; comment at the top of every PKGBUILD so users know who to contact and whether the package is orphaned. Namcap checks for the same tag.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB909.html">PB909</a></td>
+        <td class="rname">uppercase-pkgname</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Arch package names are lowercase by convention, even when upstream&#39;s name is not (python, not Python). makepkg accepts uppercase, so this only surfaces in repo tooling and user confusion later — rename now, keep the case in pkgdesc.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB910.html">PB910</a></td>
+        <td class="rname">missing-metadata</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">pkgdesc, url and license are not required by makepkg but are required by Arch packaging standards: without them pacman -Qi shows blanks and the package&#39;s legal status is undeclared. Split packages may set them per package function instead.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB911.html">PB911</a></td>
+        <td class="rname">non-unique-source-name</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A source that downloads to a bare version-numbered file (v1.2.3.tar.gz) collides with every other package doing the same in a shared SRCDEST cache, silently reusing the wrong tarball. Rename it: &#34;$pkgname-$pkgver.tar.gz::https://…/v1.2.3.tar.gz&#34;.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB912.html">PB912</a></td>
+        <td class="rname">duplicated-optdepends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">A package listed in both depends and optdepends is contradictory metadata: the hard dependency always wins, and the optdepends line falsely suggests the feature is optional. Keep exactly one of the two. The auto-fix deletes the optdepends entry, which is the half with nothing behind it.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB913.html">PB913</a></td>
+        <td class="rname">stale-ignore-directive</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">A &#39;# pkglint: ignore=&#39; directive that matches no finding on its own or the next line — the issue was fixed, or the ID was never a pkglint rule — no longer documents a reviewed exception. It misleads reviewers into thinking a finding exists there, and if the flagged construct ever comes back, the leftover directive silences it without anyone re-reviewing. The auto-fix removes the stale IDs, or the whole comment once none remain.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB914.html">PB914</a></td>
+        <td class="rname">go-no-pie</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">The Arch Go packaging guidelines build with -buildmode=pie: without it the Go toolchain links a position-dependent executable that ASLR cannot relocate, which PB806 flags on the built package. Set it in GOFLAGS or on the go build command; a PKGBUILD that chooses another -buildmode explicitly is left alone.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB915.html">PB915</a></td>
+        <td class="rname">go-no-trimpath</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">Without -trimpath, go embeds absolute $srcdir paths in the binary, so two builders never produce the same bytes and the package leaks its build layout. The Arch Go packaging guidelines put -trimpath in GOFLAGS on every build.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB916.html">PB916</a></td>
+        <td class="rname">go-readonly-modcache</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">go writes its module cache read-only, so after a build that fetched modules, cleaning $srcdir (or $GOPATH under it) fails until someone chmods the tree. The Arch Go packaging guidelines pass -modcacherw on every module-aware command to keep the cache removable.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB917.html">PB917</a></td>
+        <td class="rname">go-cgo-flags-dropped</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">cgo compiles C with CGO_CFLAGS/CGO_LDFLAGS, not the CFLAGS/LDFLAGS makepkg exports, so unless the PKGBUILD forwards them (export CGO_CFLAGS=&#34;$CFLAGS&#34;, …) Arch&#39;s fortify/RELRO hardening never reaches the C parts of a Go build. Pure-Go packages can set CGO_ENABLED=0 instead, which also silences this rule. The fix writes the guidelines&#39; block of CGO_* exports at the top of the function that runs the build.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB918.html">PB918</a></td>
+        <td class="rname">self-provides</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">Every package implicitly provides its own name, so listing $pkgname in provides is dead metadata — at best ignored, at worst masking a typo of the capability the entry was meant to declare. The Arch package guidelines say provides is for other capabilities the package supplies (a library soname, a renamed predecessor). The auto-fix deletes the entry, and the whole array with it when nothing else is in it.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB919.html">PB919</a></td>
+        <td class="rname">self-conflicts</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">A package can never conflict with itself — pacman resolves same-name conflicts by upgrading — so listing $pkgname in conflicts is dead metadata that misleads readers about what the package actually displaces. The Arch package guidelines say to drop it, and the auto-fix does — along with the whole array when nothing else is in it.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB920.html">PB920</a></td>
+        <td class="rname">non-spdx-license</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Arch migrated the license field to SPDX expressions (RFC 16): &#39;GPL-2.0-or-later&#39; says which GPL and whether later versions qualify, where the legacy &#39;GPL&#39; said neither, and license-audit tooling parses only the SPDX form. Only known-legacy spellings are flagged, so a valid-but-uncommon SPDX identifier never is.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB921.html">PB921</a></td>
+        <td class="rname">usr-local-install</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">/usr/local is reserved for software the administrator builds outside the package manager; the Arch package guidelines forbid packages from touching it. This is the PKGBUILD-side complement of PB820, which flags the same files in the built archive. Install under /usr (usually /usr/bin, /usr/lib, /usr/share) instead.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB922.html">PB922</a></td>
+        <td class="rname">usr-libexec-install</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Arch does not use /usr/libexec: the package guidelines put internal executables that users should not invoke directly in /usr/lib/$pkgname instead. Upstream build systems often default libexecdir to /usr/libexec, so the fix is usually --libexecdir=/usr/lib on configure rather than moving files by hand.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB930.html">PB930</a></td>
+        <td class="rname">python-tox</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">tox exists to test against multiple Python versions by building fresh virtualenvs and re-resolving dependencies from PyPI — the opposite of checking that *this* package works against *this* system&#39;s packages, and a network dependency inside check(). The Arch Python package guidelines forbid it; invoke pytest (or upstream&#39;s runner) directly.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB931.html">PB931</a></td>
+        <td class="rname">python-lint-checkdepends</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">pytest plugins like pytest-cov, pytest-black or pytest-mypy lint upstream&#39;s code style or measure coverage; neither says anything about whether the built package works, and a new linter release starts failing builds that did not change. The Arch Python package guidelines say check() runs tests, not upstream&#39;s CI. The auto-fix deletes the entry, unless a command in the file still passes the plugin&#39;s flag.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB932.html">PB932</a></td>
+        <td class="rname">python-prebuilt-wheel</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A .whl source is a pre-built artifact: what lands in the package was compiled by whoever uploaded the wheel, not by this PKGBUILD, so nothing reviewed here is what ships. The Arch Python package guidelines require building from the source distribution except where no sdist exists at all.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB933.html">PB933</a></td>
+        <td class="rname">python-missing-build-backend</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc"><code>python -m build</code> and <code>python -m installer</code> come from the python-build and python-installer packages, which makepkg does not install for you: without them in makedepends the build fails in any clean chroot, however reliably it works on the maintainer&#39;s machine. The auto-fix adds the missing package to makedepends.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB934.html">PB934</a></td>
+        <td class="rname">python-setup-py</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc"><code>python setup.py install</code> runs the distutils flow that setuptools has removed: it bypasses PEP 517 build isolation, writes egg-info metadata pip cannot manage, and breaks outright on modern setuptools. The Arch Python package guidelines build with <code>python -m build</code> and stage with <code>python -m installer</code>.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB940.html">PB940</a></td>
+        <td class="rname">cargo-check-release</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">--release on cargo test/check (or its short spelling, -r) disables debug assertions and integer-overflow checks — precisely the invariants a test run exists to exercise. The Arch Rust package guidelines run check() without --release; the shipped binary is still built --release in build(). A --release kept in a variable counts as passed wherever the PKGBUILD assigns it, though only one written out in the command itself can be removed automatically.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB941.html">PB941</a></td>
+        <td class="rname">cargo-install-tracked</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">cargo install records what it installed in .crates.toml and .crates2.json under the install root; staged into $pkgdir those files ship in the package, conflict with every other Rust package doing the same, and describe a cargo state directory that does not exist on the user&#39;s system. The Rust package guidelines pass --no-track. Flags kept in a variable count as passed wherever the PKGBUILD assigns it; an install whose flags come from outside the file is left alone, since --no-track may be in there. The auto-fix appends --no-track, before any -- separator the command has.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB942.html">PB942</a></td>
+        <td class="rname">cargo-build-not-release</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">cargo builds the unoptimized, debug-assertion-laden dev profile unless told otherwise, so a plain <code>cargo build</code> in build() ships a slow binary. The Arch Rust package guidelines build with --release (-r is the same flag); a PKGBUILD that selects another profile explicitly (--profile) has made the call, as has one whose build() runs a release build beside the dev one, and both are left alone. Flags kept in a variable count as passed wherever the PKGBUILD assigns it; a build whose flags come from outside the file is left alone too, since --release may be in there.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB944.html">PB944</a></td>
+        <td class="rname">rust-missing-makedepends</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">cargo is not part of the base build environment: without rust (or rustup) in makedepends the build fails in any clean chroot. rustup satisfies the dependency for maintainers who manage toolchains themselves, so either spelling counts. The auto-fix declares rust.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB950.html">PB950</a></td>
+        <td class="rname">cmake-missing-prefix</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">CMake&#39;s install prefix defaults to /usr/local, which Arch packages must not touch (PB921/PB820 flag the resulting files); the CMake package guidelines configure with -DCMAKE_INSTALL_PREFIX=/usr. A PKGBUILD that sets another prefix explicitly (/opt for a self-contained tree) has made a decision and is left alone.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB951.html">PB951</a></td>
+        <td class="rname">cmake-build-type-release</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">-DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after the flags makepkg exports, silently overriding Arch&#39;s chosen -O2 and fortify settings. The CMake package guidelines build with -DCMAKE_BUILD_TYPE=None so the distribution&#39;s CFLAGS are what actually compile the code. The auto-fix rewrites the value to None, leaving the rest of the argument — a -D prefix, a :STRING type, the quoting — as written.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB952.html">PB952</a></td>
+        <td class="rname">cmake-missing-makedepends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">cmake is not part of the base build environment: without it in makedepends the build fails in any clean chroot, however reliably it configures on the maintainer&#39;s machine. The auto-fix declares cmake.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB953.html">PB953</a></td>
+        <td class="rname">meson-missing-prefix</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">Meson&#39;s install prefix defaults to /usr/local, which Arch packages must not touch; the Meson package guidelines configure with --prefix=/usr, or use arch-meson, which passes the distribution defaults for you.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB954.html">PB954</a></td>
+        <td class="rname">meson-missing-makedepends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">meson (and the arch-meson wrapper it ships) is not part of the base build environment: without meson in makedepends the build fails in any clean chroot. The auto-fix declares meson, which is also what ships arch-meson.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB955.html">PB955</a></td>
+        <td class="rname">meson-ninja-direct</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">In a meson project, <code>meson compile -C build</code> wraps ninja with the environment and argument handling meson configured; calling ninja directly bypasses that and breaks quietly when the backend or its options change. The Meson package guidelines use the meson wrappers for compile, test and install.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB960.html">PB960</a></td>
+        <td class="rname">vcs-missing-pkgver-fn</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A VCS source that follows upstream tip fetches new code on every build, but without a pkgver() function the package version is whatever literal pkgver= holds — so two different checkouts build &#39;the same&#39; version and pacman never offers the upgrade. The VCS package guidelines derive pkgver from the checkout (git describe, revision counts).</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB961.html">PB961</a></td>
+        <td class="rname">vcs-missing-provides-conflicts</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">A -git (or -svn, -hg, -bzr) package builds the same software as its release counterpart: without provides and conflicts on the base name, pacman happily installs both at once and dependencies on the release name are unsatisfiable by the VCS build. The VCS package guidelines declare both. The auto-fix declares the pair together — either one alone is worse than the finding.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB962.html">PB962</a></td>
+        <td class="rname">vcs-pkgver-in-folder</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">makepkg keeps one persistent clone per checkout folder name and updates it incrementally. With $pkgver in the name:: prefix of a VCS source, pkgver() renames the folder on every version bump, so each build abandons the cache and re-clones the entire repository.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB963.html">PB963</a></td>
+        <td class="rname">vcs-suffix-mismatch</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">The VCS suffixes are a promise about what gets built: a -git package follows upstream&#39;s tip. A -git name with no git source builds something else under that promise, and a git source pinned to a fixed commit or tag is a release snapshot wearing a -git name — either way users and AUR helpers are misled about what updates mean.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB970.html">PB970</a></td>
+        <td class="rname">font-package-arch</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Font files render identically on every machine type, so the Arch font package guidelines require arch=(&#39;any&#39;) on ttf-/otf- packages. A concrete architecture makes pacman rebuild and re-download the same bytes per architecture for nothing.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB971.html">PB971</a></td>
+        <td class="rname">font-package-depends</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">Installed fonts are discovered by fontconfig on its own; a font package needs no dependencies, and the historical fontconfig/xorg-font-utils entries only force unrelated software onto minimal systems. The font package guidelines say to declare none. The auto-fix drops them.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB972.html">PB972</a></td>
+        <td class="rname">font-unstable-source</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">fonts.google.com and fontspace.com serve archives generated on demand from the font&#39;s current revision: the bytes change without the URL changing, so the pinned checksum eventually fails on every user&#39;s machine at once. Fetch the versioned release artifact from the font&#39;s own repository instead.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB973.html">PB973</a></td>
+        <td class="rname">dkms-missing-depends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">A -dkms package installs module sources under /usr/src that only dkms can build, register and rebuild across kernel upgrades; without dkms in depends the package installs sources nothing will ever compile. The auto-fix declares dkms.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB974.html">PB974</a></td>
+        <td class="rname">dkms-kernel-headers</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">dkms discovers every installed kernel and pulls the matching headers itself, so a -dkms package depending on linux-headers (or any kernel&#39;s -headers) pins one kernel flavor: it drags the stock headers onto linux-lts systems and adds nothing on any other. The DKMS package guidelines say to leave headers to dkms. The auto-fix drops the pinned entry.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB975.html">PB975</a></td>
+        <td class="rname">lib32-pkgdesc-suffix</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A lib32- package&#39;s one-line description is shown in lists where only it distinguishes the multilib build from its 64-bit sibling; the 32-bit package guidelines end pkgdesc with &#34;(32-bit)&#34;.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB976.html">PB976</a></td>
+        <td class="rname">lib32-missing-m32</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">On x86_64 nothing compiles 32-bit unless the PKGBUILD asks: without -m32 in CFLAGS/CXXFLAGS/LDFLAGS (or an equivalent CC spelling) the build emits 64-bit objects and the lib32- package ships the wrong ABI. Repackaging PKGBUILDs with no build() are exempt — they compile nothing.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB977.html">PB977</a></td>
+        <td class="rname">mingw-required-options</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">Cross-built Windows binaries must escape the host&#39;s toolchain defaults: the build host&#39;s strip corrupts PE binaries (mingw-strip differs), Windows linking needs the static/import libraries makepkg would delete, and Arch&#39;s CFLAGS target the host ABI. The MinGW package guidelines therefore require options=(!strip staticlibs !buildflags).</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB978.html">PB978</a></td>
+        <td class="rname">mingw-pkgdesc-suffix</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A mingw-w64- package&#39;s description is shown in lists where only it distinguishes the cross build from the native one; the MinGW package guidelines end pkgdesc with &#34;(mingw-w64)&#34;.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB979.html">PB979</a></td>
+        <td class="rname">npm-missing-makedepends</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"><span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></td>
+        <td class="rdoc">npm is not part of the base build environment (and not bundled with the nodejs package): without npm in makedepends the build fails in any clean chroot. The auto-fix declares npm.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB980.html">PB980</a></td>
+        <td class="rname">npm-user-cache</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">npm writes every downloaded tarball into the invoking user&#39;s ~/.npm, so a build leaves root-owned droppings in the builder&#39;s home directory that no clean step removes. The Node.js package guidelines pass --cache &#34;$srcdir/npm-cache&#34; so the cache dies with the build directory. The auto-fix appends that flag to the npm command.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB981.html">PB981</a></td>
+        <td class="rname">java-runtime-dependency</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></td>
+        <td class="rdoc">Shipped .jar files and compiled classes run on nothing without a JVM, and pacman cannot know that from the file list. The Java package guidelines depend on the java-runtime virtual (or java-environment when a full JDK is needed) so any installed JVM satisfies it. The auto-fix declares java-runtime.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB982.html">PB982</a></td>
+        <td class="rname">clr-required-metadata</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">CLR assemblies are CIL bytecode, identical on every architecture and structured in a way binutils strip corrupts. The CLR package guidelines therefore set arch=(&#39;any&#39;) and options=(&#39;!strip&#39;) on mono/.NET packages; a package missing either ships per-arch duplicates or broken assemblies.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB983.html">PB983</a></td>
+        <td class="rname">haskell-arch-any</td>
+        <td class="rsev"><span class="sev warn">warn</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">GHC compiles Haskell libraries to native code with an ABI hash baked into every interface file, so no haskell- package is architecture-independent: arch=(&#39;any&#39;) ships x86_64 objects to every architecture. The Haskell package guidelines list the real architectures.</td>
+      </tr>
+      
+      <tr>
+        <td class="rid"><a href="PB984.html">PB984</a></td>
+        <td class="rname">php-arch-any</td>
+        <td class="rsev"><span class="sev info">info</span></td>
+        <td class="rfix"></td>
+        <td class="rdoc">A pure-PHP package — one whose PKGBUILD compiles nothing — is architecture-independent and should declare arch=(&#39;any&#39;) so one build serves every machine. php- packages that build a native extension (phpize/configure/make) are architecture-specific and exempt.</td>
+      </tr>
+      
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+
+</main>
+</body>
+</html>

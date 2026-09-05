@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grub-luks-keyfile — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/grub-luks-keyfile: 46 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/grub-luks-keyfile.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="grub-luks-keyfile — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/grub-luks-keyfile: 46 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/grub-luks-keyfile.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>grub-luks-keyfile</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>2:2.06-1</b>
+          
+          <span>maintained by yvindpettersen</span>
+          
+          <span>7 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/grub-luks-keyfile">AUR page</a>
+          
+          <a href="../badge/grub-luks-keyfile.svg">badge</a>
+        </p>
+        <p>GNU GRand Unified Bootloader (2) with crypto extensions to support for DMCrypt and LUKS volumes with detached headers and key files.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 46</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 32</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;GPL3&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB603.html">PB603</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          conflicts entry &#34;grub&#34; claims core system package &#34;grub&#34;: installing it forces the real package to be removed
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB603.html">PB603</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          replaces entry &#34;grub&#34; claims core system package &#34;grub&#34;: pacman replaces the real package with this one on the next sysupgrade
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB603.html">PB603</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          provides entry &#34;grub&#34; claims core system package &#34;grub&#34;: installing it silently satisfies dependencies meant for the real package
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 40</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;xz&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;gettext&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;device-mapper&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 62</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;git.savannah.nongnu.org&#34; differs from project url host &#34;www.gnu.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 117</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 120</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 123</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 126</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 130</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 133</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 141</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 148</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 152</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 158</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 165</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 169</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 196</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 202</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 206</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 213</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 217</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 244</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 250</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 254</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 261</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 265</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 293</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 301</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 305</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 310</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 316</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 325</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 329</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 334</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 341</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 345</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 354</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 358</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 367</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 371</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 377</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 382</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

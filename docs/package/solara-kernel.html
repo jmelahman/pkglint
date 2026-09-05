@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>solara-kernel — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/solara-kernel: 8 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/solara-kernel.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="solara-kernel — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/solara-kernel: 8 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/solara-kernel.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>solara-kernel</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>7.0.10-3</b>
+          
+          <span>maintained by c-ludenberg</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/solara-kernel">AUR page</a>
+          
+          <a href="../badge/solara-kernel.svg">badge</a>
+        </p>
+        <p>The Solara Linux Kernel — BORE scheduler, CachyOS patches, maximum POWER kernel and modules</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 8</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB601.html">PB601</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source count differs between PKGBUILD (&#34;2&#34;) and .SRCINFO (&#34;3&#34;); regenerate .SRCINFO
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 80</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;x86_64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 84</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;https://github.com/CachyOS/linux/releases/download/$_srcname/$_srcname.tar.gz&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 84</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;cachyos&#34; on github.com but the project url is under &#34;celestia-foundation&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 132</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 254</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 283</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 489</div>
+        <div class="rid"><a href="../rules/PB302.html">PB302</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          eval assembles and executes code at build time, defeating static review
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

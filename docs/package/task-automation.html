@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>task-automation — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for aur/task-automation: 1 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/task-automation.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="task-automation — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for aur/task-automation: 1 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/task-automation.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>task-automation</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>0.1.0-1</b>
+          
+          <span>maintained by Remisa</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/task-automation">AUR page</a>
+          
+          <a href="../badge/task-automation.svg">badge</a>
+        </p>
+        <p>KDE Plasma Wayland task recorder and player for keyboard, mouse, wheel, and timing automation</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 1</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

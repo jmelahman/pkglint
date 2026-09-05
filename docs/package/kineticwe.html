@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kineticwe — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/kineticwe: 20 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/kineticwe.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="kineticwe — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/kineticwe: 20 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/kineticwe.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>kineticwe</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1:6.7.80-18</b>
+          
+          <span>maintained by theblackdon</span>
+          
+          <span>2 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/kineticwe">AUR page</a>
+          
+          <a href="../badge/kineticwe.svg">badge</a>
+        </p>
+        <p>KineticWE - A tiling KWin Wayland compositor with native window tiling</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 20</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 10</div>
+        <div class="rid"><a href="../rules/PB906.html">PB906</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          pkgdesc repeats the package name &#34;kineticwe&#34;; describe what the software does instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 54</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;qt6-base&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 55</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;qt6-declarative&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 56</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;qt6-svg&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 58</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;qt6-wayland&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 67</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;kglobalaccel&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 84</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;kirigami&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 86</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;kwayland&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 87</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;kscreenlocker&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 104</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;libcanberra&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 105</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;libevdev&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 107</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;pipewire&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 120</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;libqaccessibilityclient-qt6&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 165</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;$url/-/archive/$_commit/$pkgname-$_commit.tar.gz&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 166</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;invent.kde.org&#34; differs from project url host &#34;gitlab.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 167</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;invent.kde.org&#34; differs from project url host &#34;gitlab.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 200</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 222</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 239</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 349</div>
+        <div class="rid"><a href="../rules/PB922.html">PB922</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          mkdir installs under /usr/libexec: Arch does not use /usr/libexec; internal helpers belong in /usr/lib/kineticwe
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

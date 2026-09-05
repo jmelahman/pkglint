@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xen-edk2 — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/xen-edk2: 50 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/xen-edk2.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="xen-edk2 — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/xen-edk2: 50 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/xen-edk2.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>xen-edk2</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>202602-1</b>
+          
+          <span>maintained by Refutationalist</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/xen-edk2">AUR page</a>
+          
+          <a href="../badge/xen-edk2.svg">badge</a>
+        </p>
+        <p>UEFI firmware for xen hypervisor from edk2</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 50</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB960.html">PB960</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          git source follows upstream tip but there is no pkgver() function, so every build reuses the hardcoded version and pacman never sees an upgrade
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;openssl&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;pyca&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 24</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 24</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;krb5&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;gost-engine&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 26</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 26</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;provider-corner&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;google&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;ucb-bar&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 29</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 30</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 30</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;kkos&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 31</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 31</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;google&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 32</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 32</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;akheron&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;google&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 34</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 35</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 35</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;devicetree-org&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;mipi-alliance&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;zeux&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;mbed-tls&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 39</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 39</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;dmtf&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 40</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 40</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;gitlab.com&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;cloudflare&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 42</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 42</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;openssl&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 43</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 43</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;open-quantum-safe&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;tlsfuzzer&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 45</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 45</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;tlsfuzzer&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 46</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 46</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;tlsfuzzer&#34; on github.com but the project url is under &#34;tianocore&#34;; verify this is the same project
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

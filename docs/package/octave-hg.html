@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>octave-hg — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/octave-hg: 5 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/octave-hg.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="octave-hg — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/octave-hg: 5 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/octave-hg.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>octave-hg</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>6:8.0.0.r31096.b6aeea949531-1</b>
+          
+          <span>maintained by erzsebetszabo</span>
+          
+          <span>10 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/octave-hg">AUR page</a>
+          
+          <a href="../badge/octave-hg.svg">badge</a>
+        </p>
+        <p>A high-level language, primarily intended for numerical computations.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 5</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 11</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;GPL&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;hg.savannah.gnu.org&#34; differs from project url host &#34;www.octave.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          source &#34;git://git.sv.gnu.org/gnulib&#34; is fetched over unencrypted git:// with nothing verifying what arrives
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;git.sv.gnu.org&#34; differs from project url host &#34;www.octave.org&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

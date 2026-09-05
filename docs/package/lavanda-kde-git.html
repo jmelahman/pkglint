@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lavanda-kde-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for aur/lavanda-kde-git: 8 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/lavanda-kde-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="lavanda-kde-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for aur/lavanda-kde-git: 8 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/lavanda-kde-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>lavanda-kde-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>r26.85018ee-1</b>
+          
+          <span>maintained by Joboy</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/lavanda-kde-git">AUR page</a>
+          
+          <a href="../badge/lavanda-kde-git.svg">badge</a>
+        </p>
+        <p>Lavanda KDE plasma theme</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 8</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 3</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;pgkbase&#34; should be prefixed with an underscore (_pgkbase) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;lavanda-kde-git&#34; builds the same software as &#34;lavanda-kde&#34; but declares neither provides=(lavanda-kde) nor conflicts=(lavanda-kde), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;lavanda-aurorae-theme-git&#34; builds the same software as &#34;lavanda-aurorae-theme&#34; but declares neither provides=(lavanda-aurorae-theme) nor conflicts=(lavanda-aurorae-theme), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;kvantum-theme-lavanda-git&#34; builds the same software as &#34;kvantum-theme-lavanda&#34; but declares neither provides=(kvantum-theme-lavanda) nor conflicts=(kvantum-theme-lavanda), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;lavanda-sea-kde-git&#34; builds the same software as &#34;lavanda-sea-kde&#34; but declares neither provides=(lavanda-sea-kde) nor conflicts=(lavanda-sea-kde), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;lavanda-sea-aurorae-theme-git&#34; builds the same software as &#34;lavanda-sea-aurorae-theme&#34; but declares neither provides=(lavanda-sea-aurorae-theme) nor conflicts=(lavanda-sea-aurorae-theme), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;kvantum-theme-lavanda-sea-git&#34; builds the same software as &#34;kvantum-theme-lavanda-sea&#34; but declares neither provides=(kvantum-theme-lavanda-sea) nor conflicts=(kvantum-theme-lavanda-sea), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 12</div>
+        <div class="rid"><a href="../rules/PB711.html">PB711</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          git source needs &#34;git&#34; in makedepends; a clean build environment does not have it
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

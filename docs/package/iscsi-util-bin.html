@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iscsi-util-bin — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/iscsi-util-bin: 2 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/iscsi-util-bin.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="iscsi-util-bin — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/iscsi-util-bin: 2 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/iscsi-util-bin.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>iscsi-util-bin</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>4.0.1-5</b>
+          
+          <span>maintained by cerratonix</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/iscsi-util-bin">AUR page</a>
+          
+          <a href="../badge/iscsi-util-bin.svg">badge</a>
+        </p>
+        <p>A simple and modern GUI for managing iSCSI.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 2</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB908.html">PB908</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          no &#39;# Maintainer:&#39; comment; AUR convention names the responsible maintainer at the top of the PKGBUILD
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;https://github.com/mijocecr/iscsi-util/releases/download/iscsi-util_v4/ISCSI-Util.tar.gz&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

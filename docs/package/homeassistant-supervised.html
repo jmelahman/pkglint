@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>homeassistant-supervised — AUR Report Card</title>
+<meta name="description" content="pkglint grade F for aur/homeassistant-supervised: 13 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/homeassistant-supervised.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="homeassistant-supervised — AUR Report Card">
+<meta property="og:description" content="pkglint grade F for aur/homeassistant-supervised: 13 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/homeassistant-supervised.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-F" title="grade F">F</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>homeassistant-supervised</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>4.0.0-2</b>
+          
+          <span>maintained by michelleholst</span>
+          
+          <span>6 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/homeassistant-supervised">AUR page</a>
+          
+          <a href="../badge/homeassistant-supervised.svg">badge</a>
+        </p>
+        <p>Home Assistant Supervised</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 13</small></div>
+  <div>
+  
+    
+    <p class="file">.INSTALL</p>
+    <div class="findings">
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB501.html">PB501</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          curl accesses the network from an install scriptlet running as root
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 85</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 101</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 114</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          scriptlet touches &#34;/usr/lib/systemd/system/systemd-journal-gatewayd.socket&#34;, a persistence location outside pacman&#39;s tracking
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 127</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 139</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 143</div>
+        <div class="rid"><a href="../rules/PB501.html">PB501</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          curl accesses the network from an install scriptlet running as root
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 192</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 198</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 216</div>
+        <div class="rid"><a href="../rules/PB501.html">PB501</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          curl accesses the network from an install scriptlet running as root
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 225</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet enables a systemd unit; prefer documenting this or shipping a preset
+          </div>
+      </div>
+      
+    </div>
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 30</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;212dbc6c596626f2a383d0d7f03daecb44eeb8b6&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 30</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;www.home-assistant.io&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

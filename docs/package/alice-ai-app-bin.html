@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>alice-ai-app-bin — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for aur/alice-ai-app-bin: 2 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/alice-ai-app-bin.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="alice-ai-app-bin — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for aur/alice-ai-app-bin: 2 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/alice-ai-app-bin.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>alice-ai-app-bin</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1.4.4-1</b>
+          
+          <span>maintained by zxp19821005</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/alice-ai-app-bin">AUR page</a>
+          
+          <a href="../badge/alice-ai-app-bin.svg">badge</a>
+        </p>
+        <p>A smart desktop AI assistant application built with Vue.js, Vite, and Electron. Advanced memory system, function calling, MCP support and more.(Prebuilt version.Use system-wide electron)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 2</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;x86_64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 58</div>
+        <div class="rid"><a href="../rules/PB306.html">PB306</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          command name &#34;$srcdir/…-1.4.4-$CARCH.AppImage&#34; is not statically resolvable
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

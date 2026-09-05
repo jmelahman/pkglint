@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jdk7 — AUR Report Card</title>
+<meta name="description" content="pkglint grade F for aur/jdk7: 13 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/jdk7.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="jdk7 — AUR Report Card">
+<meta property="og:description" content="pkglint grade F for aur/jdk7: 13 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/jdk7.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-F" title="grade F">F</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>jdk7</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>7u80-1</b>
+          
+          <span>maintained by severach</span>
+          
+          <span>132 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/jdk7">AUR page</a>
+          
+          <a href="../badge/jdk7.svg">badge</a>
+        </p>
+        <p>Oracle Java 7 Development Kit (public release - end of support)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 13</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB601.html">PB601</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pkgver differs between PKGBUILD (&#34;$_majoru80&#34;) and .SRCINFO (&#34;7u80&#34;); regenerate .SRCINFO
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB601.html">PB601</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source count differs between PKGBUILD (&#34;6&#34;) and .SRCINFO (&#34;7&#34;); regenerate .SRCINFO
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 73</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 76</div>
+        <div class="rid"><a href="../rules/PB301.html">PB301</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          &#34;source&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 83</div>
+        <div class="rid"><a href="../rules/PB301.html">PB301</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          &#34;ln&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 106</div>
+        <div class="rid"><a href="../rules/PB108.html">PB108</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          PKGEXT overrides a makepkg.conf setting from within the package
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 113</div>
+        <div class="rid"><a href="../rules/PB106.html">PB106</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          DLAGENTS override replaces makepkg&#39;s download logic with custom commands
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 128</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 134</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 152</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 158</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 214</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 224</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB930: python-tox — AUR Report Card</title>
+<meta name="description" content="PB930 (python-tox): tox exists to test against multiple Python versions by building fresh virtualenvs and re-resolving dependencies from PyPI — the opposite of checking that *this* package works…">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB930.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB930: python-tox — AUR Report Card">
+<meta property="og:description" content="PB930 (python-tox): tox exists to test against multiple Python versions by building fresh virtualenvs and re-resolving dependencies from PyPI — the opposite of checking that *this* package works…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB930.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB930</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">python-tox</span></h1>
+    
+    <p class="lede">tox exists to test against multiple Python versions by building fresh virtualenvs and re-resolving dependencies from PyPI — the opposite of checking that *this* package works against *this* system&#39;s packages, and a network dependency inside check(). The Arch Python package guidelines forbid it; invoke pytest (or upstream&#39;s runner) directly.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>checkdepends=(&#39;python-tox&#39;)
+check() {
+  tox
+}</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>checkdepends=(&#39;python-pytest&#39;)
+check() {
+  pytest
+}</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB930</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB930</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB922.html">&larr; PB922 usr-libexec-install</a>
+      <a href="PB931.html">PB931 python-lint-checkdepends &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

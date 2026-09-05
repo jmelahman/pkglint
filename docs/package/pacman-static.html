@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pacman-static — AUR Report Card</title>
+<meta name="description" content="pkglint grade F for aur/pacman-static: 14 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/pacman-static.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="pacman-static — AUR Report Card">
+<meta property="og:description" content="pkglint grade F for aur/pacman-static: 14 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/pacman-static.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-F" title="grade F">F</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>pacman-static</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>7.1.0.r9.g54d9411-18</b>
+          
+          <span>maintained by Morganamilo</span>
+          <span>co-maintained by andreas_baumann</span>
+          <span>77 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/pacman-static">AUR page</a>
+          
+          <a href="../badge/pacman-static.svg">badge</a>
+        </p>
+        <p>Statically-compiled pacman (to fix or install systems without libc)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 14</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.2.0&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v5.8.3&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;curl.haxx.se&#34; differs from project url host &#34;www.archlinux.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;www.archlinux.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;gnupg.org&#34; differs from project url host &#34;www.archlinux.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;sourceware.org&#34; differs from project url host &#34;www.archlinux.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.gnupg.org&#34; differs from project url host &#34;www.archlinux.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;zlib.net&#34; differs from project url host &#34;www.archlinux.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 146</div>
+        <div class="rid"><a href="../rules/PB301.html">PB301</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          &#34;gcc&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 162</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          error is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 177</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 180</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 192</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 224</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

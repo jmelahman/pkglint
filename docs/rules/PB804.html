@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB804: elf-text-relocation — AUR Report Card</title>
+<meta name="description" content="PB804 (elf-text-relocation): DT_TEXTREL means the loader must patch the code segment at runtime, so the text pages can&#39;t stay read-only and shared — a security and memory cost. Usually non-PIC…">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB804.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB804: elf-text-relocation — AUR Report Card">
+<meta property="og:description" content="PB804 (elf-text-relocation): DT_TEXTREL means the loader must patch the code segment at runtime, so the text pages can&#39;t stay read-only and shared — a security and memory cost. Usually non-PIC…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB804.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB804</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">elf-text-relocation</span></h1>
+    
+    <p class="lede">DT_TEXTREL means the loader must patch the code segment at runtime, so the text pages can&#39;t stay read-only and shared — a security and memory cost. Usually non-PIC assembly in a shared library; rebuild with -fPIC.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>build() {
+  gcc -shared -o libdemo.so demo.c   # non-PIC objects force text relocations
+}</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>build() {
+  gcc -shared -fPIC -o libdemo.so demo.c
+}</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB804</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB804</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB803.html">&larr; PB803 elf-executable-stack</a>
+      <a href="PB805.html">PB805 elf-missing-relro &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

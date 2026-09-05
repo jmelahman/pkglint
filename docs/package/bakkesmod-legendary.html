@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bakkesmod-legendary — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/bakkesmod-legendary: 20 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/bakkesmod-legendary.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="bakkesmod-legendary — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/bakkesmod-legendary: 20 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/bakkesmod-legendary.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>bakkesmod-legendary</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>2.71-1</b>
+          
+          <span>maintained by kentslaney</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/bakkesmod-legendary">AUR page</a>
+          
+          <a href="../badge/bakkesmod-legendary.svg">badge</a>
+        </p>
+        <p>A mod aimed at making you better at Rocket League!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 20</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB601.html">PB601</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pkgver differs between PKGBUILD (&#34;….…&#34;) and .SRCINFO (&#34;2.71&#34;); regenerate .SRCINFO
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 3</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;rlver&#34; should be prefixed with an underscore (_rlver) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 9</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;GPL&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;rlstr&#34; should be prefixed with an underscore (_rlstr) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;rlesc&#34; should be prefixed with an underscore (_rlesc) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;pkgesc&#34; should be prefixed with an underscore (_pkgesc) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;loopback-$pkgesc-$pkgrel.zip::https://github.com/kentslaney/bakkesmod-arch/archive/refs/tags/$pkgver-$pkgrel-legendary.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 29</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 31</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 32</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 33</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 34</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 35</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www.7-zip.org&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;raw.githubusercontent.com&#34; differs from project url host &#34;bakkesmod.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 101</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;legendary_prefixes&#34; should be prefixed with an underscore (_legendary_prefixes) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 108</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;heroic_prefixes&#34; should be prefixed with an underscore (_heroic_prefixes) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 112</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;heroic_global&#34; should be prefixed with an underscore (_heroic_global) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 116</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;wine_bm_path&#34; should be prefixed with an underscore (_wine_bm_path) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 164</div>
+        <div class="rid"><a href="../rules/PB302.html">PB302</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          eval assembles and executes code at build time, defeating static review
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 165</div>
+        <div class="rid"><a href="../rules/PB302.html">PB302</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          eval assembles and executes code at build time, defeating static review
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

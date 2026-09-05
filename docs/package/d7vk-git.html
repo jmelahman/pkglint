@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>d7vk-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/d7vk-git: 9 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/d7vk-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="d7vk-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/d7vk-git: 9 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/d7vk-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>d7vk-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1.10.r0.g9fc2980-1</b>
+          
+          <span>maintained by HurricanePootis</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/d7vk-git">AUR page</a>
+          
+          <a href="../badge/d7vk-git.svg">badge</a>
+        </p>
+        <p>Vulkan-based implementation of D3D7, 6, 5 and 3 for Linux / Wine, spun off from DXVK.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 9</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 3</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;d7vk-git&#34; builds the same software as &#34;d7vk&#34; but declares neither provides=(d7vk) nor conflicts=(d7vk), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;khronosgroup&#34; on github.com but the project url is under &#34;wintersnowfall&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;khronosgroup&#34; on github.com but the project url is under &#34;wintersnowfall&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 19</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;doitsujin&#34; on github.com but the project url is under &#34;wintersnowfall&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;doitsujin&#34; on github.com but the project url is under &#34;wintersnowfall&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 106</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 120</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 125</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 126</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

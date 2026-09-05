@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yutovo — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/yutovo: 35 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/yutovo.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="yutovo — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/yutovo: 35 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/yutovo.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>yutovo</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1.7.1-3</b>
+          
+          <span>maintained by denprog</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/yutovo">AUR page</a>
+          
+          <a href="../badge/yutovo.svg">badge</a>
+        </p>
+        <p>Arbitrary precision graphical WYSIWYG calculator inside a text editor</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 35</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 12</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;qt5-base&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 15</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.15.3&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 15</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.0.6&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;boost_1_83_0::https://archives.boost.io/release/1.83.0/source/boost_1_83_0.zip&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archives.boost.io&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;www-fourier.univ-grenoble-alpes.fr&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 19</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.6.1&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 19</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.1.0&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.3.1&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;mathgl-8.0.3.tar.gz::https://downloads.sourceforge.net/mathgl/mathgl-8.0.3.tar.gz&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v2.4.4&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 24</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;stb_image.h::https://raw.githubusercontent.com/nothings/stb/master/stb_image.h&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 24</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;raw.githubusercontent.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;stb_image_write.h::https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;raw.githubusercontent.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 26</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.7.1&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 26</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.1.1&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;v1.7.1&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;yutovo.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 57</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 64</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 86</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 99</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 106</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 113</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 124</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 137</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

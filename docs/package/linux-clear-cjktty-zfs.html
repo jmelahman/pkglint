@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>linux-clear-cjktty-zfs — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/linux-clear-cjktty-zfs: 15 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/linux-clear-cjktty-zfs.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="linux-clear-cjktty-zfs — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/linux-clear-cjktty-zfs: 15 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/linux-clear-cjktty-zfs.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>linux-clear-cjktty-zfs</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>7.2.1-1</b>
+          
+          <span>maintained by neko_ayaya</span>
+          
+          <span>2 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/linux-clear-cjktty-zfs">AUR page</a>
+          
+          <a href="../badge/linux-clear-cjktty-zfs.svg">badge</a>
+        </p>
+        <p>Clear Linux内核,带有zfs和cjktty并开启kexec 此包包括内核和已编译的模块</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 15</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 145</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;cdn.kernel.org&#34; differs from project url host &#34;git.staropensource.de&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 146</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;cdn.kernel.org&#34; differs from project url host &#34;git.staropensource.de&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 147</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;cdn.kernel.org&#34; differs from project url host &#34;git.staropensource.de&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 148</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows default branch with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 149</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;zfs-2.4.4&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 149</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;git.staropensource.de&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 150</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;0001-cjktty.patch::https://github.com/bigshans/cjktty-patches/raw/master/v7.x/cjktty-7.2.patch&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 150</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;git.staropensource.de&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 151</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;0002-cjktty-32.patch::https://github.com/bigshans/cjktty-patches/raw/master/cjktty-add-cjk32x32-font-data.patch&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 151</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;git.staropensource.de&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 485</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 486</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 487</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 570</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 696</div>
+        <div class="rid"><a href="../rules/PB302.html">PB302</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          eval assembles and executes code at build time, defeating static review
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

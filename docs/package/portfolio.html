@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>portfolio — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/portfolio: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/portfolio.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="portfolio — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/portfolio: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/portfolio.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>portfolio</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>0.87.0-1</b>
+          
+          <span>maintained by Cobra</span>
+          <span>co-maintained by Bevan</span>
+          <span>44 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/portfolio">AUR page</a>
+          
+          <a href="../badge/portfolio.svg">badge</a>
+        </p>
+        <p>Track your portfolio performance (finance)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 7</div>
+        <div class="rid"><a href="../rules/PB906.html">PB906</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          pkgdesc repeats the package name &#34;portfolio&#34;; describe what the software does instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB109.html">PB109</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source is under &#34;buchen&#34; on github.com but the project url is under &#34;portfolio-performance&#34;; verify this is the same project
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB911.html">PB911</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source downloads to &#34;0.87.0.tar.gz&#34;, which does not identify the package; rename it with &#34;$pkgname-$pkgver.tar.gz::url&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;dlcdn.apache.org&#34; differs from project url host &#34;github.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB102.html">PB102</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          sha1sums is the strongest digest present; add sha256sums or b2sums
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB307.html">PB307</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          large base64-like literal embedded in build script
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

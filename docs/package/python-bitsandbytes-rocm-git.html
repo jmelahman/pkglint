@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>python-bitsandbytes-rocm-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/python-bitsandbytes-rocm-git: 5 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/python-bitsandbytes-rocm-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="python-bitsandbytes-rocm-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/python-bitsandbytes-rocm-git: 5 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/python-bitsandbytes-rocm-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>python-bitsandbytes-rocm-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>0.50.1.r1.g2b6cfb79-1</b>
+          
+          <span>maintained by wuxxin</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/python-bitsandbytes-rocm-git">AUR page</a>
+          
+          <a href="../badge/python-bitsandbytes-rocm-git.svg">badge</a>
+        </p>
+        <p>Accessible large language models via k-bit quantization for PyTorch. (GIT Version, with ROCm support)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 5</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 5</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;python-bitsandbytes-rocm-git&#34; builds the same software as &#34;python-bitsandbytes-rocm&#34; but declares neither provides=(python-bitsandbytes-rocm) nor conflicts=(python-bitsandbytes-rocm), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 34</div>
+        <div class="rid"><a href="../rules/PB711.html">PB711</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          git source needs &#34;git&#34; in makedepends; a clean build environment does not have it
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 50</div>
+        <div class="rid"><a href="../rules/PB950.html">PB950</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cmake configure without -DCMAKE_INSTALL_PREFIX=/usr defaults to /usr/local, which Arch packages must not touch
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 52</div>
+        <div class="rid"><a href="../rules/PB933.html">PB933</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          python -m build needs &#34;python-build&#34; in makedepends; a clean build environment does not have it
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 60</div>
+        <div class="rid"><a href="../rules/PB933.html">PB933</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          python -m installer needs &#34;python-installer&#34; in makedepends; a clean build environment does not have it
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

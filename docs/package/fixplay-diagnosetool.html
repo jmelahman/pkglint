@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fixplay-diagnosetool — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/fixplay-diagnosetool: 9 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/fixplay-diagnosetool.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="fixplay-diagnosetool — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/fixplay-diagnosetool: 9 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/fixplay-diagnosetool.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>fixplay-diagnosetool</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>0.3.0-1</b>
+          
+          <span>maintained by Fixplay</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/fixplay-diagnosetool">AUR page</a>
+          
+          <a href="../badge/fixplay-diagnosetool.svg">badge</a>
+        </p>
+        <p>Cross-platform diagnostic tool for gaming consoles</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 9</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB908.html">PB908</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          no &#39;# Maintainer:&#39; comment; AUR convention names the responsible maintainer at the top of the PKGBUILD
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB918.html">PB918</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          provides lists the package&#39;s own name &#34;fixplay-diagnosetool&#34;; a package always provides itself, so the entry is dead metadata the guidelines say to drop
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;fixplay-diagnoseTool-v$pkgver.tar.gz::https://github.com/fabioudev/fixplay-diagnoseTool/archive/refs/tags/v$pkgver.tar.gz&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB201.html">PB201</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          npm downloads during build(); network access belongs in prepare() with pinned hashes
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 47</div>
+        <div class="rid"><a href="../rules/PB980.html">PB980</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          npm ci writes the invoking user&#39;s ~/.npm cache; the Node.js package guidelines pass --cache &#34;$srcdir/npm-cache&#34; so the build leaves no droppings outside $srcdir
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 49</div>
+        <div class="rid"><a href="../rules/PB201.html">PB201</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          curl downloads during build(); network access belongs in prepare() with pinned hashes
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 57</div>
+        <div class="rid"><a href="../rules/PB203.html">PB203</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cargo build without --locked: dependency resolution may diverge from Cargo.lock
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 59</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;x86_64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 61</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;x86_64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

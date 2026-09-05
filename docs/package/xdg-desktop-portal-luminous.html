@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xdg-desktop-portal-luminous — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for aur/xdg-desktop-portal-luminous: 3 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/xdg-desktop-portal-luminous.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="xdg-desktop-portal-luminous — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for aur/xdg-desktop-portal-luminous: 3 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/xdg-desktop-portal-luminous.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>xdg-desktop-portal-luminous</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>0.1.21-1</b>
+          
+          <span>maintained by SteinGates</span>
+          
+          <span>6 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/xdg-desktop-portal-luminous">AUR page</a>
+          
+          <a href="../badge/xdg-desktop-portal-luminous.svg">badge</a>
+        </p>
+        <p>xdg-desktop-portal backend for wlroots based compositors, providing screenshot and screencast</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 3</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB908.html">PB908</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          no &#39;# Maintainer:&#39; comment; AUR convention names the responsible maintainer at the top of the PKGBUILD
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 9</div>
+        <div class="rid"><a href="../rules/PB918.html">PB918</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          provides lists the package&#39;s own name &#34;xdg-desktop-portal-luminous&#34;; a package always provides itself, so the entry is dead metadata the guidelines say to drop
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

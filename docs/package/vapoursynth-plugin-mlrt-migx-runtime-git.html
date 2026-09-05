@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vapoursynth-plugin-mlrt-migx-runtime-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade F for aur/vapoursynth-plugin-mlrt-migx-runtime-git: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/vapoursynth-plugin-mlrt-migx-runtime-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="vapoursynth-plugin-mlrt-migx-runtime-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade F for aur/vapoursynth-plugin-mlrt-migx-runtime-git: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/vapoursynth-plugin-mlrt-migx-runtime-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-F" title="grade F">F</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>vapoursynth-plugin-mlrt-migx-runtime-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>811.1f166ba-2</b>
+          
+          <span>maintained by TheFeelTrain</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/vapoursynth-plugin-mlrt-migx-runtime-git">AUR page</a>
+          
+          <a href="../badge/vapoursynth-plugin-mlrt-migx-runtime-git.svg">badge</a>
+        </p>
+        <p>Plugin for VapourSynth: mlrt (MIGraphX runtime)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 4</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;vapoursynth-plugin-mlrt-migx-runtime-git&#34; builds the same software as &#34;vapoursynth-plugin-mlrt-migx-runtime&#34; but declares neither provides=(vapoursynth-plugin-mlrt-migx-runtime) nor conflicts=(vapoursynth-plugin-mlrt-migx-runtime), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;latest_release&#34; should be prefixed with an underscore (_latest_release) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB301.html">PB301</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          &#34;get_latest_release_version&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;models-$latest_release.7z::https://github.com/AmusementClub/vs-mlrt/releases/download/$latest_release/models.$latest_release.7z&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 40</div>
+        <div class="rid"><a href="../rules/PB950.html">PB950</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cmake configure without -DCMAKE_INSTALL_PREFIX=/usr defaults to /usr/local, which Arch packages must not touch
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 40</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

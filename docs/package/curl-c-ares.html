@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>curl-c-ares — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for aur/curl-c-ares: 3 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/curl-c-ares.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="curl-c-ares — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for aur/curl-c-ares: 3 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/curl-c-ares.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>curl-c-ares</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>8.20.0-2</b>
+          
+          <span>maintained by 5long</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/curl-c-ares">AUR page</a>
+          
+          <a href="../badge/curl-c-ares.svg">badge</a>
+        </p>
+        <p>command line tool and library for transferring data with URLs (built with c-ares)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 3</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 34</div>
+        <div class="rid"><a href="../rules/PB603.html">PB603</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          provides entry &#34;curl&#34; claims core system package &#34;curl&#34;: installing it silently satisfies dependencies meant for the real package
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB603.html">PB603</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          conflicts entry &#34;curl&#34; claims core system package &#34;curl&#34;: installing it forces the real package to be removed
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;curl.se&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

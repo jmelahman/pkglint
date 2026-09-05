@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB829: info-directory-file — AUR Report Card</title>
+<meta name="description" content="PB829 (info-directory-file): usr/share/info/dir is the info reader&#39;s generated index — shared by every package and rebuilt by pacman&#39;s texinfo hook. A package shipping its own copy conflicts with…">
+
+<link rel="stylesheet" href="../assets/site.css?v=64df558d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB829.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB829: info-directory-file — AUR Report Card">
+<meta property="og:description" content="PB829 (info-directory-file): usr/share/info/dir is the info reader&#39;s generated index — shared by every package and rebuilt by pacman&#39;s texinfo hook. A package shipping its own copy conflicts with…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB829.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB829</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">info-directory-file</span></h1>
+    
+    <p class="lede">usr/share/info/dir is the info reader&#39;s generated index — shared by every package and rebuilt by pacman&#39;s texinfo hook. A package shipping its own copy conflicts with every other package that does. Delete it in package().</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>package() {
+  make DESTDIR=&#34;$pkgdir&#34; install-info   # writes usr/share/info/dir
+}</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>package() {
+  make DESTDIR=&#34;$pkgdir&#34; install-info
+  rm -f &#34;$pkgdir/usr/share/info/dir&#34;
+}</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB829</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB829</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB828.html">&larr; PB828 perllocal-pod</a>
+      <a href="PB830.html">PB830 stale-python-bytecode &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

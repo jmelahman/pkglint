@@ -371,20 +371,16 @@ func TestRenderRepositories(t *testing.T) {
 		`data-packager=""`,
 		// Votes are an AUR notion; an official row shows none rather than 0.
 		`<span class="none">&ndash;</span>`,
-		// The per-repository breakdown, whose names are filters.
+		// The repository toggles beside the disclosure, and the tallies they
+		// sum: the page is rendered for the whole corpus, with hooks the
+		// script rewrites.
 		`class="rkey" data-repo="core"`,
 		`class="rkey" data-repo="aur"`,
-		// The box admits to the field.
-		`Filter packages by name, maintainer, packager, or description`,
-		// The toggle, and the two scopes it switches between: the whole
-		// corpus is what the page opens on without the script, the AUR alone
-		// is what the toggle's off position shows.
-		`<input type="checkbox" id="official">`,
-		`<dl class="titleblock" data-scope="all">`,
-		`<dl class="titleblock" data-scope="aur" hidden>`,
-		`<div class="dist" data-scope="all">`,
-		`<div class="dist" data-scope="aur" hidden>`,
-		`<table class="repos" data-scope="all">`,
+		`<script type="application/json" id="repostats">`,
+		`"core":{"total":1,"findings":0,"fixable":0,"drifted":0,"grades":{"B":1}}`,
+		`<dd data-stat="total">2</dd>`,
+		`<dd data-stat="findings">0</dd>`,
+		` hidden data-stat-row="drifted"`,
 	} {
 		if !strings.Contains(index, want) {
 			t.Errorf("index.html missing %s", want)
@@ -418,15 +414,15 @@ func TestRenderRepositories(t *testing.T) {
 
 	js := read(filepath.Join("assets", "site.js"))
 	for _, want := range []string{"tr.dataset.repo", "tr.dataset.packager", `.get("repo")`, `"packaged by "`, `".rkey"`,
-		`getElementById("official")`, `"[data-scope]"`, `"all"`} {
+		`getElementById("repostats")`, `"[data-stat]"`, `"all"`} {
 		if !strings.Contains(js, want) {
 			t.Errorf("site.js missing %s: the repository filter is not wired up", want)
 		}
 	}
 }
 
-// TestRenderSingleRepositoryHasNoBreakdown: with one source the per-repository
-// table would repeat the legend line for line, so it is left out.
+// TestRenderSingleRepositoryHasNoBreakdown: with one source a repository
+// toggle would have nothing to toggle, so the controls are left out.
 func TestRenderSingleRepositoryHasNoBreakdown(t *testing.T) {
 	results := []siteResult{
 		{Name: "demo", Base: "demo", Version: "1.0-1", Grade: "A", Findings: []rules.Finding{}},
@@ -444,11 +440,8 @@ func TestRenderSingleRepositoryHasNoBreakdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(b), `<table class="repos"`) {
-		t.Error("index.html shows a per-repository breakdown for a single repository")
-	}
-	if strings.Contains(string(b), `id="official"`) || strings.Contains(string(b), `data-scope="aur"`) {
-		t.Error("index.html offers an official-repositories toggle with nothing to toggle")
+	if strings.Contains(string(b), `class="rkey"`) || strings.Contains(string(b), `id="repostats"`) {
+		t.Error("index.html offers repository toggles with nothing to toggle")
 	}
 	// A result with no repository is an AUR one, and says so in the column.
 	if !strings.Contains(string(b), `data-repo="aur"`) {

@@ -1,6 +1,7 @@
 // Roster controls for the report card index: text filter, grade filter (driven
-// by the corpus bar and its legend), repository filter (driven by the
-// breakdown table and the official-repositories toggle), and column sorting. No dependencies; the table is fully
+// by the corpus bar and its legend), repository filter (the toggles beside
+// the disclosure, which also redraw the counts and the bar), and column
+// sorting. No dependencies; the table is fully
 // readable with JavaScript off.
 //
 // The index server-renders only the most-voted slice of the corpus — the whole
@@ -29,28 +30,100 @@
   var bars = Array.prototype.slice.call(document.querySelectorAll(".bar"));
   var keys = Array.prototype.slice.call(document.querySelectorAll(".band, .gkey"));
   var rkeys = Array.prototype.slice.call(document.querySelectorAll(".rkey"));
-  // The official-repositories toggle, and the blocks that show one scope of
-  // the corpus — the whole of it or the AUR alone. Both exist only when the
-  // corpus has two sources; with one, every repository control is absent
-  // and the filter defaults to everything, as it always did.
-  var official = document.getElementById("official");
-  var scoped = Array.prototype.slice.call(document.querySelectorAll("[data-scope]"));
+  // Each repository's tally — total, findings, fixable, drifted, and a count
+  // per grade — keyed by name, rendered into the page beside the toggles.
+  // Present only when the corpus has more than one source; with one there
+  // are no toggles, nothing to redraw, and the filter admits everything.
+  var stats = null;
+  var statsEl = document.getElementById("repostats");
+  if (statsEl) {
+    try { stats = JSON.parse(statsEl.textContent); } catch (e) { stats = null; }
+  }
+  var scales = Array.prototype.slice.call(document.querySelectorAll(".scale"));
+  var statEls = Array.prototype.slice.call(document.querySelectorAll("[data-stat]"));
+  var statRows = Array.prototype.slice.call(document.querySelectorAll("[data-stat-row]"));
   var grades = Object.create(null); // selected grades; empty means "all"
   var repos = Object.create(null);  // selected repositories; empty means "all"
 
-  // aurOnly is the toggle's off position: exactly the AUR selected. It is
-  // the default when the toggle exists — the masthead says AUR, so the
-  // official repositories are the opt-in — and the AUR scope of the numbers
-  // above the roster is shown for as long as it holds. Any other selection,
-  // including none, is the toggle on and the whole-corpus scope.
+  // With toggles, the pressed repositories are the ones shown, and the AUR
+  // alone is where the page opens: the masthead says AUR, so the official
+  // repositories are the opt-in. Without toggles the set stays empty, which
+  // the filter reads as everything.
   function aurOnly() {
     var rs = Object.keys(repos);
     return rs.length === 1 && rs[0] === "aur";
   }
+  function allRepos() {
+    return rkeys.length > 0 && Object.keys(repos).length === rkeys.length;
+  }
   function defaultRepos() {
     var rs = Object.create(null);
-    if (official) rs.aur = true;
+    if (rkeys.length) rs.aur = true;
     return rs;
+  }
+
+  // ticks mirrors the Go side's scale: round marks at a readable interval,
+  // plus the total at the right edge, dropping a mark that would collide
+  // with it.
+  function ticks(total) {
+    var out = [];
+    if (!total) return out;
+    var steps = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+    var step = 1;
+    for (var i = 0; i < steps.length; i++) {
+      step = steps[i];
+      if (Math.floor(total / step) <= 6) break;
+    }
+    for (var n = 0; n < total; n += step) {
+      if (total - n < Math.floor(step / 2)) break;
+      out.push(n);
+    }
+    out.push(total);
+    return out;
+  }
+
+  // redraw sums the pressed repositories' tallies and rewrites what the
+  // page rendered for the whole corpus: the title block's counts, the
+  // distribution's bar, scale and legend, and the section tags' n. A grade
+  // the selection holds none of loses its band and key rather than keeping
+  // a zero-width sliver.
+  function redraw() {
+    if (!stats || !rkeys.length) return;
+    var sum = { total: 0, findings: 0, fixable: 0, drifted: 0 };
+    var grades = {};
+    Object.keys(repos).forEach(function (r) {
+      var st = stats[r];
+      if (!st) return;
+      sum.total += st.total;
+      sum.findings += st.findings;
+      sum.fixable += st.fixable;
+      sum.drifted += st.drifted;
+      Object.keys(st.grades || {}).forEach(function (g) {
+        grades[g] = (grades[g] || 0) + st.grades[g];
+      });
+    });
+    statEls.forEach(function (el) {
+      el.textContent = sum[el.dataset.stat];
+    });
+    statRows.forEach(function (el) {
+      el.hidden = !sum[el.dataset.statRow];
+    });
+    keys.forEach(function (el) {
+      var n = grades[el.dataset.grade] || 0;
+      el.hidden = n === 0;
+      if (el.classList.contains("band")) el.style.flexGrow = n;
+      var b = el.querySelector("b");
+      if (b) b.textContent = n;
+    });
+    scales.forEach(function (scale) {
+      scale.textContent = "";
+      ticks(sum.total).forEach(function (n) {
+        var span = document.createElement("span");
+        span.style.left = (n / sum.total * 100).toFixed(4) + "%";
+        span.textContent = n;
+        scale.appendChild(span);
+      });
+    });
   }
 
   // Where package pages sit relative to this one. The script renders rows the
@@ -280,15 +353,9 @@
     if (empty) empty.hidden = hits.length !== 0;
     // raw, not q: a box holding just "@" filters nothing but is still not
     // empty, and Reset is what empties it.
-    var atDefault = official ? aurOnly() : !rpicked.length;
+    var atDefault = rkeys.length ? aurOnly() : !rpicked.length;
     if (clear) clear.hidden = !raw && !picked.length && atDefault;
     bars.forEach(function (el) { el.classList.toggle("filtered", picked.length > 0); });
-    if (official) {
-      official.checked = !aurOnly();
-      scoped.forEach(function (el) {
-        el.hidden = (el.dataset.scope === "aur") !== aurOnly();
-      });
-    }
     keys.forEach(function (el) {
       el.setAttribute("aria-pressed", grades[el.dataset.grade] ? "true" : "false");
     });
@@ -309,29 +376,24 @@
   rkeys.forEach(function (el) {
     el.addEventListener("click", function () {
       var r = el.dataset.repo;
+      // The last pressed repository stays pressed: an empty selection would
+      // show an empty roster under numbers that add up to nothing.
+      if (repos[r] && Object.keys(repos).length === 1) return;
       if (repos[r]) delete repos[r];
       else repos[r] = true;
       reflect();
+      redraw();
       apply();
     });
   });
-
-  if (official) {
-    official.addEventListener("change", function () {
-      repos = Object.create(null);
-      if (!official.checked) repos.aur = true;
-      reflect();
-      apply();
-    });
-  }
 
   // The query lives in the URL as well as the box: ?search=@lone_wolf opens
   // the roster already narrowed, which is the only way a static site can hand
   // out a link to a filtered view — a maintainer pointing at their own
   // packages being the case that pays for it. ?repo=core does the same for
-  // the repository filter, so "how does core look" is a link too. When the
-  // toggle exists its off position is the page's default and goes unspelled;
-  // ?repo=all is the toggle on with nothing narrower picked. Typing
+  // the repository filter, so "how does core look" is a link too. The AUR
+  // alone is the page's default and goes unspelled; every repository pressed
+  // is ?repo=all. Typing
   // mirrors the box back with replaceState, one entry, so the address bar
   // always names the view on screen and Back still leaves the page rather
   // than un-typing the query.
@@ -342,8 +404,8 @@
     if (raw) params.set("search", raw);
     else params.delete("search");
     var rs = Object.keys(repos);
-    if (official && aurOnly()) params.delete("repo");
-    else if (official && !rs.length) params.set("repo", "all");
+    if (rkeys.length && aurOnly()) params.delete("repo");
+    else if (allRepos()) params.set("repo", "all");
     else if (rs.length) params.set("repo", rs.join(","));
     else params.delete("repo");
     var qs = params.toString();
@@ -363,6 +425,7 @@
     var wanted = params.get("repo") || "";
     if (wanted === "all") {
       repos = Object.create(null);
+      rkeys.forEach(function (el) { repos[el.dataset.repo] = true; });
     } else if (wanted) {
       repos = Object.create(null);
       wanted.split(",").forEach(function (r) {
@@ -385,6 +448,7 @@
       grades = Object.create(null);
       repos = defaultRepos();
       reflect();
+      redraw();
       apply();
       if (search) search.focus();
     });
@@ -415,6 +479,7 @@
     });
   });
 
+  redraw();
   apply();
 
   // The whole corpus, fetched after the page is usable rather than shipped

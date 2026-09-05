@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -141,17 +142,19 @@ type band struct {
 	Style  template.CSS
 }
 
-// scope is the corpus as one view of the index sees it — everything, or the
-// AUR alone — with the headline counts and the distribution bar that view
-// draws. The index renders every scope and a script shows one at a time.
+// scope is the corpus, or one repository's share of it, as the index's
+// headline counts and distribution bar see it. The index is rendered for the
+// whole corpus and carries each repository's scope as JSON, so the script can
+// redraw the numbers and the bar for whichever repositories are pressed.
 type scope struct {
-	Name     string
-	Total    int
-	Findings int
-	Fixable  int
-	Drifted  int
-	Bands    []band
-	Ticks    []tick
+	Name     string         `json:"-"`
+	Total    int            `json:"total"`
+	Findings int            `json:"findings"`
+	Fixable  int            `json:"fixable"`
+	Drifted  int            `json:"drifted"`
+	Grades   map[string]int `json:"grades"`
+	Bands    []band         `json:"-"`
+	Ticks    []tick         `json:"-"`
 }
 
 // tick is one labelled mark on the scale drawn under the distribution bar.
@@ -160,26 +163,11 @@ type tick struct {
 	Style template.CSS
 }
 
-// repoStat is one repository's line in the index's breakdown: how many of the
-// corpus it holds, and how those fell across the grades, in the order of the
-// distribution bar's bands so the columns line up under the same letters.
-type repoStat struct {
-	Repo   string
-	Count  int
-	Grades []int
-}
-
-// repoStats tallies the corpus per repository, in display order.
-func repoStats(results []siteResult, bands []band) []repoStat {
-	counts := map[string]map[string]int{}
-	for _, r := range results {
-		if counts[r.Repo] == nil {
-			counts[r.Repo] = map[string]int{}
-		}
-		counts[r.Repo][r.Grade]++
-	}
-	repos := make([]string, 0, len(counts))
-	for repo := range counts {
+// repoOrderOf lists the repositories present, in display order: the base
+// system first, the AUR last, anything unfamiliar between.
+func repoOrderOf[T any](byRepo map[string]T) []string {
+	repos := make([]string, 0, len(byRepo))
+	for repo := range byRepo {
 		repos = append(repos, repo)
 	}
 	sort.Slice(repos, func(i, j int) bool {
@@ -188,17 +176,7 @@ func repoStats(results []siteResult, bands []band) []repoStat {
 		}
 		return repos[i] < repos[j]
 	})
-	out := make([]repoStat, 0, len(repos))
-	for _, repo := range repos {
-		st := repoStat{Repo: repo}
-		for _, b := range bands {
-			n := counts[repo][b.Grade]
-			st.Grades = append(st.Grades, n)
-			st.Count += n
-		}
-		out = append(out, st)
-	}
-	return out
+	return repos
 }
 
 // fileGroup collects a package's findings under the file they were found in,
@@ -241,10 +219,9 @@ func renderSite(out string, results []siteResult) error {
 	}
 
 	tally := func(rs []siteResult) scope {
-		counts := map[string]int{}
-		sc := scope{Total: len(rs)}
+		sc := scope{Total: len(rs), Grades: map[string]int{}}
 		for _, r := range rs {
-			counts[r.Grade]++
+			sc.Grades[r.Grade]++
 			sc.Findings += len(r.Findings)
 			if len(r.Drift) > 0 {
 				sc.Drifted++
@@ -255,12 +232,11 @@ func renderSite(out string, results []siteResult) error {
 				}
 			}
 		}
-		sc.Bands = bands(counts, len(rs))
+		sc.Bands = bands(sc.Grades, len(rs))
 		sc.Ticks = ticks(len(rs))
 		return sc
 	}
 	corpus := tally(results)
-	corpus.Name = "all"
 
 	// page wraps per-page data with what every template needs: the head's title
 	// and description, the page's own absolute URL and the site's, the relative
@@ -290,23 +266,30 @@ func renderSite(out string, results []siteResult) error {
 		head = head[:rosterRows]
 	}
 
-	// The index carries the corpus twice when it has two sources: the whole
-	// of it, and the AUR alone, so the "include official repositories" toggle
-	// can swap the headline numbers and the distribution along with the
-	// roster rather than leave core's totals over an AUR-only table. With a
-	// single source there is one scope and no toggle.
-	repos := repoStats(results, corpus.Bands)
-	scopes := []scope{corpus}
-	if len(repos) > 1 {
-		var aur []siteResult
-		for _, r := range results {
-			if r.Repo == aurRepo {
-				aur = append(aur, r)
-			}
+	// The repositories, each tallied on its own, in display order. With more
+	// than one the index offers them as toggles, and the script sums the
+	// pressed ones to redraw the headline counts and the distribution; the
+	// page itself is rendered for the whole corpus, which is what a reader
+	// without the script gets.
+	var repos []scope
+	byRepo := map[string][]siteResult{}
+	for _, r := range results {
+		byRepo[r.Repo] = append(byRepo[r.Repo], r)
+	}
+	for _, name := range repoOrderOf(byRepo) {
+		sc := tally(byRepo[name])
+		sc.Name = name
+		repos = append(repos, sc)
+	}
+	repoJSON, err := json.Marshal(func() map[string]scope {
+		m := map[string]scope{}
+		for _, sc := range repos {
+			m[sc.Name] = sc
 		}
-		sc := tally(aur)
-		sc.Name = aurRepo
-		scopes = append(scopes, sc)
+		return m
+	}())
+	if err != nil {
+		return err
 	}
 	indexData := page("", "AUR Report Card",
 		fmt.Sprintf("Static security and hygiene grades for %d AUR PKGBUILDs, generated by pkglint without ever sourcing them.", len(results)),
@@ -314,8 +297,9 @@ func renderSite(out string, results []siteResult) error {
 			"Results":   head,
 			"Shown":     len(head),
 			"Sort":      "votes", // run() ordered them
-			"Scopes":    scopes,
+			"Corpus":    corpus,
 			"Repos":     repos,
+			"RepoJSON":  template.JS(repoJSON),
 			"Total":     len(results),
 			"Generated": time.Now().UTC().Format("2006-01-02 15:04 UTC"),
 		})

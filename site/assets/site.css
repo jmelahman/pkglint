@@ -333,15 +333,15 @@ p { max-width: var(--measure); }
    would say it is unpopular. */
 .none { color: var(--dim); }
 
-/* The per-repository breakdown under the legend. Its repository names are
-   filters, styled as the legend's keys are: plain labels with no script,
-   controls with it. */
-.repos { width: auto; margin-top: 1.5rem; }
-.repos thead th { padding: 0.4rem 0.7rem; }
-.repos thead th .grade { min-width: 0; font-size: 0.6875rem; }
-.repos tbody td { padding: 0.35rem 0.7rem; border-bottom: 0; }
-.repos tbody tr:hover td { background: transparent; }
-.repos tbody td:first-child { padding-left: 0; }
+/* The repository toggles beside the disclosure. Pressed is shown: they read
+   as plain labels with no script and as controls with it, styled as the
+   legend's keys are. */
+.keys { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-top: 1.75rem; }
+.keys .explain { margin-top: 0; }
+/* Opened, the disclosure takes the row below the toggles rather than
+   squeezing its text in beside them. */
+.keys .explain[open] { order: 1; flex-basis: 100%; }
+.rkeys { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .rkey {
   display: inline-block; padding: 0.35rem 0.5rem; border: 0; border-radius: 3px;
   background: transparent; color: inherit; cursor: default; font: inherit;
@@ -349,6 +349,11 @@ p { max-width: var(--measure); }
 .js .rkey { cursor: pointer; }
 .js .rkey:hover { background: var(--ink-2); }
 .rkey[aria-pressed="true"] { background: var(--accent-soft); }
+.js .rkey[aria-pressed="false"] .repo { opacity: 0.45; }
+/* The script hides what the pressed repositories hold none of: a grade's band
+   and key, the drifted row. The attribute has to win over the display the
+   element's own class set. */
+.band[hidden], .gkey[hidden], .titleblock div[hidden] { display: none !important; }
 
 /* ── disclosure ───────────────────────────────────────────────────────── */
 /* The caveat about what a grade is worth has to be reachable without being
@@ -392,16 +397,6 @@ input[type="search"]::placeholder { color: var(--dim); }
 }
 .clear:hover { color: var(--chalk); border-color: var(--dim); }
 .clear[hidden] { display: none; }
-.scope-toggle {
-  display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;
-  font: 400 0.8125rem/1 var(--mono); color: var(--dim); user-select: none;
-}
-.scope-toggle:hover { color: var(--chalk); }
-.scope-toggle input { accent-color: var(--accent); margin: 0; }
-/* A scoped block is one view of the corpus; the script shows one at a time,
-   and the attribute has to win over whatever display the block's own class
-   set. */
-[data-scope][hidden] { display: none !important; }
 
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }

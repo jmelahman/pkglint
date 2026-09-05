@@ -336,11 +336,22 @@ p { max-width: var(--measure); }
 /* The repository toggles beside the disclosure. Pressed is shown: they read
    as plain labels with no script and as controls with it, styled as the
    legend's keys are. */
-.keys { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-top: 1.75rem; }
-.keys .explain { margin-top: 0; }
-/* The toggles come first; opened, the disclosure drops to its own row below
-   them rather than squeezing its text in beside them. */
-.keys .explain[open] { flex-basis: 100%; }
+.keys {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  align-items: start; column-gap: 1rem; margin-top: 1.75rem;
+}
+/* The toggles hold the first column and the disclosure spans both as a
+   subgrid: its button sits in the second column, on the toggles' line at
+   every width, and its text opens across the full width beneath. Nothing
+   already on the page moves when it is expanded, and on a narrow screen
+   the button stays beside the toggles rather than dropping under them. */
+.keys .rkeys { grid-column: 1; grid-row: 1; min-height: 2.15rem; align-items: center; }
+.keys .explain {
+  grid-column: 1 / -1; grid-row: 1; margin-top: 0;
+  display: grid; grid-template-columns: subgrid; column-gap: 1rem;
+}
+.keys .explain summary { grid-column: 2; justify-self: start; }
+.keys .explain > div, .keys .explain::details-content { grid-column: 1 / -1; }
 .rkeys { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .rkey {
   display: inline-block; padding: 0.35rem 0.5rem; border: 0; border-radius: 3px;

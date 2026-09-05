@@ -53,11 +53,19 @@
     </div>
     {{/* A disclosure rather than a standing section: the caveat matters, but it
          is read once and then in the way. <details> keeps it one click deep
-         with no script. Beside it, when the corpus has more than one source,
+         with no script. Before it, when the corpus has more than one source,
          the repositories as toggles: the pressed ones are what the numbers
          above, the bar and the roster show. Each carries its own tally in
          the JSON below so the script can sum any combination. */}}
     <div class="keys">
+    {{if gt (len .Repos) 1}}
+    <div class="rkeys" role="group" aria-label="Repositories">
+      {{range .Repos}}<button type="button" class="rkey" data-repo="{{.Name}}" aria-pressed="false"
+        title="Show {{.Name}} ({{.Total}} packages)"><span class="repo repo-{{.Name}}">{{.Name}}</span></button>
+      {{end}}
+    </div>
+    <script type="application/json" id="repostats">{{.RepoJSON}}</script>
+    {{end}}
     <details class="explain">
       <summary>What a grade means</summary>
       <div>
@@ -72,14 +80,6 @@
         derived.</a></p>
       </div>
     </details>
-    {{if gt (len .Repos) 1}}
-    <div class="rkeys" role="group" aria-label="Repositories">
-      {{range .Repos}}<button type="button" class="rkey" data-repo="{{.Name}}" aria-pressed="false"
-        title="Show {{.Name}} ({{.Total}} packages)"><span class="repo repo-{{.Name}}">{{.Name}}</span></button>
-      {{end}}
-    </div>
-    <script type="application/json" id="repostats">{{.RepoJSON}}</script>
-    {{end}}
     </div>
   </div>
 </section>

@@ -338,9 +338,9 @@ p { max-width: var(--measure); }
    legend's keys are. */
 .keys { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-top: 1.75rem; }
 .keys .explain { margin-top: 0; }
-/* Opened, the disclosure takes the row below the toggles rather than
-   squeezing its text in beside them. */
-.keys .explain[open] { order: 1; flex-basis: 100%; }
+/* The toggles come first; opened, the disclosure drops to its own row below
+   them rather than squeezing its text in beside them. */
+.keys .explain[open] { flex-basis: 100%; }
 .rkeys { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .rkey {
   display: inline-block; padding: 0.35rem 0.5rem; border: 0; border-radius: 3px;
@@ -349,6 +349,10 @@ p { max-width: var(--measure); }
 .js .rkey { cursor: pointer; }
 .js .rkey:hover { background: var(--ink-2); }
 .rkey[aria-pressed="true"] { background: var(--accent-soft); }
+/* In the toggle row the chips are peers: the roster's brighter official
+   chips would read as the AUR being disabled here, so pressed is the only
+   distinction, and it is what dims the rest. */
+.rkey .repo { color: var(--chalk); border-color: var(--dim); }
 .js .rkey[aria-pressed="false"] .repo { opacity: 0.45; }
 /* The script hides what the pressed repositories hold none of: a grade's band
    and key, the drifted row. The attribute has to win over the display the

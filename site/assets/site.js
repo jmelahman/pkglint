@@ -1,6 +1,6 @@
 // Roster controls for the report card index: text filter, grade filter (driven
 // by the corpus bar and its legend), repository filter (driven by the
-// breakdown table), and column sorting. No dependencies; the table is fully
+// breakdown table and the official-repositories toggle), and column sorting. No dependencies; the table is fully
 // readable with JavaScript off.
 //
 // The index server-renders only the most-voted slice of the corpus — the whole
@@ -26,11 +26,32 @@
   var count = document.getElementById("count");
   var empty = document.getElementById("empty");
   var rest = document.getElementById("rest");
-  var bar = document.querySelector(".bar");
+  var bars = Array.prototype.slice.call(document.querySelectorAll(".bar"));
   var keys = Array.prototype.slice.call(document.querySelectorAll(".band, .gkey"));
   var rkeys = Array.prototype.slice.call(document.querySelectorAll(".rkey"));
+  // The official-repositories toggle, and the blocks that show one scope of
+  // the corpus — the whole of it or the AUR alone. Both exist only when the
+  // corpus has two sources; with one, every repository control is absent
+  // and the filter defaults to everything, as it always did.
+  var official = document.getElementById("official");
+  var scoped = Array.prototype.slice.call(document.querySelectorAll("[data-scope]"));
   var grades = Object.create(null); // selected grades; empty means "all"
   var repos = Object.create(null);  // selected repositories; empty means "all"
+
+  // aurOnly is the toggle's off position: exactly the AUR selected. It is
+  // the default when the toggle exists — the masthead says AUR, so the
+  // official repositories are the opt-in — and the AUR scope of the numbers
+  // above the roster is shown for as long as it holds. Any other selection,
+  // including none, is the toggle on and the whole-corpus scope.
+  function aurOnly() {
+    var rs = Object.keys(repos);
+    return rs.length === 1 && rs[0] === "aur";
+  }
+  function defaultRepos() {
+    var rs = Object.create(null);
+    if (official) rs.aur = true;
+    return rs;
+  }
 
   // Where package pages sit relative to this one. The script renders rows the
   // server never sent, so it has to spell their links itself, and the shards
@@ -214,11 +235,16 @@
     var rpicked = Object.keys(repos);
 
     var hits = [];
+    // inScope counts what the repository selection alone admits: the
+    // denominator the query and the grade keys narrow from, so an AUR-only
+    // view reads as so many packages rather than so many matches.
+    var inScope = 0;
     for (var i = 0; i < model.length; i++) {
       var e = model[i];
+      if (rpicked.length && !repos[e.repo]) continue;
+      inScope++;
       var hay = byMaintainer ? e.mtext : e.text;
-      if ((!q || hay.indexOf(q) !== -1) && (!picked.length || grades[e.grade]) &&
-        (!rpicked.length || repos[e.repo])) {
+      if ((!q || hay.indexOf(q) !== -1) && (!picked.length || grades[e.grade])) {
         hits.push(e);
       }
     }
@@ -238,10 +264,13 @@
     // whose only effect is to throw away the HTML that was shipped.
     if (!(asServed && !q && !picked.length && !rpicked.length && !sortCol)) render(hits, shown);
 
-    var of = loaded ? model.length : total || model.length;
+    // Until roster.json lands the served rows are a slice of the corpus, and
+    // the page's own total is the honest denominator for it.
+    var of = loaded || rpicked.length ? inScope : total || model.length;
     if (count) {
       if (shown < hits.length) {
-        count.textContent = "first " + shown + " of " + hits.length + " matches";
+        count.textContent = "first " + shown + " of " + hits.length +
+          (hits.length === of ? " packages" : " matches");
       } else if (hits.length === of) {
         count.textContent = of + " packages";
       } else {
@@ -251,8 +280,15 @@
     if (empty) empty.hidden = hits.length !== 0;
     // raw, not q: a box holding just "@" filters nothing but is still not
     // empty, and Reset is what empties it.
-    if (clear) clear.hidden = !raw && !picked.length && !rpicked.length;
-    if (bar) bar.classList.toggle("filtered", picked.length > 0);
+    var atDefault = official ? aurOnly() : !rpicked.length;
+    if (clear) clear.hidden = !raw && !picked.length && atDefault;
+    bars.forEach(function (el) { el.classList.toggle("filtered", picked.length > 0); });
+    if (official) {
+      official.checked = !aurOnly();
+      scoped.forEach(function (el) {
+        el.hidden = (el.dataset.scope === "aur") !== aurOnly();
+      });
+    }
     keys.forEach(function (el) {
       el.setAttribute("aria-pressed", grades[el.dataset.grade] ? "true" : "false");
     });
@@ -280,11 +316,22 @@
     });
   });
 
+  if (official) {
+    official.addEventListener("change", function () {
+      repos = Object.create(null);
+      if (!official.checked) repos.aur = true;
+      reflect();
+      apply();
+    });
+  }
+
   // The query lives in the URL as well as the box: ?search=@lone_wolf opens
   // the roster already narrowed, which is the only way a static site can hand
   // out a link to a filtered view — a maintainer pointing at their own
   // packages being the case that pays for it. ?repo=core does the same for
-  // the repository filter, so "how does core look" is a link too. Typing
+  // the repository filter, so "how does core look" is a link too. When the
+  // toggle exists its off position is the page's default and goes unspelled;
+  // ?repo=all is the toggle on with nothing narrower picked. Typing
   // mirrors the box back with replaceState, one entry, so the address bar
   // always names the view on screen and Back still leaves the page rather
   // than un-typing the query.
@@ -295,13 +342,16 @@
     if (raw) params.set("search", raw);
     else params.delete("search");
     var rs = Object.keys(repos);
-    if (rs.length) params.set("repo", rs.join(","));
+    if (official && aurOnly()) params.delete("repo");
+    else if (official && !rs.length) params.set("repo", "all");
+    else if (rs.length) params.set("repo", rs.join(","));
     else params.delete("repo");
     var qs = params.toString();
     history.replaceState(null, "",
       location.pathname + (qs ? "?" + qs : "") + location.hash);
   }
 
+  repos = defaultRepos();
   if (window.URLSearchParams) {
     var params = new URLSearchParams(location.search);
     var seeded = params.get("search");
@@ -310,9 +360,16 @@
     // and show an empty roster with no key to un-press.
     var known = Object.create(null);
     rkeys.forEach(function (el) { known[el.dataset.repo] = true; });
-    (params.get("repo") || "").split(",").forEach(function (r) {
-      if (known[r]) repos[r] = true;
-    });
+    var wanted = params.get("repo") || "";
+    if (wanted === "all") {
+      repos = Object.create(null);
+    } else if (wanted) {
+      repos = Object.create(null);
+      wanted.split(",").forEach(function (r) {
+        if (known[r]) repos[r] = true;
+      });
+      if (!Object.keys(repos).length) repos = defaultRepos();
+    }
   }
 
   if (search) {
@@ -326,7 +383,7 @@
     clear.addEventListener("click", function () {
       if (search) search.value = "";
       grades = Object.create(null);
-      repos = Object.create(null);
+      repos = defaultRepos();
       reflect();
       apply();
       if (search) search.focus();

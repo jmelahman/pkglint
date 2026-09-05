@@ -117,7 +117,7 @@ func renderShards(tmpl *template.Template, out string, page pageFunc, results []
 
 	for i, s := range shards {
 		data := page("roster/"+s.Key+".html",
-			fmt.Sprintf("Packages: %s — Arch Report Card", s.Key),
+			fmt.Sprintf("Packages: %s — AUR Report Card", s.Key),
 			fmt.Sprintf("Every Arch Linux package base beginning with %q graded by pkglint: %d packages.", s.Key, len(s.Results)),
 			map[string]any{
 				"Results": s.Results,
@@ -138,7 +138,7 @@ func renderShards(tmpl *template.Template, out string, page pageFunc, results []
 		}
 	}
 
-	index := page("roster/", "All packages — Arch Report Card",
+	index := page("roster/", "All packages — AUR Report Card",
 		fmt.Sprintf("Every one of the %d Arch Linux package bases pkglint grades, listed alphabetically.", len(results)),
 		// Key is empty rather than absent: shardnav compares it against every
 		// letter, and a missing map key would compare a string against nil.

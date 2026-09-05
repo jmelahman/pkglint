@@ -372,11 +372,19 @@ func TestRenderRepositories(t *testing.T) {
 		// Votes are an AUR notion; an official row shows none rather than 0.
 		`<span class="none">&ndash;</span>`,
 		// The per-repository breakdown, whose names are filters.
-		`<table class="repos">`,
 		`class="rkey" data-repo="core"`,
 		`class="rkey" data-repo="aur"`,
 		// The box admits to the field.
 		`Filter packages by name, maintainer, packager, or description`,
+		// The toggle, and the two scopes it switches between: the whole
+		// corpus is what the page opens on without the script, the AUR alone
+		// is what the toggle's off position shows.
+		`<input type="checkbox" id="official">`,
+		`<dl class="titleblock" data-scope="all">`,
+		`<dl class="titleblock" data-scope="aur" hidden>`,
+		`<div class="dist" data-scope="all">`,
+		`<div class="dist" data-scope="aur" hidden>`,
+		`<table class="repos" data-scope="all">`,
 	} {
 		if !strings.Contains(index, want) {
 			t.Errorf("index.html missing %s", want)
@@ -409,7 +417,8 @@ func TestRenderRepositories(t *testing.T) {
 	}
 
 	js := read(filepath.Join("assets", "site.js"))
-	for _, want := range []string{"tr.dataset.repo", "tr.dataset.packager", `.get("repo")`, `"packaged by "`, `".rkey"`} {
+	for _, want := range []string{"tr.dataset.repo", "tr.dataset.packager", `.get("repo")`, `"packaged by "`, `".rkey"`,
+		`getElementById("official")`, `"[data-scope]"`, `"all"`} {
 		if !strings.Contains(js, want) {
 			t.Errorf("site.js missing %s: the repository filter is not wired up", want)
 		}
@@ -435,8 +444,11 @@ func TestRenderSingleRepositoryHasNoBreakdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(b), `<table class="repos">`) {
+	if strings.Contains(string(b), `<table class="repos"`) {
 		t.Error("index.html shows a per-repository breakdown for a single repository")
+	}
+	if strings.Contains(string(b), `id="official"`) || strings.Contains(string(b), `data-scope="aur"`) {
+		t.Error("index.html offers an official-repositories toggle with nothing to toggle")
 	}
 	// A result with no repository is an AUR one, and says so in the column.
 	if !strings.Contains(string(b), `data-repo="aur"`) {

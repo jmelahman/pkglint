@@ -392,6 +392,16 @@ input[type="search"]::placeholder { color: var(--dim); }
 }
 .clear:hover { color: var(--chalk); border-color: var(--dim); }
 .clear[hidden] { display: none; }
+.scope-toggle {
+  display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;
+  font: 400 0.8125rem/1 var(--mono); color: var(--dim); user-select: none;
+}
+.scope-toggle:hover { color: var(--chalk); }
+.scope-toggle input { accent-color: var(--accent); margin: 0; }
+/* A scoped block is one view of the corpus; the script shows one at a time,
+   and the attribute has to win over whatever display the block's own class
+   set. */
+[data-scope][hidden] { display: none !important; }
 
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }

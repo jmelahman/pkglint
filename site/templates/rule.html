@@ -10,7 +10,7 @@
 <section class="row">
   <div class="tag">{{.Rule.ID}}</div>
   <div>
-    <p class="eyebrow"><a href="{{.Root}}index.html">Arch report card</a> ·
+    <p class="eyebrow"><a href="{{.Root}}index.html">AUR report card</a> ·
       <a href="index.html">Rule reference</a></p>
     <h1><span class="obj">{{.Rule.Name}}</span></h1>
     {{if .Rule.FixLevel.Fixable}}<p class="facts">{{template "fixpill" .Rule.FixLevel}}</p>{{end}}

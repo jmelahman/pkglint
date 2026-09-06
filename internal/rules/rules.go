@@ -747,3 +747,45 @@ func RuleByID(id string) (Rule, bool) {
 	r, ok := registryByID[id]
 	return r, ok
 }
+
+// Lookup resolves a rule from what a user typed on the command line: an ID in
+// any case ("pb101"), or the rule's short name ("skipped-checksum"). IDs are
+// matched first, so the two namespaces must not overlap and a name must
+// identify one rule; TestRegistryIsWellFormed holds the registry to both.
+func Lookup(q string) (Rule, bool) {
+	q = strings.TrimSpace(q)
+	if r, ok := RuleByID(strings.ToUpper(q)); ok {
+		return r, true
+	}
+	name := strings.ToLower(q)
+	for _, r := range registry() {
+		if r.Name == name {
+			return r, true
+		}
+	}
+	return Rule{}, false
+}
+
+// suggestLimit caps how many near matches an unresolvable rule name offers.
+const suggestLimit = 5
+
+// Suggest returns the rules an argument Lookup could not resolve plausibly
+// meant: IDs it prefixes ("pb10"), and names it appears in ("checksum"). It
+// exists to make an error message helpful, not as a search API — at most
+// suggestLimit rules come back, in ID order.
+func Suggest(q string) []Rule {
+	q = strings.ToLower(strings.TrimSpace(q))
+	if q == "" {
+		return nil
+	}
+	var out []Rule
+	for _, r := range registry() {
+		if strings.HasPrefix(strings.ToLower(r.ID), q) || strings.Contains(r.Name, q) {
+			out = append(out, r)
+			if len(out) == suggestLimit {
+				break
+			}
+		}
+	}
+	return out
+}

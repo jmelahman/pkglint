@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -66,6 +67,7 @@ func TestCleanPKGBUILDHasNoFindings(t *testing.T) {
 
 func TestRegistryIsWellFormed(t *testing.T) {
 	seen := map[string]bool{}
+	names := map[string]string{}
 	for _, r := range Registry() {
 		if seen[r.ID] {
 			t.Errorf("duplicate rule ID %s", r.ID)
@@ -73,6 +75,16 @@ func TestRegistryIsWellFormed(t *testing.T) {
 		seen[r.ID] = true
 		if r.Name == "" || r.Doc == "" || r.Check == nil {
 			t.Errorf("rule %s is missing name, doc, or check", r.ID)
+		}
+		// Lookup resolves a name as well as an ID — `pkglint explain
+		// skipped-checksum` — so a name has to identify one rule, and must not
+		// be spelled like an ID, which Lookup matches first and would shadow it.
+		if prev, dup := names[r.Name]; dup {
+			t.Errorf("rules %s and %s share the name %q", prev, r.ID, r.Name)
+		}
+		names[r.Name] = r.ID
+		if _, isID := RuleByID(strings.ToUpper(r.Name)); isID {
+			t.Errorf("rule %s is named %q, which is also a rule ID", r.ID, r.Name)
 		}
 		if r.Bad == "" || r.Good == "" {
 			t.Errorf("rule %s is missing a Bad/Good example", r.ID)
@@ -2520,5 +2532,61 @@ package_demo-docs() {
 	}
 	if args := argsIn("package_demo-docs"); len(args) < 4 || args[3] != "$pkgdir/usr/share/licenses/demo-docs/" {
 		t.Errorf("package_demo-docs(): pkgname should rebind to the split's own name, got %v", args)
+	}
+}
+
+// TestLookup covers the spellings `pkglint explain` accepts for a rule: the ID
+// in any case, and the rule's short name.
+func TestLookup(t *testing.T) {
+	for _, q := range []string{"PB101", "pb101", "  PB101  ", "skipped-checksum", "Skipped-Checksum"} {
+		r, ok := Lookup(q)
+		if !ok {
+			t.Errorf("Lookup(%q) found nothing", q)
+			continue
+		}
+		if r.ID != "PB101" {
+			t.Errorf("Lookup(%q) = %s, want PB101", q, r.ID)
+		}
+	}
+	for _, q := range []string{"", "PB9999", "checksum", "PB10 1"} {
+		if _, ok := Lookup(q); ok {
+			t.Errorf("Lookup(%q) resolved, want no match", q)
+		}
+	}
+	// Every rule has to be reachable by both of its own spellings, or the
+	// listing sends people to a page `explain` cannot open.
+	for _, want := range Registry() {
+		for _, q := range []string{want.ID, want.Name} {
+			if got, ok := Lookup(q); !ok || got.ID != want.ID {
+				t.Errorf("Lookup(%q) = %s (found=%v), want %s", q, got.ID, ok, want.ID)
+			}
+		}
+	}
+}
+
+// TestSuggest covers the near matches an unresolvable argument offers: an ID
+// the query prefixes, a name it appears in, and nothing at all for a query
+// that resembles neither.
+func TestSuggest(t *testing.T) {
+	ids := func(rs []Rule) []string {
+		var out []string
+		for _, r := range rs {
+			out = append(out, r.ID)
+		}
+		return out
+	}
+	if got := ids(Suggest("checksum")); !slices.Contains(got, "PB101") || !slices.Contains(got, "PB102") {
+		t.Errorf("Suggest(\"checksum\") = %v, want the checksum rules", got)
+	}
+	if got := ids(Suggest("pb10")); len(got) == 0 || got[0] != "PB101" {
+		t.Errorf("Suggest(\"pb10\") = %v, want PB101 first", got)
+	}
+	if got := Suggest("pb"); len(got) != suggestLimit {
+		t.Errorf("Suggest(\"pb\") returned %d rules, want the cap of %d", len(got), suggestLimit)
+	}
+	for _, q := range []string{"", "  ", "zzzzz"} {
+		if got := Suggest(q); len(got) != 0 {
+			t.Errorf("Suggest(%q) = %v, want nothing", q, ids(got))
+		}
 	}
 }

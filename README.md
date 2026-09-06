@@ -90,6 +90,9 @@ pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
   --offline                    # with --fix: skip fixes needing network (VCS ref resolution, https probing)
   --add-ignores                # insert ignore directives suppressing every current finding
   --no-inline-ignores          # disregard ignore directives (audit an untrusted package)
+
+pkglint explain PB101 ...      # print one rule's documentation, example, and
+                               # how to fix or suppress it (ID or name, any case)
 ```
 
 Suppress a reviewed, intentional finding inline:
@@ -222,8 +225,11 @@ image with passwordless `sudo pacman`, which stock `archlinux:base-devel` lacks.
 | Style         | PB901–PB984 | namcap's PKGBUILD conventions (hardcoded architectures, custom variables without `_` prefix, `$startdir`, redundant makedepends, missing Maintainer/pkgdesc/url/license, pre-SPDX license identifiers, stale ignore directives, …) plus the published [Arch package guidelines](https://wiki.archlinux.org/title/Arch_package_guidelines) and the per-ecosystem guidelines: [Go](https://wiki.archlinux.org/title/Go_package_guidelines), [Python](https://wiki.archlinux.org/title/Python_package_guidelines), [Rust](https://wiki.archlinux.org/title/Rust_package_guidelines), [CMake](https://wiki.archlinux.org/title/CMake_package_guidelines)/[Meson](https://wiki.archlinux.org/title/Meson_package_guidelines), [VCS](https://wiki.archlinux.org/title/VCS_package_guidelines), [fonts](https://wiki.archlinux.org/title/Font_package_guidelines), [DKMS](https://wiki.archlinux.org/title/DKMS_package_guidelines), [lib32](https://wiki.archlinux.org/title/32-bit_package_guidelines), [MinGW](https://wiki.archlinux.org/title/MinGW_package_guidelines), [Node.js](https://wiki.archlinux.org/title/Node.js_package_guidelines), [Java](https://wiki.archlinux.org/title/Java_package_guidelines), [CLR](https://wiki.archlinux.org/title/CLR_package_guidelines), [Haskell](https://wiki.archlinux.org/title/Haskell_package_guidelines) and PHP |
 
 `pkglint --rules` prints the full documentation for each, with its severity and
-the flag that auto-fixes it; the
-[rule reference](https://jamison.lahman.dev/pkglint/rules/) adds an example per rule.
+the flag that auto-fixes it. `pkglint explain PB101` (or `pkglint explain
+skipped-checksum`) prints one rule's page — documentation, a flagged snippet
+beside the preferred spelling, and how to fix or suppress it — the same
+reference the [rule reference](https://jamison.lahman.dev/pkglint/rules/)
+publishes.
 
 ### Relationship to namcap
 

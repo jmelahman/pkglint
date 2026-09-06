@@ -470,8 +470,15 @@ func ExceedsThreshold(reports []PackageReport, sev rules.Severity) bool {
 }
 
 // rulesWidth is the column --rules wraps at: the classic terminal width, so
-// the listing reads in a default-size window and in a pager.
-const rulesWidth = 80
+// the listing reads in a default-size window and in a pager. ruleIndent is
+// what a rule's body — documentation, prose, snippets — hangs under, and
+// ruleLabelIndent the shallower indent of the labels heading those blocks in
+// `explain`.
+const (
+	rulesWidth      = 80
+	ruleIndent      = "      "
+	ruleLabelIndent = "  "
+)
 
 // RenderRules writes the rule listing behind --rules: one header line per
 // rule — ID, name, the severity it reports (a range when it escalates), and
@@ -483,19 +490,110 @@ func RenderRules(w io.Writer, all []rules.Rule, color bool) {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		fmt.Fprintf(w, "%s %s  %s", s.wrap(ansiBold, r.ID), r.Name, s.severityRange(r.Severities()))
-		if flag := r.FixLevel.Flag(); flag != "" {
-			code := ansiGreen
-			if !r.FixLevel.Safe() {
-				code = ansiYellow
-			}
-			fmt.Fprintf(w, "  %s", s.wrap(code, flag))
-		}
-		fmt.Fprintln(w)
-		for _, line := range wrapWords(r.Doc, rulesWidth-6) {
-			fmt.Fprintf(w, "      %s\n", line)
-		}
+		renderRuleHeader(w, s, r)
+		renderRuleDoc(w, r)
 	}
+}
+
+// renderRuleHeader writes a rule's identity line: ID, name, the severity it
+// reports (a range when it escalates), and the flag that auto-fixes it, if
+// any. --rules and `explain` share it so the two cannot drift apart.
+func renderRuleHeader(w io.Writer, s styler, r rules.Rule) {
+	fmt.Fprintf(w, "%s %s  %s", s.wrap(ansiBold, r.ID), r.Name, s.severityRange(r.Severities()))
+	if flag := r.FixLevel.Flag(); flag != "" {
+		code := ansiGreen
+		if !r.FixLevel.Safe() {
+			code = ansiYellow
+		}
+		fmt.Fprintf(w, "  %s", s.wrap(code, flag))
+	}
+	fmt.Fprintln(w)
+}
+
+// renderRuleDoc writes a rule's documentation, wrapped under the indent the
+// rest of the listing uses.
+func renderRuleDoc(w io.Writer, r rules.Rule) {
+	renderIndented(w, wrapWords(r.Doc, rulesWidth-len(ruleIndent)))
+}
+
+// renderIndented writes already-wrapped lines under ruleIndent.
+func renderIndented(w io.Writer, lines []string) {
+	for _, line := range lines {
+		if line == "" {
+			// A blank separator inside a block is blank: indenting it would
+			// leave trailing whitespace on the line.
+			fmt.Fprintln(w)
+			continue
+		}
+		fmt.Fprintf(w, "%s%s\n", ruleIndent, line)
+	}
+}
+
+// RenderRuleDetail writes one rule's reference page behind `pkglint explain`:
+// the --rules header and documentation, what the rule is checked against, the
+// flagged-versus-preferred example pair the report card site shows, the
+// auto-fix invocation when the rule has one, and the directive that suppresses
+// it. Everything printed is registry data, so — as in RenderRules — color
+// needs no sanitizing. The snippets are written verbatim, however long their
+// lines: they are code, and wrapping them would break what they demonstrate.
+func RenderRuleDetail(w io.Writer, r rules.Rule, color bool) {
+	s := styler(color)
+	renderRuleHeader(w, s, r)
+	renderRuleDoc(w, r)
+
+	applies := "the PKGBUILD and the install scriptlets committed beside it."
+	if r.Scope == rules.ScopePackage {
+		applies = "the built package archive (*.pkg.tar.*), not the PKGBUILD — lint one " +
+			"directly, or run 'pkglint build' to produce it."
+	}
+	renderRuleSection(w, s, ansiBold, "Applies to", wrapWords(applies, rulesWidth-len(ruleIndent)))
+
+	if r.Bad != "" {
+		renderRuleSection(w, s, ansiRed, "Flagged", snippetLines(r.Bad))
+	}
+	if r.Good != "" {
+		renderRuleSection(w, s, ansiGreen, "Preferred", snippetLines(r.Good))
+	}
+	if flag := r.FixLevel.Flag(); flag != "" {
+		fix := fmt.Sprintf("'pkglint %s' rewrites this in place", flag)
+		if !r.FixLevel.Safe() {
+			fix += " — the rewrite is mechanical but changes what the build does, so read the result"
+		}
+		fix += ". Add --diff to see the change without writing it."
+		renderRuleSection(w, s, ansiBold, "Auto-fix", wrapWords(fix, rulesWidth-len(ruleIndent)))
+	}
+	renderRuleSection(w, s, ansiBold, "Suppress", suppressLines(r))
+}
+
+// suppressLines is the Suppress block: the directive that silences one
+// finding, then the prose under it. Only a PKGBUILD-scope rule gets the inline
+// form — a built-package finding is anchored at a path inside the archive,
+// where there is no line of source for a directive to sit on, so --ignore is
+// the only thing that turns it off.
+func suppressLines(r rules.Rule) []string {
+	directive, prose := "# pkglint: ignore="+r.ID, fmt.Sprintf(
+		"on the finding's line or the line above it, in that file. '--ignore %s' turns "+
+			"the rule off for a whole run instead.", r.ID)
+	if r.Scope == rules.ScopePackage {
+		directive, prose = "pkglint --ignore "+r.ID, "turns the rule off for a whole run. An "+
+			"inline '# pkglint: ignore=' directive cannot reach this finding: it is reported "+
+			"against a file in the built archive, not a line of the PKGBUILD."
+	}
+	return append([]string{directive, ""}, wrapWords(prose, rulesWidth-len(ruleIndent))...)
+}
+
+// renderRuleSection writes one labelled block of an `explain` page: a blank
+// line, the label, and the body under the shared indent.
+func renderRuleSection(w io.Writer, s styler, code, label string, body []string) {
+	fmt.Fprintf(w, "\n%s%s\n", ruleLabelIndent, s.wrap(code, label))
+	renderIndented(w, body)
+}
+
+// snippetLines splits an example into the lines to print. A snippet is code:
+// its own line breaks are the ones that matter, and the trailing newline a raw
+// string literal may end with is not a blank line to reproduce.
+func snippetLines(snippet string) []string {
+	return strings.Split(strings.TrimRight(snippet, "\n"), "\n")
 }
 
 // severityRange renders a rule's severity span, coloring each end on its own

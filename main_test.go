@@ -986,3 +986,88 @@ func TestRulesFlag(t *testing.T) {
 		t.Errorf("bad --color mode with --rules: exit %d, want 2", code)
 	}
 }
+
+// TestExplainCommand covers `pkglint explain`: a rule named by ID or by name
+// prints its documentation, example, and suppression directive; --color is
+// honoured; and an argument that names no rule fails with suggestions rather
+// than printing a page.
+func TestExplainCommand(t *testing.T) {
+	var buf bytes.Buffer
+	if code := run([]string{"explain", "PB101", "--color=never"}, &buf); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+	out := buf.String()
+	for _, want := range []string{"PB101 skipped-checksum  error", "Flagged", "Preferred", "# pkglint: ignore=PB101"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain PB101 missing %q:\n%s", want, out)
+		}
+	}
+
+	// The ID in any case and the rule's own name all reach the same page.
+	for _, q := range []string{"pb101", "skipped-checksum"} {
+		var alt bytes.Buffer
+		if code := run([]string{"explain", q, "--color=never"}, &alt); code != 0 {
+			t.Fatalf("explain %s: exit %d, want 0", q, code)
+		}
+		if alt.String() != out {
+			t.Errorf("explain %s rendered a different page than explain PB101", q)
+		}
+	}
+
+	// Every rule explains without blowing up, and says which of the two
+	// things it is checked against.
+	for _, r := range rules.Registry() {
+		var page bytes.Buffer
+		if code := run([]string{"explain", r.ID, "--color=never"}, &page); code != 0 {
+			t.Errorf("explain %s: exit %d, want 0", r.ID, code)
+		}
+		if !strings.Contains(page.String(), "Applies to") {
+			t.Errorf("explain %s omits what it applies to:\n%s", r.ID, page.String())
+		}
+	}
+
+	var many bytes.Buffer
+	if code := run([]string{"explain", "PB101", "PB102", "--color=never"}, &many); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+	if !strings.Contains(many.String(), "PB101 ") || !strings.Contains(many.String(), "PB102 ") {
+		t.Errorf("explain should print every rule it is given:\n%s", many.String())
+	}
+
+	var colored bytes.Buffer
+	if code := run([]string{"explain", "PB101", "--color=always"}, &colored); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+	if !strings.Contains(colored.String(), "\x1b[1mPB101\x1b[0m") {
+		t.Errorf("--color=always should bold the rule ID:\n%q", colored.String())
+	}
+
+	// A bad argument prints nothing: the first rule's page must not scroll
+	// past above the error.
+	for _, args := range [][]string{
+		{"explain"},
+		{"explain", "PB9999"},
+		{"explain", "PB101", "nonsense"},
+		{"explain", "PB101", "--color=sometimes"},
+	} {
+		var bad bytes.Buffer
+		if code := run(args, &bad); code != 2 {
+			t.Errorf("%v: exit %d, want 2", args, code)
+		}
+		if bad.Len() != 0 {
+			t.Errorf("%v wrote to stdout before failing:\n%s", args, bad.String())
+		}
+	}
+}
+
+// TestUnknownRuleError covers the suggestions offered for an argument that
+// names no rule: near matches when there are any, and no invented ones when
+// there are not. The message goes to stderr, so it is exercised directly.
+func TestUnknownRuleError(t *testing.T) {
+	if err := unknownRuleError("checksum"); err == nil || !strings.Contains(err.Error(), "PB101 skipped-checksum") {
+		t.Errorf("a partial name should suggest the rules it matches, got %v", err)
+	}
+	if err := unknownRuleError("PB9999"); err == nil || strings.Contains(err.Error(), "did you mean") {
+		t.Errorf("an argument matching nothing should not invent suggestions, got %v", err)
+	}
+}

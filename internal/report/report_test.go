@@ -668,3 +668,81 @@ func TestWrapWords(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderRuleDetail pins the `pkglint explain` page: the --rules header
+// line verbatim, then the documentation, the example pair unwrapped, the
+// auto-fix invocation, and the suppression directive. Prose wraps within 80
+// columns; snippets do not wrap at all, because they are code.
+func TestRenderRuleDetail(t *testing.T) {
+	r := rules.Rule{
+		ID: "PB1", Name: "fixed", Severity: rules.Warn, FixLevel: rules.FixSafe,
+		Doc:  strings.Repeat("word ", 40),
+		Bad:  "source=('" + strings.Repeat("x", 90) + "')\nsha256sums=('SKIP')",
+		Good: "sha256sums=('9f86')",
+	}
+	var buf bytes.Buffer
+	RenderRuleDetail(&buf, r, false)
+	out := buf.String()
+
+	var header bytes.Buffer
+	RenderRules(&header, []rules.Rule{r}, false)
+	if !strings.HasPrefix(out, header.String()) {
+		t.Errorf("explain should open with the --rules entry verbatim:\n--- got ---\n%s\n--- want prefix ---\n%s", out, header.String())
+	}
+	for _, want := range []string{
+		"\n  Flagged\n      source=('" + strings.Repeat("x", 90) + "')\n      sha256sums=('SKIP')\n",
+		"\n  Preferred\n      sha256sums=('9f86')\n",
+		"\n  Applies to\n      the PKGBUILD and the install scriptlets committed beside it.\n",
+		"'pkglint --fix' rewrites this in place",
+		"\n  Suppress\n      # pkglint: ignore=PB1\n\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimRight(line, " ") != line {
+			t.Errorf("line has trailing whitespace: %q", line)
+		}
+		if n := len([]rune(line)); n > rulesWidth && !strings.Contains(line, "xxx") {
+			t.Errorf("prose line exceeds %d columns (%d): %q", rulesWidth, n, line)
+		}
+	}
+	if strings.ContainsRune(out, 0x1b) {
+		t.Errorf("uncolored rendering contains escape codes:\n%q", out)
+	}
+
+	var colored bytes.Buffer
+	RenderRuleDetail(&colored, r, true)
+	for _, want := range []string{"\x1b[1mPB1\x1b[0m", "\x1b[31mFlagged\x1b[0m", "\x1b[32mPreferred\x1b[0m"} {
+		if !strings.Contains(colored.String(), want) {
+			t.Errorf("colored output missing %q:\n%q", want, colored.String())
+		}
+	}
+	if got := stripSGR(colored.String()); got != out {
+		t.Errorf("stripping SGR must yield the plain rendering\n--- stripped ---\n%q\n--- plain ---\n%q", got, out)
+	}
+}
+
+// TestRenderRuleDetailPackageScope pins what a built-package rule's page says
+// about suppression: an inline directive has no line to sit on, so only
+// --ignore is offered.
+func TestRenderRuleDetailPackageScope(t *testing.T) {
+	r := rules.Rule{ID: "PB8", Name: "packaged", Scope: rules.ScopePackage, Severity: rules.Info,
+		Doc: "doc", Bad: "bad", Good: "good"}
+	var buf bytes.Buffer
+	RenderRuleDetail(&buf, r, false)
+	out := buf.String()
+	if !strings.Contains(out, "the built package archive (*.pkg.tar.*)") {
+		t.Errorf("package-scope rule should say what it is checked against:\n%s", out)
+	}
+	if !strings.Contains(out, "\n  Suppress\n      pkglint --ignore PB8\n") {
+		t.Errorf("package-scope rule should offer --ignore:\n%s", out)
+	}
+	if strings.Contains(out, "# pkglint: ignore=PB8\n") {
+		t.Errorf("package-scope finding cannot be suppressed inline:\n%s", out)
+	}
+	if strings.Contains(out, "Auto-fix") {
+		t.Errorf("rule with no fix should not offer one:\n%s", out)
+	}
+}

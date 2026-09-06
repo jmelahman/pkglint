@@ -111,9 +111,10 @@ archives (default: .)`,
 	cmd.Flags().BoolVar(&noInline, "no-inline-ignores", false, "disregard '# pkglint: ignore=' directives, reporting the findings they suppress (audit a package without trusting its annotations)")
 	cmd.Flags().BoolVar(&addIgnores, "add-ignores", false, "insert '# pkglint: ignore=' directives suppressing every current finding")
 	cmd.AddCommand(newBuildCommand(stdout, &code))
-	// `build` and `help` are the only words the root command can no longer
-	// treat as a path; cobra's generated `completion` subcommand would widen
-	// that set for a feature this CLI does not otherwise offer.
+	cmd.AddCommand(newExplainCommand(stdout))
+	// `build`, `explain` and `help` are the only words the root command can no
+	// longer treat as a path; cobra's generated `completion` subcommand would
+	// widen that set for a feature this CLI does not otherwise offer.
 	cmd.CompletionOptions.DisableDefaultCmd = true
 	cmd.SetVersionTemplate("pkglint {{.Version}}\n")
 	cmd.SetArgs(args)

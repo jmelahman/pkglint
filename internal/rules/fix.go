@@ -1691,47 +1691,287 @@ func lineIndent(raw []byte, o int) string {
 
 // --- PB914/PB915/PB916: Arch Go guideline build flags ------------------------
 
-// goFlagInsertion returns the offset just after the go subcommand's verb word
-// ("build", "install", or the verb after "mod"), where an inserted flag is
-// still parsed as a flag: go's flag parsing stops at the first non-flag
-// argument, so appending at the end of the call — what the cargo fix does —
-// would hand the flag to the package loader instead.
-func goFlagInsertion(c Command) (int, bool) {
-	verb := c.Subcommand()
-	if verb == "mod" {
-		if verb = secondSubcommand(c); verb == "" {
-			return 0, false
+// goFlagOrder is the guidelines' spelling of the build flags, and the order
+// an inserted one is slotted into: after the last flag that precedes it here
+// and is already present, else before the first that follows it, else first.
+var goFlagOrder = []string{"-buildmode", "-trimpath", "-mod=", "-modcacherw"}
+
+// goFlagSlot returns where flag goes among words, which are the flag words
+// already present in their textual order: the index of the word to insert
+// after, or -1 to insert before words[0] (or, with no words, wherever the
+// caller's front is).
+func goFlagSlot(words []string, flag string) int {
+	rank := func(w string) int {
+		for i, p := range goFlagOrder {
+			if strings.HasPrefix(w, p) {
+				return i
+			}
+		}
+		return -1
+	}
+	mine := rank(flag)
+	after := -1
+	for i, w := range words {
+		if r := rank(w); r >= 0 && r < mine {
+			after = i
 		}
 	}
-	w := wordByValue(c, verb)
-	if w == nil {
-		return 0, false
-	}
-	return off(w.End()), true
+	return after
 }
 
 // goFlagEdits inserts flag into every command in cmds that neither passes it
-// nor inherits it from a GOFLAGS assignment.
+// nor inherits it from a GOFLAGS assignment, where the PKGBUILD keeps such
+// flags: in the GOFLAGS export the command inherits, in the array it spreads
+// onto the command, or on the command itself — as a continuation line of its
+// own when that is how the command lays its flags out. One edit covers every
+// command that shares the assignment.
 func goFlagEdits(ctx *Context, cmds []Command, flagPrefix, flag string) []Edit {
 	var edits []Edit
+	seen := map[int]bool{}
 	for _, c := range cmds {
 		if goFlagAddressed(goFlags(ctx, c), c, flagPrefix) {
 			continue
 		}
-		at, ok := goFlagInsertion(c)
-		if !ok {
+		edit, ok := goFlagEdit(c, flag)
+		if !ok || seen[edit.Start] {
 			continue
 		}
-		edits = append(edits, Edit{
-			Path:  c.Unit.Path,
-			Start: at,
-			End:   at,
-			New:   " " + flag,
-			Line:  int(c.Stmt.Pos().Line()),
-			Desc:  fmt.Sprintf("insert %s into `go %s`", flag, c.Subcommand()),
-		})
+		seen[edit.Start] = true
+		edit.Line = int(c.Stmt.Pos().Line())
+		edits = append(edits, edit)
 	}
 	return edits
+}
+
+// goFlagEdit picks the one place flag belongs for c. The GOFLAGS export in
+// scope wins when there is one with literal text to extend — that is the
+// guidelines' home for these flags and the edit a maintainer would make — an
+// array the command (or that export) expands is next, and the command line
+// is the fallback.
+func goFlagEdit(c Command, flag string) (Edit, bool) {
+	at := -1
+	if c.Stmt != nil {
+		at = off(c.Stmt.Pos())
+	}
+	// The command's own `GOFLAGS=… go build` prefix is not the shared home
+	// the edit is after — and PB205's fix may be removing that very prefix
+	// in the same pass — so it is passed over for the command line.
+	own := map[*syntax.Assign]bool{}
+	for _, as := range c.Call.Assigns {
+		own[as] = true
+	}
+	var goflags *syntax.Assign
+	scanAssignments(c.Unit, "GOFLAGS", c.Fn, at, c.Call, false, func(as *syntax.Assign) {
+		if as.Value != nil && !own[as] {
+			goflags = as
+		}
+	})
+	if goflags != nil {
+		if name := varRefName(goflags.Value); name != "" && name != "GOFLAGS" {
+			if arr := arrayInScope(c, name, at); arr != nil {
+				return goFlagIntoArray(c, arr, flag)
+			}
+		} else if edit, ok := goFlagIntoString(c, goflags.Value, flag); ok {
+			return edit, true
+		}
+	}
+	for i, w := range c.ArgWord {
+		if !argOpaque(c, i) {
+			continue
+		}
+		if name := varRefName(w); name != "" {
+			if arr := arrayInScope(c, name, at); arr != nil {
+				return goFlagIntoArray(c, arr, flag)
+			}
+		}
+	}
+	return goFlagIntoCommand(c, flag)
+}
+
+// arrayInScope returns the last array assignment to name that c can see, or
+// nil when the name is not assigned as an array literal.
+func arrayInScope(c Command, name string, at int) *syntax.Assign {
+	var arr *syntax.Assign
+	scanAssignments(c.Unit, name, c.Fn, at, c.Call, true, func(as *syntax.Assign) {
+		if as.Array != nil {
+			arr = as
+		}
+	})
+	return arr
+}
+
+// goFlagIntoString inserts flag into the literal text of a GOFLAGS value,
+// slotted by goFlagOrder among the flags the text spells out. A value with
+// no literal text at all has nowhere to put it.
+func goFlagIntoString(c Command, w *syntax.Word, flag string) (Edit, bool) {
+	// The literal runs of the value, each with the offset its text starts at.
+	type run struct {
+		text string
+		base int
+	}
+	var runs []run
+	for _, part := range w.Parts {
+		switch x := part.(type) {
+		case *syntax.Lit:
+			runs = append(runs, run{x.Value, off(x.Pos())})
+		case *syntax.SglQuoted:
+			runs = append(runs, run{x.Value, off(x.Pos()) + 1})
+		case *syntax.DblQuoted:
+			for _, p := range x.Parts {
+				if lit, ok := p.(*syntax.Lit); ok {
+					runs = append(runs, run{lit.Value, off(lit.Pos())})
+				}
+			}
+		}
+	}
+	if len(runs) == 0 {
+		return Edit{}, false
+	}
+	// The flag words the text spells out, with where each ends and starts.
+	var words []string
+	var starts, ends []int
+	for _, r := range runs {
+		for i := 0; i < len(r.text); {
+			if r.text[i] == ' ' {
+				i++
+				continue
+			}
+			j := i
+			for j < len(r.text) && r.text[j] != ' ' {
+				j++
+			}
+			if r.text[i] == '-' {
+				words = append(words, r.text[i:j])
+				starts = append(starts, r.base+i)
+				ends = append(ends, r.base+j)
+			}
+			i = j
+		}
+	}
+	var start int
+	var text string
+	switch slot := goFlagSlot(words, flag); {
+	case slot >= 0:
+		start, text = ends[slot], " "+flag
+	case len(words) > 0:
+		start, text = starts[0], flag+" "
+	default:
+		start, text = runs[0].base, flag
+		if strings.TrimSpace(runs[0].text) != "" {
+			text += " "
+		}
+	}
+	return Edit{
+		Path:  c.Unit.Path,
+		Start: start,
+		End:   start,
+		New:   text,
+		Desc:  fmt.Sprintf("insert %s into GOFLAGS", flag),
+	}, true
+}
+
+// goFlagIntoArray adds flag as an element of a flag array, slotted by
+// goFlagOrder and laid out the way the array's elements are: one per line
+// when they are, inline otherwise.
+func goFlagIntoArray(c Command, as *syntax.Assign, flag string) (Edit, bool) {
+	elems := as.Array.Elems
+	var words []string
+	for _, el := range elems {
+		s, _ := pkgbuild.RenderWord(el.Value, nil)
+		words = append(words, s)
+	}
+	raw := c.Unit.Raw
+	perLine := len(elems) > 0 && elems[0].Pos().Line() != as.Array.Lparen.Line()
+	var start int
+	var text string
+	switch slot := goFlagSlot(words, flag); {
+	case slot >= 0:
+		start = off(elems[slot].End())
+		if perLine {
+			text = "\n" + lineIndent(raw, off(elems[slot].Pos())) + flag
+		} else {
+			text = " " + flag
+		}
+	case len(elems) > 0:
+		start = off(elems[0].Pos())
+		if perLine {
+			text = flag + "\n" + lineIndent(raw, start)
+		} else {
+			text = flag + " "
+		}
+	default:
+		start, text = off(as.Array.Lparen)+1, flag
+	}
+	return Edit{
+		Path:  c.Unit.Path,
+		Start: start,
+		End:   start,
+		New:   text,
+		Desc:  fmt.Sprintf("insert %s into %s", flag, as.Name.Value),
+	}, true
+}
+
+// goFlagIntoCommand puts flag on the command line itself, slotted by
+// goFlagOrder among the flags already there. A flag that sits on a
+// continuation line of its own gets the new one as another such line;
+// otherwise the flag goes right after its neighbour, or after the verb.
+func goFlagIntoCommand(c Command, flag string) (Edit, bool) {
+	verb := c.Subcommand()
+	if verb == "mod" {
+		if verb = secondSubcommand(c); verb == "" {
+			return Edit{}, false
+		}
+	}
+	vw := wordByValue(c, verb)
+	if vw == nil {
+		return Edit{}, false
+	}
+	// The flag words after the verb, up to the first non-flag argument,
+	// which is where go stops reading flags. A flag's value (`-o build`) ends
+	// the run early, which only costs a slot further back in the list.
+	var flagWords []*syntax.Word
+	var words []string
+	past := false
+	for _, w := range c.Call.Args {
+		if !past {
+			past = w == vw
+			continue
+		}
+		s, _ := pkgbuild.RenderWord(w, nil)
+		if !strings.HasPrefix(s, "-") {
+			break
+		}
+		flagWords = append(flagWords, w)
+		words = append(words, s)
+	}
+	raw := c.Unit.Raw
+	ownLine := func(w *syntax.Word) bool {
+		return w.Pos().Line() != vw.Pos().Line() && strings.TrimSpace(string(raw[lineStart(raw, off(w.Pos())):off(w.Pos())])) == ""
+	}
+	var start int
+	var text string
+	switch slot := goFlagSlot(words, flag); {
+	case slot >= 0:
+		w := flagWords[slot]
+		start = off(w.End())
+		if ownLine(w) {
+			text = " \\\n" + lineIndent(raw, off(w.Pos())) + flag
+		} else {
+			text = " " + flag
+		}
+	case len(flagWords) > 0 && ownLine(flagWords[0]):
+		start = off(flagWords[0].Pos())
+		text = flag + " \\\n" + lineIndent(raw, start)
+	default:
+		start, text = off(vw.End()), " "+flag
+	}
+	return Edit{
+		Path:  c.Unit.Path,
+		Start: start,
+		End:   start,
+		New:   text,
+		Desc:  fmt.Sprintf("insert %s into `go %s`", flag, c.Subcommand()),
+	}, true
 }
 
 func fixGoPIE(ctx *Context, _ *FixEnv) []Edit {

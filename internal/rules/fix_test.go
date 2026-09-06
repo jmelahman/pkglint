@@ -1954,3 +1954,76 @@ EOT
 	}
 	mustNotContain(t, got, "${mods")
 }
+
+// The Go flag fixes put the flag where the PKGBUILD keeps its flags, in the
+// guidelines' order, rather than always after the verb.
+func TestFixGoFlagPlacement(t *testing.T) {
+	t.Run("into the GOFLAGS export the command inherits, once for every command", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  export GOFLAGS="-buildmode=pie -mod=readonly -modcacherw"
+  go build -o demo ./cmd/demo
+  go build -o democtl ./cmd/democtl
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, `export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"`)
+		mustContain(t, got, "  go build -o demo ./cmd/demo\n  go build -o democtl ./cmd/democtl\n")
+	})
+
+	t.Run("into the array the command spreads, one element per line", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  local common=(
+    -v
+    -buildmode=pie
+    -mod=readonly
+    -modcacherw
+  )
+  go build "${common[@]}" -o build ./cmd/...
+  go build "${common[@]}" -tags oss -o build-oss ./cmd/...
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, "    -buildmode=pie\n    -trimpath\n    -mod=readonly\n")
+		if strings.Count(got, "-trimpath") != 1 {
+			t.Errorf("flag inserted %d times, want once in the array:\n%s", strings.Count(got, "-trimpath"), got)
+		}
+	})
+
+	t.Run("into the array GOFLAGS is assembled from", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  local goflags=(-buildmode=pie -mod=readonly -modcacherw)
+  export GOFLAGS="${goflags[*]}"
+  go build -o demo .
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, "local goflags=(-buildmode=pie -trimpath -mod=readonly -modcacherw)")
+	})
+
+	t.Run("as a continuation line when the command lays its flags out that way", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go build -v \
+    -buildmode=pie \
+    -mod=readonly \
+    -modcacherw \
+    -o build ./...
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, "    -buildmode=pie \\\n    -trimpath \\\n    -mod=readonly \\\n")
+	})
+
+	t.Run("after the verb when the command has no flags to slot among", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go build -o demo .
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, "go build -buildmode=pie -trimpath -modcacherw -o demo .")
+	})
+
+	t.Run("a GOFLAGS export below the command does not draw the edit", func(t *testing.T) {
+		got := fixAll(t, map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go build -buildmode=pie -modcacherw -o demo .
+  export GOFLAGS="-buildmode=pie"
+}`)}, FixUnsafe, nil)["PKGBUILD"]
+		mustContain(t, got, "go build -buildmode=pie -trimpath -modcacherw -o demo .")
+		mustContain(t, got, `export GOFLAGS="-buildmode=pie"`)
+	})
+}

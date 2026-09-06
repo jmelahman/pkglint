@@ -48,12 +48,12 @@ var (
 
 // buildOpts are the flags specific to `build`.
 type buildOpts struct {
-	force       bool
 	keep        string
-	docker      bool
 	image       string
-	imageSet    bool
 	makepkgArgs []string
+	force       bool
+	docker      bool
+	imageSet    bool
 }
 
 // buildDirs are the locations makepkg is redirected to write into, so that

@@ -132,11 +132,14 @@ type Package struct {
 	// are computed once and shared. Dozens of rules ask for the source list,
 	// and recomputing it — expanding every element's variables and brace groups
 	// again each time — was the linter's second-largest allocation source.
-	// Callers must treat both as read-only.
+	// Callers must treat both as read-only. The sync.Once fields sit together
+	// at the end because they align to 4 rather than 8: interleaved with the
+	// pointer-width fields above, each would cost a word of padding.
+	sources []SourceEntry
+	arches  map[string]bool
+
 	sourcesOnce sync.Once
-	sources     []SourceEntry
 	archesOnce  sync.Once
-	arches      map[string]bool
 }
 
 // newParser returns a fresh parser per parse: syntax.Parser is not safe for

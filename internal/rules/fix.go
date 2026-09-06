@@ -412,9 +412,6 @@ func fixLockfileFlags(ctx *Context, id string) []Edit {
 			if !ok || !slices.Contains(fixSubs, sub) {
 				continue
 			}
-			if l.unfixable != nil && l.unfixable(c) {
-				continue
-			}
 			if hiddenFlagWords(c) {
 				continue
 			}
@@ -2085,10 +2082,7 @@ func fixNpmCI(ctx *Context, _ *FixEnv) []Edit {
 	var edits []Edit
 	for _, c := range ctx.CommandsNamed("npm") {
 		sub := c.Subcommand()
-		if sub != "install" && sub != "i" {
-			continue
-		}
-		if npmHasPackageArg(c) {
+		if (sub != "install" && sub != "i") || namesPackages(c) {
 			continue // `npm install <pkg>` is not equivalent to `npm ci`
 		}
 		w := wordByValue(c, sub)
@@ -2105,21 +2099,6 @@ func fixNpmCI(ctx *Context, _ *FixEnv) []Edit {
 		})
 	}
 	return append(edits, fixLockfileFlags(ctx, "PB206")...)
-}
-
-func npmHasPackageArg(c Command) bool {
-	seenSub := false
-	for _, a := range c.Args {
-		if strings.HasPrefix(a, "-") {
-			continue
-		}
-		if !seenSub {
-			seenSub = true
-			continue
-		}
-		return true
-	}
-	return false
 }
 
 // --- PB403: drop setuid/setgid mode bits -----------------------------------

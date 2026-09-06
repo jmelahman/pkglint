@@ -1286,10 +1286,11 @@ func TestLockfileFlagsCheckAndFixAgree(t *testing.T) {
 		}
 	}
 
-	t.Run("a package argument keeps the finding and declines the fix", func(t *testing.T) {
+	t.Run("a package argument is PB210's and is not frozen", func(t *testing.T) {
 		files := map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  pnpm install left-pad\n}")}
-		if n := ruleIDs(lint(t, files))["PB206"]; n != 1 {
-			t.Fatalf("PB206 fired %d times, want 1", n)
+		ids := ruleIDs(lint(t, files))
+		if ids["PB206"] != 0 || ids["PB210"] != 1 {
+			t.Fatalf("want PB210 once and no PB206, got %v", ids)
 		}
 		if got := fixOnly(t, files, FixUnsafe, nil, "PB206"); len(got) != 0 {
 			t.Errorf("`pnpm install <pkg>` must not be frozen, got:\n%s", got["PKGBUILD"])
@@ -1297,10 +1298,10 @@ func TestLockfileFlagsCheckAndFixAgree(t *testing.T) {
 	})
 }
 
-// PB208 covers two commands and only one of them is an edit. `gem install`
-// fetches from RubyGems with nothing pinning what it gets, and the remedy —
-// a committed Gemfile.lock, or local .gem files to install from — is not a
-// flag; the fixer leaves it alone and the finding stands.
+// `gem install rails` fetches from RubyGems with nothing pinning what it
+// gets, and the remedy — a committed Gemfile.lock, or local .gem files to
+// install from — is not a flag: PB210 reports it, and the bundler fixer
+// leaves it alone.
 func TestFixBundlerLeavesGemInstall(t *testing.T) {
 	body := `
 build() {
@@ -1309,8 +1310,9 @@ build() {
 	got := fixPKGBUILD(t, body, FixUnsafe, nil)
 	mustNotContain(t, got, "gem install rails --")
 	files := map[string]string{"PKGBUILD": pkgbuildWith("", body)}
-	if n := ruleIDs(lint(t, files))["PB208"]; n != 1 {
-		t.Errorf("expected the gem install to keep its PB208 finding, got %d", n)
+	ids := ruleIDs(lint(t, files))
+	if ids["PB208"] != 0 || ids["PB210"] != 1 {
+		t.Errorf("want PB210 once and no PB208 for the gem install, got %v", ids)
 	}
 }
 
@@ -1533,11 +1535,6 @@ var fixExampleGaps = map[string]string{
 	"PB102": "the fix writes the digest LocalDigest reports for the fetched source, and the stub " +
 		"cannot know which of the example's several sources it is being asked about; " +
 		"TestFixWeakChecksums covers the agreement between declared and reported digests.",
-	"PB208": "the rule has two halves and only one is an edit: `bundle install` gains --frozen, " +
-		"but the example's `gem install rails` has no lockfile to freeze, and the remedy — " +
-		"a committed Gemfile.lock or local .gem files — is not text this fixer can write; " +
-		"TestFixLockfileManagers covers the half that is and " +
-		"TestFixBundlerLeavesGemInstall pins the half that is not.",
 }
 
 // TestFixesClearTheirExample is the contract every auto-fix owes its rule: the

@@ -213,9 +213,9 @@ url='https://example.com'
 source=('http://example.com/demo.tar.gz')
 sha256sums=('SKIP')`, "")},
 		},
-		"PB208": {
-			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  bundle install\n}")},
-			high: map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  gem install rails\n}")},
+		"PB210": {
+			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  npm install -g typescript@5.4.5\n}")},
+			high: map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  npm install axios\n}")},
 		},
 		"PB302": {
 			low:  map[string]string{"PKGBUILD": pkgbuildWith("", "build() {\n  eval \"echo hi\"\n}")},
@@ -998,16 +998,10 @@ build() {
   bundle install --frozen
 }`)})
 	})
-	t.Run("PB208 gem install from RubyGems", func(t *testing.T) {
-		expectRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
+	t.Run("PB208 gem install is PB210's, not bundler's", func(t *testing.T) {
+		expectNoRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   gem install rails
-}`)})
-	})
-	t.Run("PB208 gem install local .gem ok", func(t *testing.T) {
-		expectNoRule(t, "PB208", map[string]string{"PKGBUILD": pkgbuildWith("", `
-package() {
-  gem install --local demo-1.0.gem
 }`)})
 	})
 	t.Run("PB209 uv sync unlocked", func(t *testing.T) {
@@ -1022,8 +1016,14 @@ build() {
   uv sync --frozen
 }`)})
 	})
-	t.Run("PB209 poetry add re-resolves", func(t *testing.T) {
+	t.Run("PB209 poetry update re-resolves", func(t *testing.T) {
 		expectRule(t, "PB209", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  poetry update
+}`)})
+	})
+	t.Run("PB209 poetry add is PB210's", func(t *testing.T) {
+		expectNoRule(t, "PB209", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
   poetry add requests
 }`)})

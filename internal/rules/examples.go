@@ -153,7 +153,7 @@ build() {
 	},
 	"PB208": {
 		Bad: `build() {
-  gem install rails   # whatever RubyGems serves right now
+  bundle install   # rewrites Gemfile.lock if it drifts from the Gemfile
 }`,
 		Good: `build() {
   bundle install --frozen   # exactly what Gemfile.lock pins
@@ -165,6 +165,15 @@ build() {
 }`,
 		Good: `build() {
   uv sync --frozen   # the committed lock is authoritative
+}`,
+	},
+	"PB210": {
+		Bad: `prepare() {
+  npm install axios uuid   # whatever the registry serves today, postinstall scripts and all
+}`,
+		Good: `makedepends=(npm)
+build() {
+  npm ci   # the project's own package.json, pinned by its lockfile
 }`,
 	},
 	"PB301": {

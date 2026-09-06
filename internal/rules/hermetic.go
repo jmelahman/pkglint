@@ -101,11 +101,11 @@ var hermeticRules = []Rule{
 	{
 		ID:       "PB208",
 		Name:     "bundler-unlocked",
-		Severity: Info, MaxSeverity: Warn, // warn once a fetch is unpinned rather than merely unfrozen
+		Severity: Info,
 		Doc: "`bundle install` without --frozen (or deployment mode) silently rewrites Gemfile.lock " +
 			"when it drifts from the Gemfile, fetching versions nobody reviewed; --frozen makes the " +
-			"committed lock authoritative and fails otherwise. Plain `gem install` has no lockfile " +
-			"at all — it installs whatever RubyGems serves at build time.",
+			"committed lock authoritative and fails otherwise. (A `gem install` of a named gem has " +
+			"no lockfile at all; that is PB210.)",
 		Check:    checkBundler,
 		FixLevel: FixUnsafe,
 		Fix:      lockfileFixer("PB208"),
@@ -116,11 +116,30 @@ var hermeticRules = []Rule{
 		Severity: Warn,
 		Doc: "uv and poetry re-resolve dependencies unless told the committed lockfile is " +
 			"authoritative: `uv sync`/`uv run` without --frozen or --locked may rewrite uv.lock, and " +
-			"`poetry update`/`poetry add` abandon poetry.lock outright. Pass --frozen, and prefer " +
+			"`poetry update` abandons poetry.lock outright. Pass --frozen, and prefer " +
 			"`poetry install` against the committed lock.",
 		Check:    checkUvPoetry,
 		FixLevel: FixUnsafe,
 		Fix:      lockfileFixer("PB209"),
+	},
+	{
+		ID:       "PB210",
+		Name:     "adhoc-package-install",
+		Severity: Warn, MaxSeverity: Error, // error unless every package is pinned to an exact version
+		Doc: "A package named on a package manager's command line — `npm install axios`, " +
+			"`pip install requests`, `npx some-tool`, `gem install rails`, `cargo install foo` — is " +
+			"fetched from a registry at build time, or at install time from a scriptlet, with nothing " +
+			"in the PKGBUILD verifying what arrives: the registry serves whatever it has at that moment, " +
+			"makepkg's checksums never see it, and npm, pip, gem, composer and cargo all run code out of " +
+			"the package the moment it lands. This is the shape of the 2025 AUR compromises: a " +
+			"`post_install` or `prepare()` gaining an `npm install` of a few registry packages whose " +
+			"postinstall scripts carried the payload. Install a project's dependencies from its own " +
+			"manifest and lockfile (`npm ci`, `pip install -r` with hashes, `bundle install --frozen`), " +
+			"declare a tool the build needs in makedepends, or build it from a checksummed source= entry. " +
+			"A spec pinned to an exact version or a full commit is at least reproducible, and is reported " +
+			"at Warn rather than Error; so is a package word pkglint cannot read (`npm install $_deps`), " +
+			"which could name anything.",
+		Check: checkAdhocInstall,
 	},
 }
 
@@ -159,48 +178,183 @@ var networkCommands = map[string]func(Command) bool{
 		return false
 	},
 	"pip": pipFetches, "pip3": pipFetches,
+	"python": pythonModuleFetches, "python3": pythonModuleFetches, "python2": pythonModuleFetches,
+	"pipx": pipxFetches,
 	"npm": func(c Command) bool {
+		sub := c.Subcommand()
+		if sub == "ci" || npmInstallSubs[sub] {
+			return true
+		}
+		// `npm exec`, like npx, fetches only what the project does not provide.
+		return (sub == "exec" || sub == "x") && adhocClaims(c)
+	},
+	"npx": adhocClaims, "bunx": adhocClaims,
+	"pnpx": func(c Command) bool { return len(c.Args) > 0 },
+	"pnpm": func(c Command) bool {
 		switch c.Subcommand() {
-		case "install", "i", "ci", "update", "add":
+		case "install", "add", "i", "update", "up", "upgrade", "dlx", "fetch":
 			return true
 		}
 		return false
 	},
-	"pnpm": func(c Command) bool { sub := c.Subcommand(); return sub == "install" || sub == "add" || sub == "i" },
-	"yarn": func(c Command) bool { sub := c.Subcommand(); return sub == "install" || sub == "add" || sub == "" },
-	"bun":  func(c Command) bool { sub := c.Subcommand(); return sub == "install" || sub == "add" || sub == "i" },
-	"cargo": func(c Command) bool {
-		return c.Subcommand() == "fetch" && !c.HasArg("--offline")
+	"yarn": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "add", "", "up", "upgrade", "dlx", "global":
+			return true
+		}
+		return false
 	},
-	"composer": func(c Command) bool { sub := c.Subcommand(); return sub == "install" || sub == "update" },
-	"gem":      gemInstallFetches,
+	"bun": func(c Command) bool {
+		switch sub := c.Subcommand(); sub {
+		case "install", "add", "i", "update":
+			return true
+		case "x":
+			return adhocClaims(c)
+		}
+		return false
+	},
+	"cargo": func(c Command) bool {
+		switch c.Subcommand() {
+		case "fetch", "update", "add":
+			return !c.HasArg("--offline")
+		case "install":
+			return !c.HasArg("--offline") && !c.HasArg("--path")
+		}
+		return false
+	},
+	"composer": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "update", "require", "global", "create-project":
+			return true
+		}
+		return false
+	},
+	"gem": gemInstallFetches,
 	"bundle": func(c Command) bool {
 		sub := c.Subcommand()
 		return sub == "" || sub == "install" || sub == "update" // bare `bundle` runs install
 	},
 	"uv": func(c Command) bool {
+		if c.HasArg("--offline") {
+			return false
+		}
 		switch c.Subcommand() {
 		case "sync", "add", "lock", "run":
 			return true
 		case "pip":
 			return uvPipFetches(c)
 		case "tool":
-			return c.HasArg("install") || c.HasArg("run")
+			return c.HasArg("install") || c.HasArg("run") || c.HasArg("upgrade") || c.HasArg("uvx")
 		}
 		return false
 	},
-	"poetry": func(c Command) bool {
+	"uvx":    func(c Command) bool { return !c.HasArg("--offline") },
+	"poetry": poetryFetches,
+	"cpan":   always, "cpanm": always,
+	"luarocks": func(c Command) bool {
 		switch c.Subcommand() {
-		case "install", "update", "add", "lock":
+		case "install", "build", "download", "search":
 			return true
 		}
 		return false
 	},
-	"dotnet": func(c Command) bool { return c.Subcommand() == "restore" },
-	"nuget":  func(c Command) bool { return c.Subcommand() == "restore" },
+	"cabal": func(c Command) bool {
+		if c.HasArg("--offline") {
+			return false
+		}
+		sub := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(c.Subcommand(), "v2-"), "v1-"), "new-")
+		switch sub {
+		case "install", "update", "fetch", "get":
+			return true
+		}
+		return false
+	},
+	"dotnet": func(c Command) bool {
+		switch c.Subcommand() {
+		case "restore":
+			return true
+		case "tool":
+			return c.HasArg("install") || c.HasArg("update") || c.HasArg("restore")
+		case "add":
+			return c.HasArg("package")
+		}
+		return false
+	},
+	"nuget": func(c Command) bool {
+		switch c.Subcommand() {
+		case "restore", "install", "update":
+			return true
+		}
+		return false
+	},
+	"deno": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "add", "cache":
+			return true
+		case "run", "compile", "bundle":
+			return !c.HasArg("--cached-only") && !c.HasArg("--no-remote")
+		}
+		return false
+	},
+	"opam": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "update", "upgrade", "pin", "init":
+			return true
+		}
+		return false
+	},
+	"nimble": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "refresh", "develop":
+			return true
+		}
+		return false
+	},
+	"flatpak": func(c Command) bool {
+		switch c.Subcommand() {
+		case "install", "update", "remote-add":
+			return true
+		}
+		return false
+	},
+	"snap": func(c Command) bool { sub := c.Subcommand(); return sub == "install" || sub == "refresh" },
 }
 
 func always(Command) bool { return true }
+
+func pipxFetches(c Command) bool {
+	switch c.Subcommand() {
+	case "install", "install-all", "inject", "run", "runpip", "upgrade", "upgrade-all", "reinstall", "reinstall-all":
+		return true
+	}
+	return false
+}
+
+func poetryFetches(c Command) bool {
+	switch c.Subcommand() {
+	case "install", "update", "add", "lock":
+		return true
+	}
+	return false
+}
+
+// pythonModuleCommands are the `python -m` modules that are package managers
+// in their own right, with the networkCommands entry each stands for. (A
+// separate table: networkCommands cannot refer to itself while initializing.)
+var pythonModuleCommands = map[string]func(Command) bool{
+	"pip": pipFetches, "pipx": pipxFetches, "poetry": poetryFetches,
+}
+
+// pythonModuleFetches answers for `python -m pip …` as networkCommands would
+// for the module's own command.
+func pythonModuleFetches(c Command) bool {
+	m, ok := pythonModule(c)
+	if !ok {
+		return false
+	}
+	fetches, ok := pythonModuleCommands[m.Name]
+	return ok && fetches(m)
+}
 
 func pipFetches(c Command) bool {
 	sub := c.Subcommand()
@@ -288,14 +442,16 @@ func checkPipHashes(ctx *Context) []Finding {
 		if c.Subcommand() != "install" || !pipFetches(c) {
 			continue
 		}
-		if c.HasArg("--require-hashes") {
+		// A requirement named on the command line has no digest to require;
+		// PB210 gives it the remedy it can act on.
+		if c.HasArg("--require-hashes") || adhocClaims(c) {
 			continue
 		}
 		out = append(out, c.finding("PB202", Warn,
 			"pip install without --require-hashes: downloads are not verified against pinned digests"))
 	}
 	for _, c := range ctx.CommandsNamed("uv") {
-		if !c.HasArg("install") || !uvPipFetches(c) || c.HasArg("--require-hashes") {
+		if !c.HasArg("install") || !uvPipFetches(c) || c.HasArg("--require-hashes") || adhocClaims(c) {
 			continue
 		}
 		out = append(out, c.finding("PB202", Warn,
@@ -534,9 +690,10 @@ type lockfileFlag struct {
 	// satisfied lists the flags any one of which already pins the lockfile.
 	satisfied []string
 	flag      string
-	// unfixable, when set, declines the fix for an invocation the flag would
-	// change the meaning of; the finding stands.
-	unfixable func(Command) bool
+	// yields, when set, hands an invocation to another rule: the flag would
+	// change the command's meaning rather than pin it, so neither the finding
+	// nor the fix is this rule's.
+	yields func(Command) bool
 	// message and desc build the finding text and the fix description from
 	// the resolved command name and subcommand.
 	message func(name, sub string) string
@@ -558,8 +715,8 @@ var lockfileFlags = []lockfileFlag{
 		commands: []string{"pnpm", "bun"}, subs: []string{"install", "i"},
 		satisfied: []string{"--frozen-lockfile", "--offline"}, flag: "--frozen-lockfile",
 		// With package args the command adds a dependency; freezing the
-		// lockfile is not equivalent.
-		unfixable: npmHasPackageArg,
+		// lockfile is not equivalent. PB210 reports what it fetches.
+		yields: namesPackages,
 		message: func(name, sub string) string {
 			return fmt.Sprintf("%s %s without --frozen-lockfile may rewrite the dependency tree", name, sub)
 		},
@@ -601,10 +758,12 @@ var lockfileFlags = []lockfileFlag{
 }
 
 // unpinned reports whether c is one of l's lockfile-installing subcommands
-// with none of the satisfying flags, and which subcommand it is.
+// with none of the satisfying flags, and which subcommand it is. A command
+// that names packages (`pnpm install left-pad`) installs no lockfile, so
+// freezing one is not its remedy; PB210 reports it instead.
 func (l lockfileFlag) unpinned(c Command) (sub string, ok bool) {
 	sub = c.Subcommand()
-	if !slices.Contains(l.subs, sub) {
+	if !slices.Contains(l.subs, sub) || adhocClaims(c) || (l.yields != nil && l.yields(c)) {
 		return "", false
 	}
 	for _, f := range l.satisfied {
@@ -638,7 +797,10 @@ func checkNpmCI(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.CommandsNamed("npm") {
 		sub := c.Subcommand()
-		if sub == "install" || sub == "i" {
+		// `npm install <anything>` — a registry name, a tarball, a path — is
+		// not a manifest install, and `npm ci` is not its remedy; a registry
+		// name is PB210's.
+		if (sub == "install" || sub == "i") && !namesPackages(c) {
 			out = append(out, c.finding("PB206", Info,
 				"npm %s may rewrite the dependency tree; prefer `npm ci` against the committed lockfile", sub))
 		}
@@ -659,26 +821,17 @@ func checkComposer(ctx *Context) []Finding {
 }
 
 func checkBundler(ctx *Context) []Finding {
-	var out []Finding
-	for _, c := range ctx.CommandsNamed("gem") {
-		if !gemInstallFetches(c) {
-			continue
-		}
-		out = append(out, c.finding("PB208", Warn,
-			"gem install fetches from RubyGems with no lockfile or checksum pinning; install local .gem files (--local) or use bundler against a committed Gemfile.lock"))
-	}
-	return append(out, checkLockfileFlags(ctx, "PB208")...)
+	return checkLockfileFlags(ctx, "PB208")
 }
 
 func checkUvPoetry(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.CommandsNamed("poetry") {
-		sub := c.Subcommand()
-		if sub != "update" && sub != "add" {
+		if c.Subcommand() != "update" {
 			continue
 		}
 		out = append(out, c.finding("PB209", Warn,
-			"poetry %s re-resolves dependencies away from the committed poetry.lock; use `poetry install`", sub))
+			"poetry update re-resolves dependencies away from the committed poetry.lock; use `poetry install`"))
 	}
 	return append(out, checkLockfileFlags(ctx, "PB209")...)
 }

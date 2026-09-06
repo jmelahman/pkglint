@@ -142,6 +142,47 @@ func TestExitCodes(t *testing.T) {
 	}
 }
 
+// TestSelectFlag covers --select: only the named rules run, --ignore still
+// subtracts from them, the rewrite modes narrow with it too, and a selection
+// naming no registered rule is a usage error rather than a run that checks
+// nothing and calls the package clean.
+func TestSelectFlag(t *testing.T) {
+	var buf bytes.Buffer
+	if code := run([]string{"--fail-on=never", "--select=PB304,PB401", "testdata/malicious"}, &buf); code != 0 {
+		t.Fatalf("--select: got exit %d, want 0\n%s", code, buf.String())
+	}
+	out := buf.String()
+	// PB304 fires once and PB401 twice in the fixture; nothing else may.
+	if !strings.Contains(out, "3 finding(s)") || !strings.Contains(out, "[PB304]") || !strings.Contains(out, "[PB401]") {
+		t.Errorf("expected exactly the PB304 and PB401 findings, got:\n%s", out)
+	}
+	if strings.Contains(out, "[PB302]") || strings.Contains(out, "[PB501]") {
+		t.Errorf("--select ran a rule it did not name, got:\n%s", out)
+	}
+
+	buf.Reset()
+	if code := run([]string{"--select=PB304", "--ignore=PB304", "testdata/malicious"}, &buf); code != 0 || !strings.Contains(buf.String(), "1 clean") {
+		t.Errorf("--ignore should subtract from --select (exit %d):\n%s", code, buf.String())
+	}
+
+	// The rewrite modes take the same set: only the selected rule's findings
+	// are annotated, though PB302 sits on the very next line.
+	buf.Reset()
+	if code := run([]string{"--add-ignores", "--diff", "--select=PB304", "testdata/malicious"}, &buf); code != 0 {
+		t.Fatalf("--add-ignores --diff --select: got exit %d, want 0\n%s", code, buf.String())
+	}
+	if out := buf.String(); !strings.Contains(out, "add ignore directive for PB304") || strings.Contains(out, "PB302") {
+		t.Errorf("--add-ignores --select should annotate PB304 alone, got:\n%s", out)
+	}
+
+	for _, sel := range []string{"PB999", "PB304,PB999", ","} {
+		buf.Reset()
+		if code := run([]string{"--select=" + sel, "testdata/clean"}, &buf); code != 2 {
+			t.Errorf("--select=%s: got exit %d, want 2\n%s", sel, code, buf.String())
+		}
+	}
+}
+
 // TestPackageArchive runs the CLI end-to-end over a synthetic built package:
 // a world-writable file is a deterministic, database-independent error.
 func TestPackageArchive(t *testing.T) {

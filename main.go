@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -77,11 +78,14 @@ archives (default: .)`,
 				}
 				return nil
 			}
+			if err := opts.checkSelect(); err != nil {
+				return err
+			}
 			if addIgnores {
 				if doFix || unsafeFix || noInline {
 					return fmt.Errorf("--add-ignores cannot be combined with --fix, --unsafe-fix, or --no-inline-ignores")
 				}
-				code = runAddIgnores(paths, ignoreSet(opts.ignore), diff, stdout)
+				code = runAddIgnores(paths, opts.disabled(), diff, stdout)
 				return nil
 			}
 			if doFix || unsafeFix {
@@ -89,7 +93,7 @@ archives (default: .)`,
 				if unsafeFix {
 					level = rules.FixUnsafe
 				}
-				code = runFix(paths, ignoreSet(opts.ignore), level, diff, offline, noInline, stdout)
+				code = runFix(paths, opts.disabled(), level, diff, offline, noInline, stdout)
 				return nil
 			}
 			code = lint(paths, opts, noInline, stdout)
@@ -129,6 +133,7 @@ type reportOpts struct {
 	color   string
 	failOn  string
 	ignore  string
+	only    string // --select; `select` is a keyword
 	verbose bool
 }
 
@@ -140,6 +145,7 @@ func addReportFlags(fs *pflag.FlagSet, o *reportOpts) {
 	fs.StringVar(&o.color, "color", "auto", "colorize text output: auto, always, or never")
 	fs.StringVar(&o.failOn, "fail-on", "warn", "exit non-zero when a finding is at or above this severity (info, warn, error, critical, or never)")
 	fs.StringVar(&o.ignore, "ignore", "", "comma-separated rule IDs to disable, e.g. PB105,PB206")
+	fs.StringVar(&o.only, "select", "", "comma-separated rule IDs to check, running no others (--ignore still subtracts from them), e.g. PB101,PB304")
 	fs.BoolVar(&o.verbose, "verbose", false, "text output: list packages with no findings individually instead of only in the summary")
 }
 
@@ -160,18 +166,63 @@ func (o reportOpts) validate(w io.Writer) error {
 			return err
 		}
 	}
+	return o.checkSelect()
+}
+
+// checkSelect rejects a --select that names a rule the registry does not have.
+// --ignore lets an unknown ID through, since ignoring a rule that does not
+// exist changes nothing; selecting one would run nothing and report every
+// package clean, which is the wrong way for a typo to fail. Every command
+// checks this before it does anything, so a build never spends a makepkg run
+// on it.
+func (o reportOpts) checkSelect() error {
+	if o.only == "" {
+		return nil
+	}
+	ids := splitIDs(o.only)
+	if len(ids) == 0 {
+		return fmt.Errorf("--select names no rules")
+	}
+	for _, id := range ids {
+		if _, ok := rules.RuleByID(id); !ok {
+			return fmt.Errorf("--select: unknown rule %q (run 'pkglint --rules' to list them)", id)
+		}
+	}
 	return nil
 }
 
-// ignoreSet parses a comma-separated rule-ID list into a set.
-func ignoreSet(csv string) map[string]bool {
-	ignored := map[string]bool{}
-	for _, id := range strings.Split(csv, ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			ignored[id] = true
+// disabled is the set of rule IDs that do not run: every rule outside --select
+// when it is given, plus everything in --ignore. The rules package takes it as
+// its ignore set, so downstream a rule left out of --select is exactly a rule
+// named in --ignore: lint, --fix, --add-ignores, and the build gate all narrow
+// with it. That last one is fine for the same reason --ignore is: the flag is
+// the operator's choice, not the analyzed file's.
+func (o reportOpts) disabled() map[string]bool {
+	disabled := map[string]bool{}
+	for _, id := range splitIDs(o.ignore) {
+		disabled[id] = true
+	}
+	selected := splitIDs(o.only)
+	if len(selected) == 0 {
+		return disabled
+	}
+	for _, r := range rules.Registry() {
+		if !slices.Contains(selected, r.ID) {
+			disabled[r.ID] = true
 		}
 	}
-	return ignored
+	return disabled
+}
+
+// splitIDs parses a comma-separated rule-ID list, in order, blanks dropped.
+func splitIDs(csv string) []string {
+	var ids []string
+	for _, id := range strings.Split(csv, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // lint runs the rules over each path and renders the reports, returning the
@@ -181,7 +232,7 @@ func ignoreSet(csv string) map[string]bool {
 // they suppress are reported anyway. verbose lists findings-free packages in
 // text output, which otherwise only counts them in the closing summary.
 func lint(paths []string, o reportOpts, noInline bool, stdout io.Writer) int {
-	ignored := ignoreSet(o.ignore)
+	ignored := o.disabled()
 
 	if len(paths) == 0 {
 		paths = []string{"."}

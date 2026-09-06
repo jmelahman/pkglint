@@ -206,7 +206,7 @@ func runBuild(paths []string, ro reportOpts, bo buildOpts, stdout io.Writer) int
 		paths = []string{"."}
 	}
 	b := &builder{
-		ignored: ignoreSet(ro.ignore),
+		ignored: ro.disabled(),
 		gate:    refusalGate(ro.failOn),
 		bo:      bo,
 		localDB: newLocalDB(alpmdb.DefaultRoot, os.Stderr),

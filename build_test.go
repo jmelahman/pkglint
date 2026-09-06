@@ -545,6 +545,38 @@ func TestBuildIgnoresInlineSuppressions(t *testing.T) {
 	}
 }
 
+// TestBuildSelectNarrowsGate: --select is the operator's choice, like --ignore,
+// so the gate reads only the selected rules. The curl|bash fixture built under
+// --select=PB908 (the missing-maintainer nit) has nothing to refuse and runs,
+// and the artifact is held to the same selection. A typo in the selection is
+// refused before makepkg is spent on it.
+func TestBuildSelectNarrowsGate(t *testing.T) {
+	seen := stubExec(t, []string{"makepkg"}, dropArchive("badpkg-1.0-1-any.pkg.tar"))
+	var buf bytes.Buffer
+	if code := run([]string{"build", "--select=PB908", "testdata/malicious"}, &buf); code != 0 {
+		t.Fatalf("got exit %d, want 0\n%s", code, buf.String())
+	}
+	if len(*seen) == 0 {
+		t.Fatal("--select left a gating rule in place: makepkg never ran")
+	}
+	out := buf.String()
+	if !strings.Contains(out, "PB908") || strings.Contains(out, "PB304") {
+		t.Errorf("the static report should hold PB908 alone, got:\n%s", out)
+	}
+	if strings.Contains(out, "PB821") {
+		t.Errorf("the archive's world-writable file is outside the selection, got:\n%s", out)
+	}
+
+	*seen = nil
+	buf.Reset()
+	if code := run([]string{"build", "--select=PB999", "testdata/malicious"}, &buf); code != 2 {
+		t.Errorf("--select=PB999: got exit %d, want 2\n%s", code, buf.String())
+	}
+	if len(*seen) > 0 {
+		t.Fatalf("an unknown --select reached makepkg: %v", args(*seen))
+	}
+}
+
 // TestBuildReportsStaleIgnores is the other half of the previous test: the
 // gate disregards the file's directives, but the report must not be a filtered
 // copy of that unsuppressed run. PB913 (stale ignore directive) exists only

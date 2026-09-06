@@ -80,6 +80,7 @@ pkglint [flags] [path ...]     # paths are package dirs, PKGBUILD files,
   --format text|json|sarif     # output format (sarif = SARIF 2.1.0, for code scanning)
   --fail-on SEVERITY           # exit 1 at or above: info, warn (default), error, critical, never
   --ignore PB105,PB206         # disable rules
+  --select PB101,PB304         # check only these rules (--ignore still subtracts from them)
   --color auto|always|never    # colorize text output (auto = only on a terminal; honors NO_COLOR)
   --verbose                    # list packages with no findings individually, not just in the summary
   --rules                      # list every rule with its documentation

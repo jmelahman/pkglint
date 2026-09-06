@@ -362,6 +362,20 @@ func goVendored(ctx *Context) bool {
 	return false
 }
 
+// goCommandVendored reports whether this particular command reads from a
+// vendor tree rather than the module cache: `-mod=vendor` reaches it through
+// its arguments or a GOFLAGS in scope — the guidelines' `export GOFLAGS=…`
+// inside build() is where most PKGBUILDs put it, out of goVendored's reach —
+// or module mode is switched off altogether, which makes go read the GOPATH
+// tree the PKGBUILD assembled and never fetch anything.
+func goCommandVendored(ctx *Context, c Command) bool {
+	if goFlagAddressed(goFlags(ctx, c), c, "-mod=vendor") {
+		return true
+	}
+	modes := assignmentsTo(ctx, "GO111MODULE", c)
+	return len(modes) > 0 && modes[len(modes)-1] == "off"
+}
+
 // isVendorArchive reports whether a source looks like a bundled vendored-deps
 // archive (vendor.tar.gz, foo-1.0-vendor.tar.zst, a local "vendor" bundle),
 // rather than any URL that merely contains the substring "vendor" (e.g. a
@@ -415,7 +429,7 @@ func checkGoDownloads(ctx *Context) []Finding {
 		return out
 	}
 	for _, c := range ctx.CommandsNamed("go") {
-		if !c.InBuildPhase() || mutable[c.Stmt] {
+		if !c.InBuildPhase() || mutable[c.Stmt] || goCommandVendored(ctx, c) {
 			continue
 		}
 		sub := c.Subcommand()

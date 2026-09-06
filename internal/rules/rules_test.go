@@ -879,6 +879,32 @@ build() {
   go build -mod=vendor -o demo .
 }`)})
 	})
+	t.Run("PB204 -mod=vendor in a GOFLAGS exported inside build() ok", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  export GOFLAGS="-buildmode=pie -mod=vendor -modcacherw"
+  go build -o demo .
+}`)})
+	})
+	t.Run("PB204 GOPATH mode with modules off reads the assembled tree, not the network", func(t *testing.T) {
+		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  mkdir -p build/src
+  mv demo-$pkgver/vendor/* build/src/
+}
+build() {
+  export GOPATH="$srcdir/build"
+  export GO111MODULE=off
+  go build -o bin/demo cmd/demo/main.go
+}`)})
+	})
+	t.Run("PB204 GOFLAGS vendor mode only covers commands it reaches", func(t *testing.T) {
+		expectRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  go build -o demo .
+  export GOFLAGS="-mod=vendor"
+}`)})
+	})
 	t.Run("PB204 go mod download in prepare ok", func(t *testing.T) {
 		expectNoRule(t, "PB204", map[string]string{"PKGBUILD": pkgbuildWith("", `
 prepare() {

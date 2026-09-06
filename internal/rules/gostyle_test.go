@@ -102,6 +102,48 @@ build() {
 }`)})
 	})
 
+	t.Run("GOFLAGS assembled from an array is read through the reference", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  local goflags=(
+    -buildmode=pie
+    -trimpath
+    -mod=readonly
+    -modcacherw
+  )
+  export CGO_CFLAGS="$CFLAGS" CGO_LDFLAGS="$LDFLAGS"
+  export GOFLAGS="${goflags[*]}"
+  go build -o demo .
+}`)}
+		ids := ruleIDs(lint(t, files))
+		for _, id := range []string{"PB914", "PB915", "PB916", "PB917"} {
+			if ids[id] != 0 {
+				t.Errorf("%s still fires with GOFLAGS built from an array: %v", id, ids)
+			}
+		}
+	})
+
+	t.Run("a flag array spread onto the command counts, and what it lacks is still reported", func(t *testing.T) {
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  local common=(
+    -v
+    -buildmode=pie
+    -mod=readonly
+    -modcacherw
+  )
+  go build "${common[@]}" -o build ./cmd/...
+  go build "${common[@]}" -tags oss -o build-oss ./cmd/...
+}`)}
+		ids := ruleIDs(lint(t, files))
+		if ids["PB914"] != 0 || ids["PB916"] != 0 {
+			t.Errorf("flags in the spread array not seen: %v", ids)
+		}
+		if ids["PB915"] != 2 {
+			t.Errorf("PB915 fired %d times, want 2 (the array has no -trimpath)", ids["PB915"])
+		}
+	})
+
 	t.Run("an export below the command it would cover does not count", func(t *testing.T) {
 		expectRule(t, "PB915", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {

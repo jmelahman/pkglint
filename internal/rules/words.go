@@ -37,6 +37,33 @@ func argOpaque(c Command, i int) bool {
 	return hasVarRef(c.Args[i]) || (i < len(c.ArgDyn) && c.ArgDyn[i])
 }
 
+// argWords returns the words the command's i'th argument contributes, split
+// the way bash splits an unquoted expansion.
+//
+// An argument pkglint could not resolve is looked up before it is given up
+// on: `cargo build $_cargo_flags` or `go build "${_goflags[@]}"` is rarely a
+// command whose flags are unknowable, it is one whose flags are written a few
+// lines up, and the assignments in scope are the best account of what the
+// tool gets. The variables worth this are exactly the ones ordinary rendering
+// cannot reach — a name assigned inside the function, an array, one a
+// preceding phase changed — which is most of how real PKGBUILDs keep their
+// build flags in one place. Words that are still expansions afterwards are
+// kept as they rendered, so a caller can tell what is left unread.
+func argWords(c Command, i int) []string {
+	if argOpaque(c, i) && i < len(c.ArgWord) {
+		if name := varRefName(c.ArgWord[i]); name != "" {
+			at := -1
+			if c.Stmt != nil {
+				at = off(c.Stmt.Pos())
+			}
+			if words, ok := wordsInScope(c.Unit, name, c.Fn, at, c.Call); ok {
+				return words
+			}
+		}
+	}
+	return strings.Fields(c.Args[i])
+}
+
 // varRefName returns the name of the variable a word is nothing but a
 // reference to — `$flags`, `${flags}`, `"$flags"`, `"${flags[@]}"` — and ""
 // for anything else. Only a whole reference stands for what the variable

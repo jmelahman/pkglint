@@ -34,33 +34,9 @@ import (
 func cargoWords(c Command) []string {
 	var out []string
 	for i := range c.Args {
-		out = append(out, cargoArgWords(c, i)...)
+		out = append(out, argWords(c, i)...)
 	}
 	return out
-}
-
-// cargoArgWords returns the words the command's i'th argument contributes.
-//
-// An argument pkglint could not resolve is looked up before it is given up
-// on: `cargo build $_cargo_flags` is rarely a command whose flags are
-// unknowable, it is one whose flags are written a few lines up, and the
-// assignments in scope are the best account of what cargo gets. The variables
-// worth this are exactly the ones ordinary rendering cannot reach — a name
-// assigned inside the function, an array, one a preceding phase changed —
-// which is most of how real PKGBUILDs keep their cargo flags in one place.
-func cargoArgWords(c Command, i int) []string {
-	if argOpaque(c, i) && i < len(c.ArgWord) {
-		if name := varRefName(c.ArgWord[i]); name != "" {
-			at := -1
-			if c.Stmt != nil {
-				at = off(c.Stmt.Pos())
-			}
-			if words, ok := wordsInScope(c.Unit, name, c.Fn, at, c.Call); ok {
-				return words
-			}
-		}
-	}
-	return strings.Fields(c.Args[i])
 }
 
 // cargoHasFlag reports whether the command passes any of flags to cargo,

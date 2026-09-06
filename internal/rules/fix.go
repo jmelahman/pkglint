@@ -1559,7 +1559,7 @@ func fixGoDownloads(ctx *Context, _ *FixEnv) []Edit {
 		return nil
 	}
 	for _, c := range ctx.CommandsNamed("go") {
-		if !c.InBuildPhase() {
+		if !c.InBuildPhase() || goCommandVendored(ctx, c) {
 			continue
 		}
 		switch c.Subcommand() {
@@ -1715,7 +1715,7 @@ func goFlagInsertion(c Command) (int, bool) {
 func goFlagEdits(ctx *Context, cmds []Command, flagPrefix, flag string) []Edit {
 	var edits []Edit
 	for _, c := range cmds {
-		if goFlagAddressed(assignmentsTo(ctx, "GOFLAGS", c), c, flagPrefix) {
+		if goFlagAddressed(goFlags(ctx, c), c, flagPrefix) {
 			continue
 		}
 		at, ok := goFlagInsertion(c)

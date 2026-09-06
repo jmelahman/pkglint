@@ -172,11 +172,49 @@ func makepkgPhase(fn string) bool {
 	return false
 }
 
+// goFlags returns the GOFLAGS values in effect for c, word by word — the
+// rendered assignments assignmentsTo sees, plus what an assignment that is
+// nothing but a variable reference holds: `GOFLAGS="${goflags[*]}"` over an
+// array of flags declared a few lines up is how a PKGBUILD keeps a long flag
+// list readable, and the flags are in the array, not in the empty string the
+// reference renders to.
+func goFlags(ctx *Context, c Command) []string {
+	at := -1
+	if c.Stmt != nil {
+		at = off(c.Stmt.Pos())
+	}
+	var out []string
+	scanAssignments(c.Unit, "GOFLAGS", c.Fn, at, c.Call, false, func(as *syntax.Assign) {
+		if as.Value == nil {
+			return
+		}
+		if name := varRefName(as.Value); name != "" && name != "GOFLAGS" {
+			if words, ok := wordsInScope(c.Unit, name, c.Fn, at, c.Call); ok {
+				out = append(out, words...)
+				return
+			}
+		}
+		s, _ := renderPlain(as.Value)
+		out = append(out, strings.Fields(s)...)
+	})
+	return out
+}
+
+// goWords returns c's arguments with flag variables read through: `go build
+// "${flags[@]}"` passes whatever the array holds.
+func goWords(c Command) []string {
+	var out []string
+	for i := range c.Args {
+		out = append(out, argWords(c, i)...)
+	}
+	return out
+}
+
 // goFlagAddressed reports whether the PKGBUILD says anything about flag for
 // this command: as an argument (any "-flag..." spelling, so an explicit
 // opt-out counts as a decision) or inside a GOFLAGS assignment.
 func goFlagAddressed(goflags []string, c Command, flag string) bool {
-	for _, a := range c.Args {
+	for _, a := range goWords(c) {
 		if strings.HasPrefix(a, flag) {
 			return true
 		}
@@ -249,7 +287,7 @@ func goModuleCommands(ctx *Context) []Command {
 func checkGoPIE(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range goBuildCommands(ctx) {
-		if goFlagAddressed(assignmentsTo(ctx, "GOFLAGS", c), c, "-buildmode") {
+		if goFlagAddressed(goFlags(ctx, c), c, "-buildmode") {
 			continue
 		}
 		out = append(out, c.finding("PB914", Warn,
@@ -263,7 +301,7 @@ func checkGoPIE(ctx *Context) []Finding {
 func checkGoTrimpath(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range goBuildCommands(ctx) {
-		if goFlagAddressed(assignmentsTo(ctx, "GOFLAGS", c), c, "-trimpath") {
+		if goFlagAddressed(goFlags(ctx, c), c, "-trimpath") {
 			continue
 		}
 		out = append(out, c.finding("PB915", Warn,
@@ -277,7 +315,7 @@ func checkGoTrimpath(ctx *Context) []Finding {
 func checkGoModcacheRW(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range goModuleCommands(ctx) {
-		if goFlagAddressed(assignmentsTo(ctx, "GOFLAGS", c), c, "-modcacherw") {
+		if goFlagAddressed(goFlags(ctx, c), c, "-modcacherw") {
 			continue
 		}
 		out = append(out, c.finding("PB916", Info,

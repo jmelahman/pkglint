@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cosmic-comp-gaming — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/cosmic-comp-gaming: 9 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/cosmic-comp-gaming.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="cosmic-comp-gaming — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/cosmic-comp-gaming: 9 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/cosmic-comp-gaming.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>cosmic-comp-gaming</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1:1.19.0-3</b>
+          
+          <span>maintained by skygrango</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/cosmic-comp-gaming">AUR page</a>
+          
+          <a href="../badge/cosmic-comp-gaming.svg">badge</a>
+        </p>
+        <p>Compositor for the COSMIC desktop environment with gaming patches and support fifo-v1, commit-timing-v1, fullscreen tearing, and VRR Target Rate feature</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 9</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 76</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows branch vrr_target_rate_v7 with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 76</div>
+        <div class="rid"><a href="../rules/PB960.html">PB960</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          git source follows upstream tip but there is no pkgver() function, so every build reuses the hardcoded version and pacman never sees an upgrade
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 77</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows branch vrr_target_rate_v3 with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 78</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source follows branch vrr_target_rate_v2 with no #commit= pin; the fetched tree is not tamper-evident
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 89</div>
+        <div class="rid"><a href="../rules/PB203.html">PB203</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cargo fetch without --locked: dependency resolution may diverge from Cargo.lock
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 89</div>
+        <div class="rid"><a href="../rules/PB944.html">PB944</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          cargo is used but neither rust nor rustup is in makedepends; a clean build environment cannot run this build
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 91</div>
+        <div class="rid"><a href="../rules/PB203.html">PB203</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cargo fetch without --locked: dependency resolution may diverge from Cargo.lock
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 93</div>
+        <div class="rid"><a href="../rules/PB203.html">PB203</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cargo fetch without --locked: dependency resolution may diverge from Cargo.lock
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 121</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

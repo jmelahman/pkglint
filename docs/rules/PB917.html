@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB917: go-cgo-flags-dropped — AUR Report Card</title>
+<meta name="description" content="PB917 (go-cgo-flags-dropped): cgo compiles C with CGO_CFLAGS/CGO_LDFLAGS, not the CFLAGS/LDFLAGS makepkg exports, so unless the PKGBUILD forwards them (export CGO_CFLAGS=&#34;$CFLAGS&#34;, …) Arch&#39;s…">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB917.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB917: go-cgo-flags-dropped — AUR Report Card">
+<meta property="og:description" content="PB917 (go-cgo-flags-dropped): cgo compiles C with CGO_CFLAGS/CGO_LDFLAGS, not the CFLAGS/LDFLAGS makepkg exports, so unless the PKGBUILD forwards them (export CGO_CFLAGS=&#34;$CFLAGS&#34;, …) Arch&#39;s…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB917.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB917</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">go-cgo-flags-dropped</span></h1>
+    <p class="facts"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></p>
+    <p class="lede">cgo compiles C with CGO_CFLAGS/CGO_LDFLAGS, not the CFLAGS/LDFLAGS makepkg exports, so unless the PKGBUILD forwards them (export CGO_CFLAGS=&#34;$CFLAGS&#34;, …) Arch&#39;s fortify/RELRO hardening never reaches the C parts of a Go build. Pure-Go packages can set CGO_ENABLED=0 instead, which also silences this rule. The fix writes the guidelines&#39; block of CGO_* exports at the top of the function that runs the build.</p>
+    
+    <div class="note">
+      <h3>Auto-fix</h3>
+      <p>Run <code>pkglint --unsafe-fix</code> to rewrite this in place —
+      the rewrite is mechanical but changes what the build does, so read the result.
+      Add <code>--diff</code> to see the change without writing it.</p>
+    </div>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>build() {
+  export GOFLAGS=&#34;-buildmode=pie -trimpath -modcacherw&#34;
+  go build -o demo .
+}</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>build() {
+  export CGO_CFLAGS=&#34;$CFLAGS&#34; CGO_LDFLAGS=&#34;$LDFLAGS&#34;
+  export GOFLAGS=&#34;-buildmode=pie -trimpath -modcacherw&#34;
+  go build -o demo .
+}</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB917</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB917</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB916.html">&larr; PB916 go-readonly-modcache</a>
+      <a href="PB918.html">PB918 self-provides &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB702: invalid-pkgver — AUR Report Card</title>
+<meta name="description" content="PB702 (invalid-pkgver): pkgver must not be empty and may not contain colons, forward slashes, hyphens or whitespace — those characters have meaning in pacman&#39;s version syntax (epoch:, -pkgrel), so…">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB702.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB702: invalid-pkgver — AUR Report Card">
+<meta property="og:description" content="PB702 (invalid-pkgver): pkgver must not be empty and may not contain colons, forward slashes, hyphens or whitespace — those characters have meaning in pacman&#39;s version syntax (epoch:, -pkgrel), so…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB702.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB702</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">invalid-pkgver</span></h1>
+    
+    <p class="lede">pkgver must not be empty and may not contain colons, forward slashes, hyphens or whitespace — those characters have meaning in pacman&#39;s version syntax (epoch:, -pkgrel), so makepkg rejects them. makepkg lints the literal value before any pkgver() function runs, so even VCS packages need a valid placeholder.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>pkgver=1.2.3-beta   # &#39;-&#39; separates pkgver from pkgrel and is not allowed here</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>pkgver=1.2.3.beta</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB702</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB702</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB701.html">&larr; PB701 invalid-pkgname</a>
+      <a href="PB703.html">PB703 invalid-pkgrel &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

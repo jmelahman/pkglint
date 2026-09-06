@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dds10-thumbnailer-kde-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/dds10-thumbnailer-kde-git: 5 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/dds10-thumbnailer-kde-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="dds10-thumbnailer-kde-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/dds10-thumbnailer-kde-git: 5 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/dds10-thumbnailer-kde-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>dds10-thumbnailer-kde-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>r10.23b2801-3</b>
+          
+          <span>maintained by failsafe65</span>
+          
+          <span>2 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/dds10-thumbnailer-kde-git">AUR page</a>
+          
+          <a href="../badge/dds10-thumbnailer-kde-git.svg">badge</a>
+        </p>
+        <p>dds10-thumbnailer-kde is a plugin for KDE 6 that creates thumbnail for Direct Draw Surface (DDS) images</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 5</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB908.html">PB908</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          no &#39;# Maintainer:&#39; comment; AUR convention names the responsible maintainer at the top of the PKGBUILD
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 2</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;dds10-thumbnailer-kde-git&#34; builds the same software as &#34;dds10-thumbnailer-kde&#34; but declares neither provides=(dds10-thumbnailer-kde) nor conflicts=(dds10-thumbnailer-kde), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB711.html">PB711</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          git source needs &#34;git&#34; in makedepends; a clean build environment does not have it
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB950.html">PB950</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          cmake configure without -DCMAKE_INSTALL_PREFIX=/usr defaults to /usr/local, which Arch packages must not touch
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 27</div>
+        <div class="rid"><a href="../rules/PB951.html">PB951</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          -DCMAKE_BUILD_TYPE=Release appends -O3 -DNDEBUG after Arch&#39;s CFLAGS, overriding the distribution&#39;s -O2; the CMake package guidelines build with -DCMAKE_BUILD_TYPE=None
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

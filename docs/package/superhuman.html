@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>superhuman — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/superhuman: 41 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/superhuman.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="superhuman — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/superhuman: 41 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/superhuman.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>superhuman</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1041.0.45-1</b>
+          
+          <span>maintained by joeyeamigh</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/superhuman">AUR page</a>
+          
+          <a href="../badge/superhuman.svg">badge</a>
+        </p>
+        <p>The fastest email experience ever made (unofficial)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 41</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-error">
+        <div class="loc">line 23</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;Superhuman-$pkgver.exe::https://assets.mail.superhuman.com/webapp/download/Superhuman.exe&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 48</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 58</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 61</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 71</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 72</div>
+        <div class="rid"><a href="../rules/PB210.html">PB210</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          npm install fetches &#34;@electron/asar&#34; at whatever version the npm registry serves at build time and runs its install scripts; install from the project&#39;s package.json and lockfile (`npm ci`) or declare the tool in makedepends
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 72</div>
+        <div class="rid"><a href="../rules/PB980.html">PB980</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          npm install writes the invoking user&#39;s ~/.npm cache; the Node.js package guidelines pass --cache &#34;$srcdir/npm-cache&#34; so the build leaves no droppings outside $srcdir
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 75</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 77</div>
+        <div class="rid"><a href="../rules/PB210.html">PB210</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          npx fetches &#34;@electron/asar&#34; at whatever version the npm registry serves at build time and runs it; install from the project&#39;s package.json and lockfile (`npm ci`) or declare the tool in makedepends
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 82</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 90</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 91</div>
+        <div class="rid"><a href="../rules/PB210.html">PB210</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          npx fetches &#34;@electron/asar&#34; at whatever version the npm registry serves at build time and runs it; install from the project&#39;s package.json and lockfile (`npm ci`) or declare the tool in makedepends
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 103</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 104</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 105</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 111</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 112</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 113</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 124</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 135</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 136</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 142</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 143</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 150</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 155</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 223</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          msg2 is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 230</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 231</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 232</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 233</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 234</div>
+        <div class="rid"><a href="../rules/PB907.html">PB907</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          warning is a makepkg-internal helper, not a stable API; use echo or printf
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 286</div>
+        <div class="rid"><a href="../rules/PB403.html">PB403</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          chmod 4755 creates a setuid/setgid file
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 290</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 291</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 292</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 293</div>
+        <div class="rid"><a href="../rules/PB903.html">PB903</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          $startdir is deprecated; use $srcdir and $pkgdir instead
+          </div>
+      </div>
+      
+    </div>
+    
+    <p class="file">superhuman.install</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          gtk-update-icon-cache is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          update-desktop-database is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB502.html">PB502</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          scriptlet removes &#34;$HOME/.config/autostart/superhuman.desktop&#34;, a persistence location outside pacman&#39;s tracking
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 54</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          gtk-update-icon-cache is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 59</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          update-desktop-database is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

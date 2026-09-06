@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mono-msbuild — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for extra/mono-msbuild: 2 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/mono-msbuild.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="mono-msbuild — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for extra/mono-msbuild: 2 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/mono-msbuild.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>mono-msbuild</h1>
+        
+        <p class="facts">
+          <span class="repo repo-extra">extra</span>
+          <b>16.10.1.xamarinxplat.2021.05.26.14.00-5</b>
+          
+          <span>maintained by alucryd</span>
+          <span>packaged by T.J. Townsend</span>
+          <a href="https://archlinux.org/pkgbase/mono-msbuild/">Arch Linux page</a>
+          <a href="https://gitlab.archlinux.org/archlinux/packaging/packages/mono-msbuild">PKGBUILD</a>
+          
+          <a href="../badge/mono-msbuild.svg">badge</a>
+        </p>
+        <p>Xamarin implementation of the Microsoft build system</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 2</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 13</div>
+        <div class="rid"><a href="../rules/PB982.html">PB982</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          CLR assemblies are architecture-independent CIL that strip corrupts; the CLR package guidelines set arch=(&#39;any&#39;) and options=(&#39;!strip&#39;)
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB103.html">PB103</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          VCS source pinned to mutable tag &#34;33648164f64f8e2d9b0458fab1c229eecfebc0a6&#34;; tags can be re-pointed — pin with #commit=
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

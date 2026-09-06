@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>udev-hid-bpf — AUR Report Card</title>
+<meta name="description" content="pkglint grade A for extra/udev-hid-bpf: 3 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/udev-hid-bpf.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="udev-hid-bpf — AUR Report Card">
+<meta property="og:description" content="pkglint grade A for extra/udev-hid-bpf: 3 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/udev-hid-bpf.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-A" title="grade A">A</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>udev-hid-bpf</h1>
+        
+        <p class="facts">
+          <span class="repo repo-extra">extra</span>
+          <b>2.3.0.20260703-2</b>
+          
+          <span>maintained by kpcyrd</span>
+          <span>packaged by Laurent Carlier</span>
+          <a href="https://archlinux.org/pkgbase/udev-hid-bpf/">Arch Linux page</a>
+          <a href="https://gitlab.archlinux.org/archlinux/packaging/packages/udev-hid-bpf">PKGBUILD</a>
+          
+          <a href="../badge/udev-hid-bpf.svg">badge</a>
+        </p>
+        <p>An automatic HID-BPF loader based on udev events written in rust</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 3</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 44</div>
+        <div class="rid"><a href="../rules/PB944.html">PB944</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          cargo is used but neither rust nor rustup is in makedepends; a clean build environment cannot run this build
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 50</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 61</div>
+        <div class="rid"><a href="../rules/PB955.html">PB955</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          this project is configured with meson; `meson compile` (and `meson install`, `meson test`) wraps ninja with the configured environment — prefer it over calling ninja directly
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

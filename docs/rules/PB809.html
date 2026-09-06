@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB809: missing-library-dependency — AUR Report Card</title>
+<meta name="description" content="PB809 (missing-library-dependency): Every DT_NEEDED library must be reachable from depends, or the binary fails to start on a system with exactly the declared dependencies installed. Reported as an…">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB809.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB809: missing-library-dependency — AUR Report Card">
+<meta property="og:description" content="PB809 (missing-library-dependency): Every DT_NEEDED library must be reachable from depends, or the binary fails to start on a system with exactly the declared dependencies installed. Reported as an…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB809.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB809</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">missing-library-dependency</span></h1>
+    
+    <p class="lede">Every DT_NEEDED library must be reachable from depends, or the binary fails to start on a system with exactly the declared dependencies installed. Reported as an error when no depends entry pulls the owning package in even transitively, a warning when only an optdepends does, and informationally when coverage is transitive (it breaks silently when the middleman drops its own dependency) or the library cannot be resolved on this system. Needs the pacman local database.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>depends=()   # but usr/bin/demo links libpng16.so.16</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>depends=(&#39;libpng&#39;)</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB809</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB809</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB808.html">&larr; PB808 insecure-rpath</a>
+      <a href="PB810.html">PB810 unused-linked-library &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

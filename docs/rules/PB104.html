@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB104: insecure-transport — AUR Report Card</title>
+<meta name="description" content="PB104 (insecure-transport): Sources fetched over http://, git:// or ftp:// can be modified in transit. Pinned to a strong digest the download is still verified, so an attacker in the path can break…">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB104.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB104: insecure-transport — AUR Report Card">
+<meta property="og:description" content="PB104 (insecure-transport): Sources fetched over http://, git:// or ftp:// can be modified in transit. Pinned to a strong digest the download is still verified, so an attacker in the path can break…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB104.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB104</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">insecure-transport</span></h1>
+    <p class="facts"><span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></p>
+    <p class="lede">Sources fetched over http://, git:// or ftp:// can be modified in transit. Pinned to a strong digest the download is still verified, so an attacker in the path can break the build but not change what it produces — a warning. With SKIP, a weak sum, or no sum at all — which includes every git:// clone — nothing checks what arrives, and it is a working man-in-the-middle vector: an error. Use https:// (or git+https://) either way. Signature files fetched insecurely are PB112&#39;s concern. --unsafe-fix rewrites the scheme (http and ftp to https, bare git:// to git+https://), but only after checking that the https URL answers — a headers-only request, or <code>git ls-remote</code> for a git remote — so a host that does not serve it keeps the finding instead of getting a broken build. It stays unsafe because reachable is not identical: only the checksum can say the https URL serves the same bytes, so rebuild after applying it. --offline skips it.</p>
+    
+    <div class="note">
+      <h3>Auto-fix</h3>
+      <p>Run <code>pkglint --unsafe-fix</code> to rewrite this in place —
+      the rewrite is mechanical but changes what the build does, so read the result.
+      Add <code>--diff</code> to see the change without writing it.</p>
+    </div>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>source=(&#34;http://example.com/foo-$pkgver.tar.gz&#34;)</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>source=(&#34;https://example.com/foo-$pkgver.tar.gz&#34;)</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB104</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB104</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB103.html">&larr; PB103 unpinned-vcs-source</a>
+      <a href="PB105.html">PB105 source-url-mismatch &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

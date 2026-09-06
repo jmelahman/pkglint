@@ -287,7 +287,7 @@ func TestRenderMaintainerFilter(t *testing.T) {
 	// The other half of the contract: the script has to read the attributes the
 	// template writes.
 	js := read(filepath.Join("assets", "site.js"))
-	for _, want := range []string{"tr.dataset.maintainer", "tr.dataset.comaintainers", `charAt(0) === "@"`} {
+	for _, want := range []string{"tr.dataset.maintainer", "tr.dataset.comaintainers", "tr.dataset.maintainers", `charAt(0) === "@"`} {
 		if !strings.Contains(js, want) {
 			t.Errorf("site.js missing %s: the roster's maintainer filter is not wired up", want)
 		}
@@ -338,7 +338,7 @@ func TestRenderRepositories(t *testing.T) {
 		{Name: "demo", Base: "demo", Repo: "aur", Version: "1.0-1", Grade: "A", Votes: 7,
 			Maintainer: "dbermond", Findings: []rules.Finding{}},
 		{Name: "linux", Base: "linux", Repo: "core", Version: "6.1-2", Grade: "B",
-			Packager: "Jan Alexander Steffens (heftig)", Findings: []rules.Finding{}},
+			Maintainers: []string{"heftig", "loqs"}, Packager: "Jan Alexander Steffens (heftig)", Findings: []rules.Finding{}},
 	}
 	out := t.TempDir()
 	for _, sub := range []string{"rules", "package", "badge"} {
@@ -364,11 +364,14 @@ func TestRenderRepositories(t *testing.T) {
 		`data-repo="core"`,
 		`data-repo="aur"`,
 		`<span class="repo repo-core">core</span>`,
-		// The packager rides the same way the maintainer does, and the tooltip
-		// says which it is.
+		// The packager and the archlinux.org maintainers ride the same way the
+		// AUR maintainer does — the maintainers space-joined, like the
+		// co-maintainers — and the tooltip says which is which.
 		`data-packager="Jan Alexander Steffens (heftig)"`,
-		`title="packaged by Jan Alexander Steffens (heftig)"`,
+		`data-maintainers="heftig loqs"`,
+		`title="maintained by heftig, loqs, packaged by Jan Alexander Steffens (heftig)"`,
 		`data-packager=""`,
+		`data-maintainers=""`,
 		// Votes are an AUR notion; an official row shows none rather than 0.
 		`<span class="none">&ndash;</span>`,
 		// The repository toggles beside the disclosure, and the tallies they
@@ -389,6 +392,7 @@ func TestRenderRepositories(t *testing.T) {
 	pkg := read(filepath.Join("package", "linux.html"))
 	for _, want := range []string{
 		`<span class="repo repo-core">core</span>`,
+		"maintained by heftig, loqs",
 		"packaged by",
 		`href="https://archlinux.org/pkgbase/linux/"`,
 		`href="` + gitlabPackages + `linux"`,
@@ -397,7 +401,7 @@ func TestRenderRepositories(t *testing.T) {
 			t.Errorf("linux.html missing %s", want)
 		}
 	}
-	for _, stray := range []string{"votes", "AUR page", "maintained by"} {
+	for _, stray := range []string{"votes", "AUR page", "co-maintained by"} {
 		if strings.Contains(pkg, stray) {
 			t.Errorf("linux.html carries an AUR-only fact: %s", stray)
 		}

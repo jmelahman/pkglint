@@ -275,6 +275,73 @@ func restoreSyncDBURL(t *testing.T, url string) func() {
 	return func() { syncDBURL = prev }
 }
 
+func restoreArchwebSearchURL(t *testing.T, url string) func() {
+	t.Helper()
+	prev := archwebSearchURL
+	archwebSearchURL = url
+	return func() { archwebSearchURL = prev }
+}
+
+// TestFetchMaintainers pins the sweep of archlinux.org's package search against
+// the API's own habits, measured 2026-09-06: a page past the last is answered
+// with the last page again rather than an error or an empty one, so the sweep
+// has to stop where num_pages says and cannot run until nothing comes back;
+// every package of a base repeats the base's maintainers, so they fold to one
+// entry; and their order is nobody's, so it is sorted.
+func TestFetchMaintainers(t *testing.T) {
+	pages := map[string]string{
+		"1": `{"valid":true,"num_pages":2,"page":1,"results":[
+			{"pkgbase":"linux","maintainers":["heftig"]},
+			{"pkgbase":"pacman","maintainers":["morganamilo","anthraxx"]},
+			{"pkgbase":"","maintainers":["nobody"]}]}`,
+		"2": `{"valid":true,"num_pages":2,"page":2,"results":[
+			{"pkgbase":"linux","maintainers":["heftig"]},
+			{"pkgbase":"orphan","maintainers":[]}]}`,
+	}
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		if body, ok := pages[r.URL.Query().Get("page")]; ok {
+			fmt.Fprint(w, body)
+			return
+		}
+		fmt.Fprint(w, pages["2"]) // the last page, over again
+	}))
+	defer srv.Close()
+	defer restoreArchwebSearchURL(t, srv.URL+"/packages/search/json/?page=%d")()
+	defer restoreGetBackoff(t, nil)()
+
+	got, err := fetchMaintainers()
+	if err != nil {
+		t.Fatalf("fetchMaintainers: %v", err)
+	}
+	want := map[string][]string{"linux": {"heftig"}, "pacman": {"anthraxx", "morganamilo"}, "orphan": nil}
+	if len(got) != len(want) {
+		t.Errorf("fetchMaintainers = %v, want %v", got, want)
+	}
+	for base, ms := range want {
+		if g, ok := got[base]; !ok || !slices.Equal(g, ms) {
+			t.Errorf("fetchMaintainers[%q] = %v (%v), want %v", base, g, ok, ms)
+		}
+	}
+	if n := hits.Load(); n != 2 {
+		t.Errorf("server saw %d requests, want exactly num_pages", n)
+	}
+
+	// The rejections: a query the form did not accept, and a page count no
+	// corpus could have.
+	for name, body := range map[string]string{
+		"invalid":   `{"valid":false}`,
+		"unbounded": `{"valid":true,"num_pages":100000,"results":[]}`,
+	} {
+		pages["1"] = body
+		if _, err := fetchMaintainers(); err == nil {
+			t.Errorf("%s page: fetchMaintainers returned no error", name)
+		}
+	}
+}
+
 // TestLoadOfficialCachesDB pins that a sync database is downloaded once a
 // day, not once a run: the mirror serves a few megabytes per repository, and
 // a same-day file in the cache is what a local re-run reads instead.
@@ -285,14 +352,19 @@ func TestLoadOfficialCachesDB(t *testing.T) {
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
-		if r.URL.Path != "/core/core.db" {
+		switch r.URL.Path {
+		case "/core/core.db":
+			w.Write(db)
+		case "/packages/search/json/":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"valid":true,"num_pages":1,"page":1,"results":[{"pkgbase":"zlib","maintainers":["zed","amy"]}]}`)
+		default:
 			http.NotFound(w, r)
-			return
 		}
-		w.Write(db)
 	}))
 	defer srv.Close()
 	defer restoreSyncDBURL(t, srv.URL+"/%s/%s.db")()
+	defer restoreArchwebSearchURL(t, srv.URL+"/packages/search/json/?page=%d")()
 	defer restoreGetBackoff(t, nil)()
 
 	cache := t.TempDir()
@@ -301,11 +373,14 @@ func TestLoadOfficialCachesDB(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loadOfficial #%d: %v", i+1, err)
 		}
-		if len(got) != 1 || got[0].PackageBase != "zlib" || got[0].Repo != "core" || got[0].Packager != "A" {
+		if len(got) != 1 || got[0].PackageBase != "zlib" || got[0].Repo != "core" || got[0].Packager != "A" ||
+			!slices.Equal(got[0].Maintainers, []string{"amy", "zed"}) {
 			t.Errorf("loadOfficial #%d = %+v", i+1, got)
 		}
 	}
-	if n := hits.Load(); n != 1 {
+	// One request for the database and one for the maintainers, both served
+	// from the cache the second time.
+	if n := hits.Load(); n != 2 {
 		t.Errorf("server saw %d requests, want the second load served from the cache", n)
 	}
 	// A repository the mirror does not carry is an error with the repository
@@ -348,6 +423,9 @@ func TestThrottleFor(t *testing.T) {
 	}
 	if got := throttleFor("https://aur.archlinux.org/cgit/aur.git/snapshot/demo.tar.gz"); got != throttle {
 		t.Error("an AUR request does not wait on the global ticker")
+	}
+	if got := throttleFor("https://archlinux.org/packages/search/json/?limit=250&page=1"); got != throttles["archlinux.org"] {
+		t.Error("an archlinux.org request does not wait on archlinux.org's ticker")
 	}
 	if got := throttleFor("::not a url"); got != throttle {
 		t.Error("an unparseable URL does not fall back to the global ticker")
@@ -582,6 +660,9 @@ func TestRunEndToEndOfficialOffline(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cache, "core.db"), db, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(cache, "maintainers.json"), []byte(`{"linux":["heftig","someone"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := saveState(statePath, map[string]stateRecord{
 		"demo": {Base: "demo", LastModified: 1000, Grade: "B",
 			Findings: []rules.Finding{{RuleID: "PB101", Severity: rules.Warn}}, Rules: rulesFingerprint()},
@@ -590,9 +671,10 @@ func TestRunEndToEndOfficialOffline(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// syncDBURL points nowhere reachable: a passing run is proof the cached
-	// database was used.
+	// syncDBURL and archwebSearchURL point nowhere reachable: a passing run
+	// is proof the cached database and maintainers were used.
 	defer restoreSyncDBURL(t, "http://127.0.0.1:1/%s/%s.db")()
+	defer restoreArchwebSearchURL(t, "http://127.0.0.1:1/search?page=%d")()
 	defer restoreGetBackoff(t, nil)()
 
 	if err := run(out, cache, statePath, "", []string{"core"}, 1, 0, 0, 1, 5, 0); err != nil {
@@ -602,7 +684,8 @@ func TestRunEndToEndOfficialOffline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("results.json: %v", err)
 	}
-	for _, want := range []string{`"repo": "aur"`, `"repo": "core"`, `"packager": "Somebody"`, `"name": "linux"`} {
+	for _, want := range []string{`"repo": "aur"`, `"repo": "core"`, `"packager": "Somebody"`, `"name": "linux"`,
+		"\"maintainers\": [\n      \"heftig\",\n      \"someone\"\n    ]"} {
 		if !strings.Contains(string(results), want) {
 			t.Errorf("results.json missing %s:\n%s", want, results)
 		}
@@ -611,7 +694,7 @@ func TestRunEndToEndOfficialOffline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("package page: %v", err)
 	}
-	for _, want := range []string{"packaged by Somebody", "https://archlinux.org/pkgbase/linux/", gitlabPackages + "linux"} {
+	for _, want := range []string{"maintained by heftig, someone", "packaged by Somebody", "https://archlinux.org/pkgbase/linux/", gitlabPackages + "linux"} {
 		if !strings.Contains(string(pkg), want) {
 			t.Errorf("linux.html missing %s", want)
 		}

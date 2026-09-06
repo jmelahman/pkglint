@@ -102,6 +102,28 @@ func TestSelectSeedIncludesCoMaintained(t *testing.T) {
 	}
 }
 
+// TestMaintains pins who the -maintainer flag reaches: the AUR maintainer, any
+// AUR co-maintainer, and any of an official package's maintainers on
+// archlinux.org, each a way of answering for the package.
+func TestMaintains(t *testing.T) {
+	who, other := "jmelahman", "somebody-else"
+	for _, tc := range []struct {
+		name string
+		m    metaPackage
+		want bool
+	}{
+		{"maintainer", metaPackage{Maintainer: &who}, true},
+		{"co-maintainer", metaPackage{Maintainer: &other, CoMaintainers: []string{"helper", who}}, true},
+		{"official maintainer", metaPackage{Repo: "extra", Packager: "Somebody Else", Maintainers: []string{"helper", who}}, true},
+		{"packager only", metaPackage{Repo: "extra", Packager: who, Maintainers: []string{other}}, false},
+		{"orphan", metaPackage{}, false},
+	} {
+		if got := maintains(tc.m, who); got != tc.want {
+			t.Errorf("%s: maintains = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestSelectSeedIsDeterministic pins the tie-break at the top-N cutoff. The
 // bases come out of a map and sort.Slice is not stable, so without one the
 // cutoff falls differently on every run and packages appear on the site, 404,

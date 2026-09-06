@@ -28,9 +28,11 @@ import (
 //
 // Co-maintainers travel as one space-joined string, matching the row's
 // data-comaintainers attribute — AUR usernames cannot hold a space, and one
-// string is what site.js folds into its haystacks either way. The repository
-// and the packager follow: the repository has a column and a filter of its
-// own, and the packager is an official package's answer to the "@" query.
+// string is what site.js folds into its haystacks either way. The repository,
+// the packager and an official package's maintainers follow: the repository
+// has a column and a filter of its own, and the other two are an official
+// package's answer to the "@" query, the maintainers space-joined like the
+// co-maintainers — archweb usernames cannot hold a space either.
 //
 // Order is the index's order, so the client can render straight from it
 // without re-sorting to reproduce the default view.
@@ -41,7 +43,7 @@ func writeRoster(out string, results []siteResult) error {
 		if len(r.Drift) > 0 {
 			drift = 1
 		}
-		rows = append(rows, []any{r.Name, r.Grade, len(r.Findings), r.Votes, r.Description, r.Maintainer, drift, strings.Join(r.CoMaintainers, " "), r.Repo, r.Packager})
+		rows = append(rows, []any{r.Name, r.Grade, len(r.Findings), r.Votes, r.Description, r.Maintainer, drift, strings.Join(r.CoMaintainers, " "), r.Repo, r.Packager, strings.Join(r.Maintainers, " ")})
 	}
 	f, err := os.Create(filepath.Join(out, "roster.json"))
 	if err != nil {

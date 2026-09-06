@@ -46,17 +46,21 @@ var funcs = template.FuncMap{
 
 // MaintainedBy is the roster name cell's tooltip: who maintains the package
 // and who co-maintains it, or "" for a full orphan — or, for an official
-// package, who built it. It is one string built here rather than pieces
-// assembled in the template, because site.js has to rebuild it verbatim for
-// rows the server never sent — a change of wording here has a twin there.
+// package, who maintains it on archlinux.org and who built it. It is one
+// string built here rather than pieces assembled in the template, because
+// site.js has to rebuild it verbatim for rows the server never sent — a
+// change of wording here has a twin there.
 func (r siteResult) MaintainedBy() string {
-	if r.Official() {
-		if r.Packager == "" {
-			return ""
-		}
-		return "packaged by " + r.Packager
-	}
 	var parts []string
+	if r.Official() {
+		if len(r.Maintainers) > 0 {
+			parts = append(parts, "maintained by "+strings.Join(r.Maintainers, ", "))
+		}
+		if r.Packager != "" {
+			parts = append(parts, "packaged by "+r.Packager)
+		}
+		return strings.Join(parts, ", ")
+	}
 	if r.Maintainer != "" {
 		parts = append(parts, "maintained by "+r.Maintainer)
 	}

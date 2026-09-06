@@ -16,6 +16,7 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -114,7 +115,114 @@ func loadOfficial(cache string, repos []string) ([]metaPackage, error) {
 		log.Printf("%s: %d package bases", repo, len(pkgs))
 		all = append(all, pkgs...)
 	}
+	if len(all) == 0 {
+		return all, nil
+	}
+	maintainers, err := loadMaintainers(cache)
+	if err != nil {
+		return nil, err
+	}
+	for i := range all {
+		all[i].Maintainers = maintainers[all[i].PackageBase]
+	}
 	return all, nil
+}
+
+// The sync database says who built a package but not who maintains it. That
+// relation lives on archlinux.org, whose package search answers in JSON: 250
+// packages a page, each with its maintainers by archweb username. The whole
+// of archlinux.org is some 64 pages — a minute at the throttle — fetched once
+// a day and folded to one entry per pkgbase, which is the level the relation
+// is kept at: every package of a base names the same people.
+//
+// The query names no repository. archweb spells them in title case and
+// rejects the pacman spelling ("repo=core" is an invalid form, answered with
+// no results rather than an error), and a base's maintainers do not depend on
+// which repository carries it, so a filter would save two pages at the price
+// of guessing how archweb spells "KDE-Unstable". Page is the one argument.
+var archwebSearchURL = "https://archlinux.org/packages/search/json/?limit=250&page=%d"
+
+// maxArchwebPages bounds the paging. archlinux.org says how many pages it
+// has and fetchMaintainers believes it — up to here, six times the corpus.
+// Past that the number is wrong, and a run that kept believing it would
+// spend its deadline on archlinux.org instead of on PKGBUILDs.
+const maxArchwebPages = 400
+
+// archwebPage is one page of the package search, reduced to what is read of
+// it: whether the query was accepted, how many pages there are, and each
+// package's base and maintainers.
+type archwebPage struct {
+	Valid    bool `json:"valid"`
+	NumPages int  `json:"num_pages"`
+	Results  []struct {
+		PkgBase     string   `json:"pkgbase"`
+		Maintainers []string `json:"maintainers"`
+	} `json:"results"`
+}
+
+// loadMaintainers returns each official package base's maintainers, from a
+// same-day cached copy or by paging through archlinux.org's package search.
+func loadMaintainers(cache string) (map[string][]string, error) {
+	p := filepath.Join(cache, "maintainers.json")
+	if fresh(p) {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		var byBase map[string][]string
+		if err := json.Unmarshal(b, &byBase); err != nil {
+			return nil, fmt.Errorf("%s: %w", p, err)
+		}
+		return byBase, nil
+	}
+	byBase, err := fetchMaintainers()
+	if err != nil {
+		return nil, fmt.Errorf("archlinux.org package search: %w", err)
+	}
+	// Written whole and renamed into place, as download does: a run killed
+	// mid-write must not leave a fresh-looking half of a file for its rerun
+	// to fail on.
+	if err := writeJSON(p+".tmp", byBase); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(p+".tmp", p); err != nil {
+		return nil, err
+	}
+	log.Printf("archlinux.org: maintainers for %d package bases", len(byBase))
+	return byBase, nil
+}
+
+// fetchMaintainers pages through the search, stopping where archlinux.org
+// says the pages end. That is the only stop there is: a page past the last is
+// answered with the last page over again, not with an error or an empty one,
+// so a loop that ran until nothing came back would never finish.
+func fetchMaintainers() (map[string][]string, error) {
+	byBase := map[string][]string{}
+	for page, last := 1, 1; page <= last; page++ {
+		var pg archwebPage
+		if err := getJSON(fmt.Sprintf(archwebSearchURL, page), &pg); err != nil {
+			return nil, err
+		}
+		if !pg.Valid {
+			return nil, fmt.Errorf("page %d: query rejected", page)
+		}
+		if pg.NumPages > maxArchwebPages {
+			return nil, fmt.Errorf("page %d: %d pages claimed, more than the %d this reads", page, pg.NumPages, maxArchwebPages)
+		}
+		// Re-read from every page rather than trusted from the first: a
+		// package added or dropped mid-sweep moves the end.
+		last = pg.NumPages
+		for _, r := range pg.Results {
+			if _, seen := byBase[r.PkgBase]; seen || r.PkgBase == "" {
+				continue
+			}
+			// Sorted: archweb lists them in no particular order, and the
+			// page should not reword itself from one night to the next over
+			// nothing.
+			byBase[r.PkgBase] = slices.Sorted(slices.Values(r.Maintainers))
+		}
+	}
+	return byBase, nil
 }
 
 // maxDescBytes bounds one desc entry. A real one is a few kilobytes.
@@ -291,9 +399,9 @@ func snapshotSource(m metaPackage) (string, error) {
 }
 
 // Official reports whether the package comes from an official repository
-// rather than the AUR. Templates branch on it: an official package has a
-// packager and a GitLab project where an AUR package has a maintainer, votes
-// and an AUR page.
+// rather than the AUR. Templates branch on it: an official package has
+// maintainers, a packager and a GitLab project where an AUR package has a
+// maintainer, co-maintainers, votes and an AUR page.
 func (r siteResult) Official() bool {
 	return r.Repo != "" && r.Repo != aurRepo
 }

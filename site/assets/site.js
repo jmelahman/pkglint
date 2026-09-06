@@ -150,20 +150,23 @@
   // co-maintainer can push to the package just as the maintainer can, so a
   // query for who maintains it has to find them too. Both keep their own
   // haystack as well, for the "@" query, and their real casing for display.
-  // An official package has a packager where an AUR package has a
-  // maintainer, and the packager goes where the maintainer would.
-  function entry(name, grade, findings, votes, desc, maintainer, drift, comaint, repo, packager) {
+  // An official package has a packager and its maintainers on archlinux.org
+  // where an AUR package has a maintainer and co-maintainers; they go where
+  // the maintainer would, the maintainers space-joined as the co-maintainers
+  // are.
+  function entry(name, grade, findings, votes, desc, maintainer, drift, comaint, repo, packager, maintainers) {
     var m = maintainer || "";
     var co = comaint || "";
     var r = repo || "aur";
     var p = packager || "";
+    var ms = maintainers || "";
     return {
       name: name, grade: grade, findings: findings, votes: votes,
       desc: desc || "", maintainer: m, comaint: co, drift: !!drift,
-      repo: r, packager: p, official: r !== "aur",
-      mtext: (m + " " + co + " " + p).toLowerCase(),
+      repo: r, packager: p, maintainers: ms, official: r !== "aur",
+      mtext: (m + " " + co + " " + p + " " + ms).toLowerCase(),
       text: (grade + " " + name + " " + r + " " + findings + " " + votes + " " +
-        (desc || "") + " " + m + " " + co + " " + p).toLowerCase()
+        (desc || "") + " " + m + " " + co + " " + p + " " + ms).toLowerCase()
     };
   }
 
@@ -173,7 +176,7 @@
     return entry(tr.dataset.name, tr.dataset.grade, +tr.dataset.findings,
       +tr.dataset.votes, tr.cells[5] ? tr.cells[5].textContent : "",
       tr.dataset.maintainer, tr.querySelector(".drift"), tr.dataset.comaintainers,
-      tr.dataset.repo, tr.dataset.packager);
+      tr.dataset.repo, tr.dataset.packager, tr.dataset.maintainers);
   });
   var loaded = false;   // roster.json has replaced the seeded model
   var sortCol = null;   // null means "the order it was served in"
@@ -190,8 +193,12 @@
   // a row matched on a handle say why, spelled once for the rows this script
   // builds exactly as the server spells it for the rows it sent.
   function maintainedBy(e) {
-    if (e.official) return e.packager ? "packaged by " + e.packager : "";
     var parts = [];
+    if (e.official) {
+      if (e.maintainers) parts.push("maintained by " + e.maintainers.split(" ").join(", "));
+      if (e.packager) parts.push("packaged by " + e.packager);
+      return parts.join(", ");
+    }
     if (e.maintainer) parts.push("maintained by " + e.maintainer);
     if (e.comaint) parts.push("co-maintained by " + e.comaint.split(" ").join(", "));
     return parts.join(", ");
@@ -205,6 +212,7 @@
     tr.dataset.maintainer = e.maintainer;
     tr.dataset.comaintainers = e.comaint;
     tr.dataset.packager = e.packager;
+    tr.dataset.maintainers = e.maintainers;
     tr.dataset.findings = e.findings;
     tr.dataset.votes = e.votes;
 
@@ -492,7 +500,7 @@
       .then(function (rows) {
         if (!rows || !rows.length) return;
         model = rows.map(function (r) {
-          return entry(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]);
+          return entry(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10]);
         });
         loaded = true;
         rest.textContent = "Searching all " + model.length + " packages. ";

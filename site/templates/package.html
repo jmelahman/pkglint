@@ -16,12 +16,14 @@
         <p class="eyebrow"><a href="{{.Root}}index.html">AUR report card</a></p>
         <h1>{{.R.Name}}</h1>
         {{/* The facts are what the repository says about the package: the AUR
-             has maintainers and votes, an official repository a packager;
-             both have a page for the package and a place its PKGBUILD lives. */}}
+             has a maintainer, co-maintainers and votes; an official repository
+             has its maintainers on archlinux.org and a packager; both have a
+             page for the package and a place its PKGBUILD lives. */}}
         <p class="facts">
           <span class="repo repo-{{.R.Repo}}">{{.R.Repo}}</span>
           <b>{{.R.Version}}</b>
           {{if .R.Official}}
+          {{with .R.Maintainers}}<span>maintained by {{join . ", "}}</span>{{end}}
           {{with .R.Packager}}<span>packaged by {{.}}</span>{{end}}
           <a href="{{.R.PageURL}}">Arch Linux page</a>
           <a href="{{.R.SourceURL}}">PKGBUILD</a>

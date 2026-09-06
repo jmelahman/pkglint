@@ -81,7 +81,7 @@ func TestWriteRosterRowShape(t *testing.T) {
 		Findings: []rules.Finding{{RuleID: "PB101"}, {RuleID: "PB102"}},
 		Drift:    []string{"a note"},
 	}, {
-		Name: "plain", Repo: "extra", Grade: "A", Packager: "Somebody Else",
+		Name: "plain", Repo: "extra", Grade: "A", Packager: "Somebody Else", Maintainers: []string{"anthraxx", "dvzrv"},
 	}}
 	if err := writeRoster(out, results); err != nil {
 		t.Fatal(err)
@@ -100,15 +100,16 @@ func TestWriteRosterRowShape(t *testing.T) {
 	// Co-maintainers are one space-joined string, the shape the row's
 	// data-comaintainers attribute uses, so site.js folds one value into its
 	// haystacks whichever way a row arrived.
-	// The repository and packager ride at the end, where an AUR row's
-	// packager is "" and an official row's maintainer is.
-	want := []any{"demo", "C", 2.0, 42.0, "a demo", "someone", 1.0, "alice bob", "aur", ""}
+	// The repository, packager and archlinux.org maintainers ride at the end,
+	// where an AUR row's packager and maintainers are "" and an official row's
+	// maintainer is — the maintainers space-joined like the co-maintainers.
+	want := []any{"demo", "C", 2.0, 42.0, "a demo", "someone", 1.0, "alice bob", "aur", "", ""}
 	if !slices.Equal(rows[0], want) {
 		t.Errorf("row = %v, want %v", rows[0], want)
 	}
 	// Drift is 0 and co-maintainers "", not absent: the rows are positional,
 	// so an omitted field would shift or drop every later one.
-	want = []any{"plain", "A", 0.0, 0.0, "", "", 0.0, "", "extra", "Somebody Else"}
+	want = []any{"plain", "A", 0.0, 0.0, "", "", 0.0, "", "extra", "Somebody Else", "anthraxx dvzrv"}
 	if !slices.Equal(rows[1], want) {
 		t.Errorf("official row = %v, want %v", rows[1], want)
 	}

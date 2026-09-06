@@ -1,9 +1,10 @@
 // Command site generates the static Arch report-card website.
 //
-// It downloads the AUR metadata dump and the official repositories' sync
-// databases, selects a seed set of packages (every AUR base modified recently,
-// plus a maintainer's packages and the top-N by votes, plus every base in the
-// official repositories), fetches each package base's snapshot tarball
+// It downloads the AUR metadata dump, the official repositories' sync
+// databases and archlinux.org's maintainer listing, selects a seed set of
+// packages (every AUR base modified recently, plus a maintainer's packages and
+// the top-N by votes, plus every base in the official repositories), fetches
+// each package base's snapshot tarball
 // (cached by LastModified: the AUR's cgit snapshot, or the release tag's
 // archive on GitLab — see official.go), runs pkglint in-process, and renders a
 // static site: an index, a page per package, a page per rule, alphabetical
@@ -91,9 +92,12 @@ type metaPackage struct {
 
 	// Repo is the repository the package came from, "" or aurRepo for the
 	// AUR. Packager is who built the official package, from its %PACKAGER%
-	// line; an AUR package has a maintainer instead. Neither is in the dump.
-	Repo     string `json:"-"`
-	Packager string `json:"-"`
+	// line, and Maintainers who answer for it on archlinux.org, by username
+	// (official.go); an AUR package has a maintainer and co-maintainers
+	// instead. None of the three is in the dump.
+	Repo        string   `json:"-"`
+	Packager    string   `json:"-"`
+	Maintainers []string `json:"-"`
 }
 
 // repo is the package's repository, spelling out the AUR for the zero value.
@@ -114,9 +118,12 @@ type siteResult struct {
 	// Co-maintainers can push to the package just as the maintainer can, so
 	// everywhere the site says or matches who maintains a package, they count.
 	CoMaintainers []string `json:"co_maintainers,omitempty"`
-	// Packager is who built an official package. It plays the maintainer's
-	// part everywhere the site says or matches who answers for a package.
+	// Packager is who built an official package, and Maintainers who answer
+	// for it on archlinux.org, by username. Together they play the
+	// maintainer's part everywhere the site says or matches who answers for
+	// a package.
 	Packager     string          `json:"packager,omitempty"`
+	Maintainers  []string        `json:"maintainers,omitempty"`
 	Votes        int             `json:"votes"`
 	Grade        string          `json:"grade"`
 	Findings     []rules.Finding `json:"findings"`
@@ -461,15 +468,16 @@ func selectSeed(meta, official []metaPackage, maintainer string, top, sinceDays 
 	return seed
 }
 
-// maintains reports whether who can push to m: as its maintainer, or as one of
-// its co-maintainers. The -maintainer flag exists so somebody can keep every
+// maintains reports whether who can push to m: as its maintainer, as one of
+// its co-maintainers, or as one of an official package's maintainers on
+// archlinux.org. The -maintainer flag exists so somebody can keep every
 // package they answer for on the site, and co-maintainership is answering for
 // a package under another title.
 func maintains(m metaPackage, who string) bool {
 	if m.Maintainer != nil && *m.Maintainer == who {
 		return true
 	}
-	return slices.Contains(m.CoMaintainers, who)
+	return slices.Contains(m.CoMaintainers, who) || slices.Contains(m.Maintainers, who)
 }
 
 // scanBatch is how many fetches run between state checkpoints. At the
@@ -646,7 +654,7 @@ func resultFrom(m metaPackage, rec stateRecord) siteResult {
 func newResult(m metaPackage) siteResult {
 	res := siteResult{
 		Name: m.PackageBase, Base: m.PackageBase, Repo: m.repo(), Version: m.Version,
-		Description: m.Description, CoMaintainers: m.CoMaintainers, Packager: m.Packager,
+		Description: m.Description, CoMaintainers: m.CoMaintainers, Packager: m.Packager, Maintainers: m.Maintainers,
 		Votes: m.NumVotes, LastModified: m.LastModified,
 		Findings: []rules.Finding{},
 	}
@@ -800,10 +808,14 @@ var throttle = time.NewTicker(500 * time.Millisecond)
 // throttles paces the hosts with their own limits. GitLab allows an
 // unauthenticated client 600 web requests in ten minutes and counts an
 // archive download as one of them; 1.2s apart is 500, with room for the
-// retries. The tickers are shared across workers, so -jobs cannot raise the
-// rate at any host, only overlap one host's fetch with another's.
+// retries. archlinux.org publishes no limit, but each page of its package
+// search is a database render rather than a file off a mirror, so the
+// nightly sweep of some 64 pages goes a second apart. The tickers are shared
+// across workers, so -jobs cannot raise the rate at any host, only overlap
+// one host's fetch with another's.
 var throttles = map[string]*time.Ticker{
 	"gitlab.archlinux.org": time.NewTicker(1200 * time.Millisecond),
+	"archlinux.org":        time.NewTicker(time.Second),
 }
 
 // throttleFor is the ticker a request to url waits on.
@@ -877,6 +889,21 @@ func downloadOnce(url, path string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// getJSON is a throttled GET decoded as JSON, its body bounded as any other
+// download's is. A page of HTML where JSON was expected fails in the decoder,
+// on its first byte.
+func getJSON(url string, v any) error {
+	resp, err := get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxDownloadBytes)).Decode(v); err != nil {
+		return fmt.Errorf("GET %s: %w", url, err)
+	}
+	return nil
 }
 
 // getBackoff paces get's retries of 429s, 5xxs and transport errors. A var so

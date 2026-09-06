@@ -48,8 +48,12 @@ a 200 sign-in page, which is why `downloadOnce` refuses HTML. The site's
 namespace is flat: a base in both gets one page, graded from the official
 PKGBUILD, and the AUR copy is logged as shadowed. State records carry `repo`;
 blank means AUR, and a record only counts as prior for a base from the same
-repository. GitLab is throttled per host (`throttles`) under its unauthenticated
-600-per-ten-minutes limit; keep any new host's pacing there too.
+repository. An official base's maintainers are not in the sync database: they
+come from archlinux.org's package-search JSON (`loadMaintainers`), swept whole
+(~64 pages of 250) once a day and cached beside the databases; the packager
+stays the database's `%PACKAGER%` name. GitLab is throttled per host
+(`throttles`) under its unauthenticated 600-per-ten-minutes limit, archlinux.org
+at a page a second; keep any new host's pacing there too.
 
 Local preview, with the published state as a starting point (`-repos ""` for
 an AUR-only run):

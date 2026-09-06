@@ -73,9 +73,11 @@ archives (default: .)`,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, paths []string) error {
 			if listRules {
-				for _, r := range rules.Registry() {
-					fmt.Fprintf(stdout, "%s %-24s %s\n", r.ID, r.Name, r.Doc)
+				colorize, err := colorEnabled(opts.color, stdout)
+				if err != nil {
+					return err
 				}
+				report.RenderRules(stdout, rules.Registry(), colorize)
 				return nil
 			}
 			if err := opts.checkSelect(); err != nil {

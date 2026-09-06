@@ -600,3 +600,71 @@ func TestExceedsThreshold(t *testing.T) {
 		t.Error("warn finding should exceed warn threshold")
 	}
 }
+
+// TestRenderRules pins the --rules layout: a header of registry tokens (ID,
+// name, severity span, fix flag), the doc wrapped under it within 80 columns,
+// and color that is nothing but SGR codes around those trusted tokens.
+func TestRenderRules(t *testing.T) {
+	all := []rules.Rule{
+		{ID: "PB1", Name: "fixed", Severity: rules.Error, Doc: strings.Repeat("word ", 40)},
+		{ID: "PB2", Name: "ranged", Severity: rules.Warn, MaxSeverity: rules.Critical, FixLevel: rules.FixUnsafe, Doc: "short"},
+		{ID: "PB3", Name: "safe", Severity: rules.Info, FixLevel: rules.FixSafe, Doc: "a " + strings.Repeat("x", 100) + " b"},
+	}
+	var plain, colored bytes.Buffer
+	RenderRules(&plain, all, false)
+	RenderRules(&colored, all, true)
+
+	out := plain.String()
+	for _, want := range []string{
+		"PB1 fixed  error\n",
+		"\nPB2 ranged  warn-critical  --unsafe-fix\n      short\n",
+		"PB3 safe  info  --fix\n      a\n      " + strings.Repeat("x", 100) + "\n      b\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plain output missing %q:\n%s", want, out)
+		}
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if n := len([]rune(line)); n > rulesWidth && !strings.Contains(line, "xxx") {
+			t.Errorf("line exceeds %d columns (%d): %q", rulesWidth, n, line)
+		}
+	}
+	if strings.ContainsRune(out, 0x1b) {
+		t.Errorf("plain rendering contains escape codes:\n%q", out)
+	}
+
+	c := colored.String()
+	for _, want := range []string{
+		"\x1b[1mPB1\x1b[0m",
+		"\x1b[33mwarn\x1b[0m-\x1b[1;31mcritical\x1b[0m",
+		"\x1b[33m--unsafe-fix\x1b[0m",
+		"\x1b[32m--fix\x1b[0m",
+	} {
+		if !strings.Contains(c, want) {
+			t.Errorf("colored output missing %q:\n%q", want, c)
+		}
+	}
+	if got := stripSGR(c); got != out {
+		t.Errorf("stripping SGR must yield the plain rendering\n--- stripped ---\n%q\n--- plain ---\n%q", got, out)
+	}
+}
+
+func TestWrapWords(t *testing.T) {
+	cases := []struct {
+		text  string
+		width int
+		want  []string
+	}{
+		{"", 10, nil},
+		{"  spaced   out  ", 10, []string{"spaced out"}},
+		{"one two three four", 9, []string{"one two", "three", "four"}},
+		{"exactly ten", 11, []string{"exactly ten"}},
+		{"ünïcödé counts runes", 7, []string{"ünïcödé", "counts", "runes"}},
+	}
+	for _, c := range cases {
+		got := wrapWords(c.text, c.width)
+		if strings.Join(got, "|") != strings.Join(c.want, "|") {
+			t.Errorf("wrapWords(%q, %d) = %q, want %q", c.text, c.width, got, c.want)
+		}
+	}
+}

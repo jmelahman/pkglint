@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/jmelahman/pkglint/internal/rules"
 )
@@ -466,4 +467,69 @@ func ExceedsThreshold(reports []PackageReport, sev rules.Severity) bool {
 		}
 	}
 	return false
+}
+
+// rulesWidth is the column --rules wraps at: the classic terminal width, so
+// the listing reads in a default-size window and in a pager.
+const rulesWidth = 80
+
+// RenderRules writes the rule listing behind --rules: one header line per
+// rule — ID, name, the severity it reports (a range when it escalates), and
+// the flag that auto-fixes it, if any — followed by its documentation wrapped
+// to rulesWidth. Every token is registry data, so color needs no sanitizing.
+func RenderRules(w io.Writer, all []rules.Rule, color bool) {
+	s := styler(color)
+	for i, r := range all {
+		if i > 0 {
+			fmt.Fprintln(w)
+		}
+		fmt.Fprintf(w, "%s %s  %s", s.wrap(ansiBold, r.ID), r.Name, s.severityRange(r.Severities()))
+		if flag := r.FixLevel.Flag(); flag != "" {
+			code := ansiGreen
+			if !r.FixLevel.Safe() {
+				code = ansiYellow
+			}
+			fmt.Fprintf(w, "  %s", s.wrap(code, flag))
+		}
+		fmt.Fprintln(w)
+		for _, line := range wrapWords(r.Doc, rulesWidth-6) {
+			fmt.Fprintf(w, "      %s\n", line)
+		}
+	}
+}
+
+// severityRange renders a rule's severity span, coloring each end on its own
+// so "warn-critical" reads as both a warning and a critical at a glance.
+func (s styler) severityRange(sr rules.SeverityRange) string {
+	if !sr.Varies() {
+		return s.severity(sr.Low)
+	}
+	return s.severity(sr.Low) + "-" + s.severity(sr.High)
+}
+
+// wrapWords greedily fills lines of at most width characters (measured in
+// runes), breaking on whitespace only; a single word longer than width gets a
+// line of its own rather than being split.
+func wrapWords(text string, width int) []string {
+	var lines []string
+	var line strings.Builder
+	lineLen := 0
+	for _, word := range strings.Fields(text) {
+		wl := utf8.RuneCountInString(word)
+		if lineLen > 0 && lineLen+1+wl > width {
+			lines = append(lines, line.String())
+			line.Reset()
+			lineLen = 0
+		}
+		if lineLen > 0 {
+			line.WriteByte(' ')
+			lineLen++
+		}
+		line.WriteString(word)
+		lineLen += wl
+	}
+	if lineLen > 0 {
+		lines = append(lines, line.String())
+	}
+	return lines
 }

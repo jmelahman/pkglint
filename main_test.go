@@ -949,3 +949,40 @@ func TestNewLocalDBReportsUnreadableRoot(t *testing.T) {
 		}
 	})
 }
+
+// TestRulesFlag covers --rules: every registered rule is listed with its
+// severity and fix flag, --color is honoured, and no line runs past 80 columns.
+func TestRulesFlag(t *testing.T) {
+	var plain bytes.Buffer
+	if code := run([]string{"--rules", "--color=never"}, &plain); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+	out := plain.String()
+	for _, r := range rules.Registry() {
+		if !strings.Contains(out, r.ID+" "+r.Name+"  ") {
+			t.Errorf("rule %s missing from --rules output", r.ID)
+		}
+	}
+	if !strings.Contains(out, "  --fix\n") || !strings.Contains(out, "  --unsafe-fix\n") {
+		t.Errorf("--rules should name the fix flags:\n%s", out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if n := len([]rune(line)); n > 80 {
+			t.Errorf("line exceeds 80 columns (%d): %q", n, line)
+		}
+	}
+	if strings.ContainsRune(out, 0x1b) {
+		t.Errorf("--color=never output contains escape codes")
+	}
+
+	var colored bytes.Buffer
+	if code := run([]string{"--rules", "--color=always"}, &colored); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+	if !strings.Contains(colored.String(), "\x1b[1mPB101\x1b[0m") {
+		t.Errorf("--color=always should bold the rule ID:\n%q", colored.String())
+	}
+	if code := run([]string{"--rules", "--color=sometimes"}, &plain); code != 2 {
+		t.Errorf("bad --color mode with --rules: exit %d, want 2", code)
+	}
+}

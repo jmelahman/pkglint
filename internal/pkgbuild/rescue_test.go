@@ -195,6 +195,11 @@ func TestRescueGivesUp(t *testing.T) {
 		// bash rejects this too: the paren error is outside any heredoc, so
 		// no rescue may apply.
 		{"paren in ordinary command", "build() {\n  echo task(s)\n}\n"},
+		// bash rejects this too: the array literal never closes.
+		{"escaped array close", "source=(a\n        b\\)\nsha256sums=('SKIP')\n"},
+		// A non-empty bad parameter name is not the `${}` spelling the rescue
+		// covers, and must keep the original error.
+		{"non-empty bad parameter name", "a=${%x}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := parseUnit("PKGBUILD", []byte(tc.src), false); err == nil {
@@ -219,5 +224,103 @@ func TestRescueLeavesHealthyInputAlone(t *testing.T) {
 		if v.Values[i] != w {
 			t.Errorf("values[%d] = %q, want %q", i, v.Values[i], w)
 		}
+	}
+}
+
+// TestRescueAssocArrayElement covers a string key written as an element of an
+// array literal — `declare -A m=([2.1.1]=x)` — where the `[` opens a word
+// instead of continuing `name[`. Passes `bash -n`.
+func TestRescueAssocArrayElement(t *testing.T) {
+	src := "declare -gA _binhashes=(\n" +
+		"  [2.1.1]='17372d86935f7541ae0bc7ff0b9eebb721af0cb0'\n" +
+		"  [2.2]='8e308f25a329e6ac3728a69afdc1ef531a24767c'\n" +
+		")\npkgver=2.1.1\n"
+	pkg := loadPKGBUILD(t, src)
+	if string(pkg.PKGBUILD.Raw) != src {
+		t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+	}
+	if v, ok := pkg.Scalar("pkgver"); !ok || v != "2.1.1" {
+		t.Errorf("pkgver = %q, %v; want 2.1.1", v, ok)
+	}
+	if !strings.Contains(string(pkg.PKGBUILD.Raw), "[2.1.1]=") {
+		t.Errorf("subscript text lost from Raw")
+	}
+}
+
+// TestRescueCmdSubstParen covers `$( (cmd) ... )` written without the
+// separating space. Bash retries the failed arithmetic parse as a command
+// substitution; upstream commits to arithmetic and rejects the command's
+// first word as an operator. Both cases pass `bash -n`.
+func TestRescueCmdSubstParen(t *testing.T) {
+	t.Run("pipeline into sed", func(t *testing.T) {
+		src := "pkgver() {\n  local v=$((git describe --tags || echo v0) | sed 's/^v//')\n  echo $v\n}\n"
+		pkg := loadPKGBUILD(t, src)
+		if string(pkg.PKGBUILD.Raw) != src {
+			t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+		}
+		if pkg.PKGBUILD.Functions["pkgver"] == nil {
+			t.Errorf("pkgver() not extracted")
+		}
+		// The restored paren text must survive: findings quote code from Raw.
+		if !strings.Contains(string(pkg.PKGBUILD.Raw), "$((git describe") {
+			t.Errorf("subshell text lost from Raw")
+		}
+	})
+
+	t.Run("top-level assignment", func(t *testing.T) {
+		src := "pkgver=$((curl -sf 'https://example.com/v' || exit 1) | tr -d ' ')\n"
+		pkg := loadPKGBUILD(t, src)
+		if string(pkg.PKGBUILD.Raw) != src {
+			t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+		}
+		if pkg.Vars["pkgver"] == nil {
+			t.Fatal("pkgver not extracted")
+		}
+	})
+
+	// Real arithmetic must not round-trip through the rescue: it closes with
+	// `))`, which is the discriminator bash itself uses.
+	t.Run("healthy arithmetic untouched", func(t *testing.T) {
+		pkg := loadPKGBUILD(t, "a=$((1+2))\nb=$(( (1+2) * 3 ))\n")
+		for _, v := range []string{"a", "b"} {
+			if pkg.Vars[v] == nil {
+				t.Errorf("%s not extracted", v)
+			}
+		}
+	})
+}
+
+// TestRescueEmptyExpansion covers `${}`, which bash defers to expansion time
+// as a "bad substitution" rather than rejecting while parsing, so `bash -n`
+// accepts it and makepkg reads the file's metadata regardless.
+func TestRescueEmptyExpansion(t *testing.T) {
+	src := "build() {\n  test -s Makefile.inc || echo \"${}\"\n}\n"
+	pkg := loadPKGBUILD(t, src)
+	if string(pkg.PKGBUILD.Raw) != src {
+		t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+	}
+	if pkg.PKGBUILD.Functions["build"] == nil {
+		t.Errorf("build() not extracted")
+	}
+}
+
+// TestRescueInvalidUTF8 covers a file that is not valid UTF-8. Bash reads
+// bytes, not runes: a Latin-1 name in a `# Contributor:` line is a file bash
+// parses and upstream refuses to tokenize.
+func TestRescueInvalidUTF8(t *testing.T) {
+	// "Martin L\xfcthi" — Latin-1, as it appears in the wild.
+	src := "# Contributor: Martin L\xfcthi <m@example.net>\npkgname=survex\npkgver=1.4.22\n"
+	pkg := loadPKGBUILD(t, src)
+	if string(pkg.PKGBUILD.Raw) != src {
+		t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+	}
+	if v, ok := pkg.Scalar("pkgname"); !ok || v != "survex" {
+		t.Errorf("pkgname = %q, %v; want survex", v, ok)
+	}
+	// An undecodable byte inside a value must come back too, not just in a
+	// comment: rules render values into findings.
+	pkg = loadPKGBUILD(t, "# \xfc\npkgdesc='caf\xe9 tools'\n")
+	if v, ok := pkg.Scalar("pkgdesc"); !ok || v != "caf\xe9 tools" {
+		t.Errorf("pkgdesc = %q, %v; want %q", v, ok, "caf\xe9 tools")
 	}
 }

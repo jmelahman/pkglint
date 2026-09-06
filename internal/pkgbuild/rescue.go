@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -51,6 +52,17 @@ func rescueParse(path string, raw []byte) *syntax.File {
 		work[i] = '~'
 	}
 
+	// Upstream's lexer requires the whole file to be valid UTF-8. Bash has no
+	// such rule: a byte above ASCII is an ordinary word character whatever its
+	// encoding, so a Latin-1 name in a `# Contributor:` line — the shape seen
+	// in the wild — is a file bash reads and upstream refuses to tokenize.
+	// Each undecodable byte becomes `_`, which is a word character in exactly
+	// the same positions, and is restored afterwards.
+	for _, i := range invalidUTF8(raw) {
+		restore[i] = work[i]
+		work[i] = '_'
+	}
+
 	var f *syntax.File
 	for range 40 {
 		var err error
@@ -64,7 +76,8 @@ func rescueParse(path string, raw []byte) *syntax.File {
 			return nil
 		}
 		if !rescueSubscript(work, off, restore) && !rescueInlineArray(work, msg, off, structural) &&
-			!rescueArithFallback(work, msg, off, restore) && !rescueHeredocText(work, off, restore) {
+			!rescueArithFallback(work, msg, off, restore) && !rescueEmptyExpansion(work, msg, off, restore) &&
+			!rescueCmdSubstParen(work, off, restore) && !rescueHeredocText(work, off, restore) {
 			return nil
 		}
 	}
@@ -89,6 +102,25 @@ func errorAt(err error) (int, string, bool) {
 
 func isIdentByte(b byte) bool {
 	return b == '_' || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9')
+}
+
+// invalidUTF8 returns the offset of every byte that is not part of a valid
+// UTF-8 sequence. Bytes that do decode are left alone, so a file that is UTF-8
+// throughout yields nothing and never reaches a rewrite.
+func invalidUTF8(raw []byte) []int {
+	var out []int
+	for i := 0; i < len(raw); {
+		if raw[i] < utf8.RuneSelf {
+			i++
+			continue
+		}
+		r, size := utf8.DecodeRune(raw[i:])
+		if r == utf8.RuneError && size == 1 {
+			out = append(out, i)
+		}
+		i += size
+	}
+	return out
 }
 
 // wordContinuations returns the offsets of every `=` and `#` that continues a
@@ -129,6 +161,14 @@ func wordContinuations(raw []byte) []int {
 // restored afterwards. The rescued index is an arithmetic variable reference
 // rather than a string key — a shape bash itself cannot decide statically —
 // but its literal carries the original text, so rendered values stay truthful.
+//
+// The same key can appear without a name in front of it, as an element of an
+// array literal: `declare -A sums=(\n  [7.1]=x\n)`. There the `[` opens a
+// word rather than continuing one, so the bracket pair is only accepted when
+// it is immediately followed by `=` — the assignment shape a glob is never in.
+// Upstream would have taken a glob as a plain literal and not errored here at
+// all, so reaching this point already means it read the brackets as a
+// subscript.
 func rescueSubscript(work []byte, off int, restore map[int]byte) bool {
 	if off >= len(work) {
 		return false
@@ -143,7 +183,15 @@ func rescueSubscript(work []byte, off int, restore map[int]byte) bool {
 			return false
 		}
 	}
-	if lb <= 0 || !isIdentByte(work[lb-1]) {
+	if lb <= 0 {
+		return false
+	}
+	element := false
+	switch b := work[lb-1]; {
+	case isIdentByte(b):
+	case b == ' ' || b == '\t' || b == '\n' || b == '(':
+		element = true
+	default:
 		return false
 	}
 	rb := -1
@@ -163,10 +211,16 @@ func rescueSubscript(work []byte, off int, restore map[int]byte) bool {
 	if rb < 0 || rb == lb+1 || rb+1 >= len(work) {
 		return false
 	}
-	switch work[rb+1] {
-	case '=', '+', '}', ':', '-', '?', '%', '#', '/', '^', ',':
-	default:
-		return false
+	if element {
+		if work[rb+1] != '=' {
+			return false
+		}
+	} else {
+		switch work[rb+1] {
+		case '=', '+', '}', ':', '-', '?', '%', '#', '/', '^', ',':
+		default:
+			return false
+		}
 	}
 	changed := false
 	for i := lb + 1; i < rb; i++ {
@@ -240,6 +294,78 @@ func rescueArithFallback(work []byte, msg string, off int, restore map[int]byte)
 		return false
 	}
 	for _, i := range []int{off + 2, off + 3, q, q + 1} {
+		if work[i] == '_' {
+			return false // already rewritten once; do not loop
+		}
+		if _, seen := restore[i]; !seen {
+			restore[i] = work[i]
+		}
+		work[i] = '_'
+	}
+	return true
+}
+
+// rescueEmptyExpansion handles `${}`. Bash decides a parameter expansion's
+// name when it expands it, so an empty one is a run-time "bad substitution"
+// and not a parse error: `bash -n` accepts a file containing it, and makepkg
+// reads such a PKGBUILD's metadata without ever running the line. Upstream
+// rejects it while lexing. The `$` is blanked to `_`, leaving the plain word
+// `_{}`, and restored afterwards; the rescued node is literal text rather
+// than an expansion, which is what an expansion of nothing amounts to.
+func rescueEmptyExpansion(work []byte, msg string, off int, restore map[int]byte) bool {
+	if !strings.Contains(msg, "invalid parameter name") {
+		return false
+	}
+	// Only the empty spelling. Any other name upstream rejects is one bash
+	// rejects too, and must keep the original error.
+	if off < 2 || off >= len(work) || work[off] != '}' || work[off-1] != '{' || work[off-2] != '$' {
+		return false
+	}
+	i := off - 2
+	if work[i] == '_' {
+		return false // already rewritten once; do not loop
+	}
+	if _, seen := restore[i]; !seen {
+		restore[i] = work[i]
+	}
+	work[i] = '_'
+	return true
+}
+
+// rescueCmdSubstParen handles a command substitution whose first command is a
+// subshell, written without the separating space: `$((cd "$srcdir" && pwd) |
+// tr -d /)`. Bash resolves the `$((` ambiguity by attempting an arithmetic
+// expansion and re-reading the construct as a command substitution when that
+// attempt fails; upstream commits to arithmetic and reports the first word of
+// the command as a bad operator. The subshell's own paren pair is blanked to
+// `_`, so the construct lexes as an ordinary command substitution whose first
+// word merely starts with an underscore, and both bytes are restored
+// afterwards.
+//
+// rescueArithFallback covers the neighbouring `$((( cmd )) ...)` spelling,
+// where the inner command is arithmetic rather than a subshell and upstream
+// fails at the end of the construct instead of inside it.
+func rescueCmdSubstParen(work []byte, off int, restore map[int]byte) bool {
+	// The nearest `$((` at or before the failure is the construct upstream is
+	// inside; anything earlier belongs to an expansion that already closed.
+	p := -1
+	for i := min(off, len(work)-1); i >= 2; i-- {
+		if work[i] == '(' && work[i-1] == '(' && work[i-2] == '$' {
+			p = i - 2
+			break
+		}
+	}
+	if p < 0 || p+3 >= len(work) {
+		return false
+	}
+	// Bash's own discriminator, applied statically: a real arithmetic
+	// expansion closes with `))`, so an inner paren that closes alone is a
+	// subshell and the construct is a command substitution.
+	q := arrayEnd(work, p+3)
+	if q < 0 || q+1 >= len(work) || work[q+1] == ')' {
+		return false
+	}
+	for _, i := range []int{p + 2, q} {
 		if work[i] == '_' {
 			return false // already rewritten once; do not loop
 		}

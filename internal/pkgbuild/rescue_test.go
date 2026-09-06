@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -281,6 +282,20 @@ func TestRescueCmdSubstParen(t *testing.T) {
 		}
 	})
 
+	// A subshell whose command reads as arithmetic (`(ls) | wc - l` is a
+	// valid expression) fails only at the missing `))`, which upstream reports
+	// at the construct's `$` rather than inside it.
+	t.Run("command that reads as arithmetic", func(t *testing.T) {
+		src := "pkgver() {\n  n=$((ls) | wc -l)\n  echo $n\n}\n"
+		pkg := loadPKGBUILD(t, src)
+		if string(pkg.PKGBUILD.Raw) != src {
+			t.Errorf("Raw was modified:\n%q", pkg.PKGBUILD.Raw)
+		}
+		if pkg.PKGBUILD.Functions["pkgver"] == nil {
+			t.Errorf("pkgver() not extracted")
+		}
+	})
+
 	// Real arithmetic must not round-trip through the rescue: it closes with
 	// `))`, which is the discriminator bash itself uses.
 	t.Run("healthy arithmetic untouched", func(t *testing.T) {
@@ -289,6 +304,30 @@ func TestRescueCmdSubstParen(t *testing.T) {
 			if pkg.Vars[v] == nil {
 				t.Errorf("%s not extracted", v)
 			}
+		}
+	})
+
+	// The rewrite is structural and never restored, so it must only touch the
+	// construct upstream failed in. A `$((` that is inert text — in a comment,
+	// in a single-quoted value — ahead of an unrelated failure (here a heredoc
+	// the heredoc rescue recovers) must come through byte-for-byte: rules
+	// render those values.
+	t.Run("unrelated text untouched", func(t *testing.T) {
+		src := "# see $((foo) bar\n_note='$((foo) bar'\n" +
+			"package() {\n  cat <<EOF\nNotes:\n```\nfoo(s) bar\n```\nUses `file`, see $pkgdir docs.\nEOF\n}\n"
+		pkg := loadPKGBUILD(t, src)
+		if v, ok := pkg.Scalar("_note"); !ok || v != "$((foo) bar" {
+			t.Errorf("_note = %q, %v; want %q", v, ok, "$((foo) bar")
+		}
+		var comments []string
+		syntax.Walk(pkg.PKGBUILD.File, func(n syntax.Node) bool {
+			if c, ok := n.(*syntax.Comment); ok {
+				comments = append(comments, c.Text)
+			}
+			return true
+		})
+		if !slices.Contains(comments, " see $((foo) bar") {
+			t.Errorf("comments = %q, want the original text among them", comments)
 		}
 	})
 }
@@ -325,6 +364,27 @@ func TestRescueInvalidUTF8(t *testing.T) {
 	pkg = loadPKGBUILD(t, "# \xfc\npkgdesc='caf\xe9 tools'\n")
 	if v, ok := pkg.Scalar("pkgdesc"); !ok || v != "caf\xe9 tools" {
 		t.Errorf("pkgdesc = %q, %v; want %q", v, ok, "caf\xe9 tools")
+	}
+}
+
+// TestRescueScalesWithRestoredBytes pins restoreBytes to sub-quadratic time.
+// A Latin-1 file puts one restore entry per undecodable byte; this input has
+// sixty thousand of them across as many literals, and sweeping the whole map
+// once per literal took over a minute here against well under a second now.
+// The bound is loose enough for a slow runner under -race and far below the
+// quadratic time.
+func TestRescueScalesWithRestoredBytes(t *testing.T) {
+	src := strings.Repeat("echo \xe9\n", 60000)
+	start := time.Now()
+	u, err := parseUnit("PKGBUILD", []byte(src), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 15*time.Second {
+		t.Errorf("parse took %v; restoreBytes is sweeping every restored byte per literal again", d)
+	}
+	if n := len(u.TopLevel); n != 60000 {
+		t.Errorf("got %d statements, want 60000", n)
 	}
 }
 

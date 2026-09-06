@@ -3,6 +3,8 @@ package pkgbuild
 import (
 	"bytes"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -34,7 +36,8 @@ func rescueParse(path string, raw []byte) *syntax.File {
 	work := bytes.Clone(raw)
 	// restore maps a rewritten offset to its original byte, which must
 	// resurface in a literal after parsing. structural marks offsets rewritten
-	// into statement separators, which by design do not come back.
+	// into statement separators or whitespace, which by design do not come
+	// back.
 	restore := map[int]byte{}
 	structural := map[int]bool{}
 
@@ -333,9 +336,6 @@ func rescueEmptyExpansion(work []byte, msg string, off int, restore map[int]byte
 		return false
 	}
 	i := off - 2
-	if work[i] == '_' {
-		return false // already rewritten once; do not loop
-	}
 	if _, seen := restore[i]; !seen {
 		restore[i] = work[i]
 	}
@@ -347,26 +347,38 @@ func rescueEmptyExpansion(work []byte, msg string, off int, restore map[int]byte
 // subshell, written without the separating space: `$((cd "$srcdir" && pwd) |
 // tr -d /)`. Bash resolves the `$((` ambiguity by attempting an arithmetic
 // expansion and re-reading the construct as a command substitution when that
-// attempt fails; upstream commits to arithmetic and reports the first word of
-// the command as a bad operator. The subshell's own paren pair is blanked to
-// `_`, so the construct lexes as an ordinary command substitution whose first
-// word merely starts with an underscore, and both bytes are restored
-// afterwards.
+// attempt fails; upstream commits to arithmetic and reports either the first
+// word of the command as a bad operator or, when the command happens to read
+// as arithmetic (`$((ls) | wc -l)`), the missing `))` at the construct's `$`.
+// The subshell's own paren pair is blanked to spaces, so the construct lexes
+// as an ordinary command substitution whose first command is the subshell's;
+// the grouping is lost, which is recorded as structural rather than restored.
 //
 // rescueArithFallback covers the neighbouring `$((( cmd )) ...)` spelling,
 // where the inner command is arithmetic rather than a subshell and upstream
 // fails at the end of the construct instead of inside it.
 func rescueCmdSubstParen(work []byte, off int, structural map[int]bool) bool {
-	// The nearest `$((` at or before the failure is the construct upstream is
-	// inside; anything earlier belongs to an expansion that already closed.
+	// The nearest `$((` opening at or before the failure. Both of upstream's
+	// errors land at or after the construct's `$`, so this is the construct
+	// it is inside — provided the failure also lies before the construct
+	// closes, which is checked below.
 	p := -1
-	for i := min(off, len(work)-1); i >= 2; i-- {
-		if work[i] == '(' && work[i-1] == '(' && work[i-2] == '$' {
-			p = i - 2
+	for i := min(off, len(work)-3); i >= 0; i-- {
+		if work[i] == '$' && work[i+1] == '(' && work[i+2] == '(' {
+			p = i
 			break
 		}
 	}
-	if p < 0 || p+3 >= len(work) {
+	if p < 0 {
+		return false
+	}
+	// A `$((` that closed before the failing offset is not the construct
+	// upstream is inside, and neither is one sitting in a comment or a
+	// quoted string ahead of an unrelated failure. Rewriting it would hand
+	// the rules text that is not in the file, since the rewrite below is
+	// never restored.
+	end := arrayEnd(work, p+2)
+	if end < 0 || off > end {
 		return false
 	}
 	// Bash's own discriminator, applied statically: a real arithmetic
@@ -375,9 +387,6 @@ func rescueCmdSubstParen(work []byte, off int, structural map[int]bool) bool {
 	q := arrayEnd(work, p+3)
 	if q < 0 || q+1 >= len(work) || work[q+1] == ')' {
 		return false
-	}
-	if structural[p+2] || structural[q] {
-		return false // already rewritten once; do not loop
 	}
 	// Both parens become spaces rather than word characters. Blanking them to
 	// `_` the way the other rescues do would glue the byte onto the subshell's
@@ -525,20 +534,20 @@ func restoreBytes(f *syntax.File, restore map[int]byte) bool {
 	if len(restore) == 0 {
 		return true
 	}
-	done := map[int]bool{}
+	// Sorted, so each literal finds its own offsets by binary search rather
+	// than a sweep of the whole map: a Latin-1 file contributes an entry per
+	// undecodable byte, and the sweep made a 200 KiB one take tens of seconds.
+	offs := slices.Sorted(maps.Keys(restore))
+	done := make([]bool, len(offs))
 	patch := func(val string, start int) string {
-		var b []byte
-		for off, orig := range restore {
-			if off >= start && off < start+len(val) {
-				if b == nil {
-					b = []byte(val)
-				}
-				b[off-start] = orig
-				done[off] = true
-			}
-		}
-		if b == nil {
+		i, _ := slices.BinarySearch(offs, start)
+		if i == len(offs) || offs[i] >= start+len(val) {
 			return val
+		}
+		b := []byte(val)
+		for ; i < len(offs) && offs[i] < start+len(val); i++ {
+			b[offs[i]-start] = restore[offs[i]]
+			done[i] = true
 		}
 		return string(b)
 	}
@@ -558,10 +567,5 @@ func restoreBytes(f *syntax.File, restore map[int]byte) bool {
 		}
 		return true
 	})
-	for off := range restore {
-		if !done[off] {
-			return false
-		}
-	}
-	return true
+	return !slices.Contains(done, false)
 }

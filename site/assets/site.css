@@ -355,8 +355,12 @@ p { max-width: var(--measure); }
 .keys .explain summary { grid-column: 2; justify-self: start; }
 .keys .explain > div, .keys .explain::details-content { grid-column: 1 / -1; }
 .rkeys { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+/* A flex box rather than inline-block: the button inherits the body's
+   15px/1.6 line, whose strut is taller than the chip and, with Plex Sans'
+   ascent exceeding its descent, leaves the slack above the chip. A flex
+   container lays out no strut, so the chip is centred by its own height. */
 .rkey {
-  display: inline-block; padding: 0.35rem 0.5rem; border: 0; border-radius: 3px;
+  display: inline-flex; align-items: center; padding: 0.35rem 0.5rem; border: 0; border-radius: 3px;
   background: transparent; color: inherit; cursor: default; font: inherit;
 }
 .js .rkey { cursor: pointer; }

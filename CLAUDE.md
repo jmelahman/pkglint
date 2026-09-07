@@ -3,11 +3,11 @@
 Never execute anything from analyzed input: PKGBUILDs are parsed (mvdan.cc/sh),
 package archives are parsed (debug/elf) — no sourcing, no `ldd`, no interpreters.
 This holds absolutely for every analysis path — `lint`, `--fix`, `--add-ignores`,
-all of `internal/`. The single exception is `pkglint build` (`build.go`), which
-runs makepkg because that is the only way to get the artifact the PB8xx rules
-inspect: a separately named verb `pkglint <path>` never reaches, gated on the
-static findings, and confined to the `runCmd`/`lookPath` seams. Do not grow a
-second one.
+all of `internal/`. The single exception is `pkglint build`
+(`internal/cli/build.go`), which runs makepkg because that is the only way to
+get the artifact the PB8xx rules inspect: a separately named verb `pkglint
+<path>` never reaches, gated on the static findings, and confined to the
+`runCmd`/`lookPath` seams. Do not grow a second one.
 
 The gate is the whole justification, so nothing in the analyzed input may weaken
 it: it reads the findings with the file's own `# pkglint: ignore=` directives
@@ -19,7 +19,14 @@ and makepkg's `-p`/`-D` are refused. A new way to reach `runCmd` has to answer
 input: the URL passes `allowedGitURL`'s scheme allowlist, which exists to keep
 git's `ext::` "run this command" transport out. Keep it that way.)
 
-- `go test . -run TestGolden -update` regenerates `testdata/*/expected.txt`.
+- The command lives in `internal/cli`; the module root is a one-line `main`
+  shim over `cli.Main`, which is what keeps `go install
+  github.com/jmelahman/pkglint@latest` resolving. There is deliberately no
+  `cmd/` — a second entry point would only duplicate that shim. `version` is
+  stamped in `internal/cli`, not in `main`, so `.goreleaser.yml` and
+  `hatch_build.py` both name that symbol in `-X`.
+- `go test ./internal/cli -run TestGolden -update` regenerates
+  `internal/cli/testdata/*/expected.txt`.
 - CI enforces a statement-coverage floor (test.yml, `-coverpkg=./...`) and a
   fuzz smoke over the untrusted-input parsers; a crasher found by fuzzing is
   checked in under `*/testdata/fuzz/` as a regression seed. Ratchet the floor

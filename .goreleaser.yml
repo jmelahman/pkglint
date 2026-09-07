@@ -8,6 +8,10 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
+    # goreleaser's default stamps -X main.version, but `version` lives in
+    # internal/cli, behind the root shim, so name that symbol instead.
+    ldflags:
+      - -s -w -X github.com/jmelahman/pkglint/internal/cli.version={{.Version}}
     # pkglint lints Arch PKGBUILDs; these are the same targets the PyPI
     # wheel matrix in .github/workflows/release.yml builds.
     goos:

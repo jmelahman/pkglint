@@ -15,6 +15,10 @@ import manygo
 # pyproject.toml [build-system].requires.
 GO_BIN_PIN = "go-bin==1.26.6"
 
+# Where the binary's version string is stamped: not `main`, since main.go is a
+# shim. .goreleaser.yml stamps the same symbol.
+VERSION_SYMBOL = "github.com/jmelahman/pkglint/internal/cli.version"
+
 
 class GoBinaryBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
@@ -56,7 +60,10 @@ class GoBinaryBuildHook(BuildHookInterface):
         subprocess.check_call(  # noqa: S603
             [
                 go, "build", "-trimpath",
-                "-ldflags", f"-s -w -X main.version={self.metadata.version}",
+                # `version` lives in internal/cli, behind the root shim, so
+                # -X names that package and not main.
+                "-ldflags",
+                f"-s -w -X {VERSION_SYMBOL}={self.metadata.version}",
                 "-o", str(Path(self.root) / binary_name),
                 ".",
             ],

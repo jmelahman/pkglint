@@ -1,4 +1,4 @@
-package main
+package cli
 
 // `pkglint build` is the one place pkglint runs a program on the user's
 // behalf. Every analysis path in this repo — lint, --fix, --add-ignores, all

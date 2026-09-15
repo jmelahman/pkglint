@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qemu-android-x86 — AUR Report Card</title>
+<meta name="description" content="pkglint grade A for aur/qemu-android-x86: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/qemu-android-x86.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="qemu-android-x86 — AUR Report Card">
+<meta property="og:description" content="pkglint grade A for aur/qemu-android-x86: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/qemu-android-x86.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-A" title="grade A">A</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>qemu-android-x86</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>9.0.r2-2</b>
+          
+          <span>maintained by jillkamper</span>
+          
+          <span>10 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/qemu-android-x86">AUR page</a>
+          
+          <a href="../badge/qemu-android-x86.svg">badge</a>
+        </p>
+        <p>Android-x86 environment via QEMU and VirGL</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 9</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;Apache&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 9</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;GPL2&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 13</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;osdn.net&#34; differs from project url host &#34;www.android-x86.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 14</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;upload.wikimedia.org&#34; differs from project url host &#34;www.android-x86.org&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+    <p class="file">qemu-android-x86.install</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 2</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          gtk-update-icon-cache is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 3</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          update-desktop-database is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

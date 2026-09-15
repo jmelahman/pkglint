@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tg-ws-proxy-git — AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/tg-ws-proxy-git: 8 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/tg-ws-proxy-git.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="tg-ws-proxy-git — AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/tg-ws-proxy-git: 8 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/tg-ws-proxy-git.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>tg-ws-proxy-git</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1.10.0.r0.gb2a8074-1</b>
+          
+          <span>maintained by gogamlg3</span>
+          
+          <span>3 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/tg-ws-proxy-git">AUR page</a>
+          
+          <a href="../badge/tg-ws-proxy-git.svg">badge</a>
+        </p>
+        <p>Local MTProto proxy server for partial bypassing of Telegram loading</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 8</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 2</div>
+        <div class="rid"><a href="../rules/PB961.html">PB961</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          &#34;tg-ws-proxy-git&#34; builds the same software as &#34;tg-ws-proxy&#34; but declares neither provides=(tg-ws-proxy) nor conflicts=(tg-ws-proxy), so both can be installed at once and nothing can depend on either
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 12</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;python&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB201.html">PB201</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pip downloads during build(); network access belongs in prepare() with pinned hashes
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB210.html">PB210</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          pip install fetches &#34;pip&#34; at whatever version PyPI serves at build time and runs its build backend; declare the module as a python-* makedepends entry
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB201.html">PB201</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pip downloads during build(); network access belongs in prepare() with pinned hashes
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 37</div>
+        <div class="rid"><a href="../rules/PB202.html">PB202</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pip install without --require-hashes: downloads are not verified against pinned digests
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB201.html">PB201</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pip downloads during build(); network access belongs in prepare() with pinned hashes
+          </div>
+      </div>
+      
+      <div class="finding sev-error">
+        <div class="loc">line 38</div>
+        <div class="rid"><a href="../rules/PB210.html">PB210</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          pip install fetches &#34;pyinstaller&#34; at whatever version PyPI serves at build time and runs its build backend; declare the module as a python-* makedepends entry
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

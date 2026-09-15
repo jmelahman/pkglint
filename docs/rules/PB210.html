@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB210: adhoc-package-install — AUR Report Card</title>
+<meta name="description" content="PB210 (adhoc-package-install): A package named on a package manager&#39;s command line — `npm install axios`, `pip install requests`, `npx some-tool`, `gem install rails`, `cargo install foo` — is…">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB210.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB210: adhoc-package-install — AUR Report Card">
+<meta property="og:description" content="PB210 (adhoc-package-install): A package named on a package manager&#39;s command line — `npm install axios`, `pip install requests`, `npx some-tool`, `gem install rails`, `cargo install foo` — is…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB210.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB210</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">adhoc-package-install</span></h1>
+    
+    <p class="lede">A package named on a package manager&#39;s command line — <code>npm install axios</code>, <code>pip install requests</code>, <code>npx some-tool</code>, <code>gem install rails</code>, <code>cargo install foo</code> — is fetched from a registry at build time, or at install time from a scriptlet, with nothing in the PKGBUILD verifying what arrives: the registry serves whatever it has at that moment, makepkg&#39;s checksums never see it, and npm, pip, gem, composer and cargo all run code out of the package the moment it lands. This is the shape of the 2025 AUR compromises: a <code>post_install</code> or <code>prepare()</code> gaining an <code>npm install</code> of a few registry packages whose postinstall scripts carried the payload. Install a project&#39;s dependencies from its own manifest and lockfile (<code>npm ci</code>, <code>pip install -r</code> with hashes, <code>bundle install --frozen</code>), declare a tool the build needs in makedepends, or build it from a checksummed source= entry. A spec pinned to an exact version or a full commit is at least reproducible, and is reported at Warn rather than Error; so is a package word pkglint cannot read (<code>npm install $_deps</code>), which could name anything.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>prepare() {
+  npm install axios uuid   # whatever the registry serves today, postinstall scripts and all
+}</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>makedepends=(npm)
+build() {
+  npm ci   # the project&#39;s own package.json, pinned by its lockfile
+}</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB210</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB210</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <a href="PB209.html">&larr; PB209 uv-poetry-unlocked</a>
+      <a href="PB301.html">PB301 top-level-execution &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

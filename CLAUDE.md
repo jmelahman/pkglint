@@ -15,6 +15,13 @@ disregarded, a file argument must be the `PKGBUILD` makepkg will actually build,
 and makepkg's `-p`/`-D` are refused. A new way to reach `runCmd` has to answer
 "could a PKGBUILD talk its way through this?" first.
 
+`pkglint build --fix` is the one place a fix reads two files: a PB8xx finding
+comes out of the archive and the remedy is a line of the PKGBUILD. The archive
+never supplies text — the owner names written come from the pacman local
+database — and the fixers re-check the pairing themselves
+(`fixablePackageArchive`), so a mismatched pair yields no edit. Keep both
+properties on any fix added to `internal/rules/fixpkg.go`.
+
 (`--fix` does start `git ls-remote` to resolve a VCS ref — a subprocess, not the
 input: the URL passes `allowedGitURL`'s scheme allowlist, which exists to keep
 git's `ext::` "run this command" transport out. Keep it that way.)

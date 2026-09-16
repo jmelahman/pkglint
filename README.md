@@ -152,6 +152,23 @@ mechanical rewrite print a one-line suggestion instead (`updpkgsums` for
 checksums, `makepkg --printsrcinfo` for a stale `.SRCINFO`), computed from what
 is left _after_ fixing.
 
+**From the build — `pkglint build --fix`**
+
+| Rules | What it does                                                                                                                                  |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| PB809 | Add to `depends` the package that owns a library the built binaries link and nothing in `depends` reaches (`usr/bin/demo` → `libc.so.6` → `glibc`) |
+
+The built-package rules judge an artifact, so their fixes live on the one
+command that has both: `pkglint build --fix` lints the PKGBUILD, builds it,
+lints the archive, and writes the answer back into the PKGBUILD it built
+(`--diff` previews, `--unsafe-fix` widens the tier as it does elsewhere). It
+only touches a PKGBUILD that declares exactly one package, since a split
+PKGBUILD's `depends` belongs to each `package_<name>()` rather than to the
+file, and only the `error` gaps — a library reached transitively or through an
+`optdepends` is a judgement the maintainer makes. The gate runs first, as
+always: a build that is refused produces no archive and fixes nothing. The
+PKGBUILD-scope fixes above stay with `pkglint --fix`.
+
 The PB102 fix hashes sources **already downloaded** into the package directory
 or `$SRCDEST` — pkglint never fetches a source — and writes a digest only after
 re-computing the existing `md5`/`sha1` from the same bytes and finding it

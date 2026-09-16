@@ -94,7 +94,9 @@ var packageRules = []Rule{
 			"when only an optdepends does, and informationally when coverage is transitive (it " +
 			"breaks silently when the middleman drops its own dependency) or the library cannot " +
 			"be resolved on this system. Needs the pacman local database.",
-		Check: checkMissingLibDeps,
+		Check:    checkMissingLibDeps,
+		FixLevel: FixSafe,
+		Fix:      fixMissingLibDeps,
 	},
 	{
 		ID: "PB810", Name: "unused-linked-library", Scope: ScopePackage,

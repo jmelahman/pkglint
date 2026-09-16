@@ -46,6 +46,12 @@ var (
 	lookPath = exec.LookPath
 )
 
+// localDBRoot is where the pacman local database is read from. It is a
+// variable for the same reason runCmd is: the build path's dependency rules
+// (and the fixes they now carry) can only be exercised against a database, and
+// a test host is not required to have one.
+var localDBRoot = alpmdb.DefaultRoot
+
 // buildOpts are the flags specific to `build`.
 type buildOpts struct {
 	keep        string
@@ -54,6 +60,22 @@ type buildOpts struct {
 	force       bool
 	docker      bool
 	imageSet    bool
+	fix         bool
+	unsafeFix   bool
+	diff        bool
+}
+
+// fixLevel is the auto-fix level the flags ask for, or FixNone when neither
+// --fix nor --unsafe-fix was given.
+func (o buildOpts) fixLevel() rules.FixLevel {
+	switch {
+	case o.unsafeFix:
+		return rules.FixUnsafe
+	case o.fix:
+		return rules.FixSafe
+	default:
+		return rules.FixNone
+	}
 }
 
 // buildDirs are the locations makepkg is redirected to write into, so that
@@ -95,6 +117,13 @@ between runs, and $SRCDEST or $BUILDDIR moves either elsewhere (a container
 build is a clean room and downloads its own). Dependencies are not synced by
 default, since that needs root — pass '-- -s' (or '--makepkg-arg=-s') to opt in.
 
+--fix writes back what the build taught it: the built-package rules see things
+no reading of the PKGBUILD can (which libraries the binaries actually link),
+and the fixes for those findings are only computable here. It rewrites the
+PKGBUILD that was just built, never another one, and only for a package that
+is the single one its PKGBUILD declares; --diff previews without writing. The
+PKGBUILD-scope fixes stay with 'pkglint --fix'.
+
 paths are package directories or PKGBUILD files (default: .). Note that
 'pkglint build' names this command even when ./build is a package directory;
 spell that one 'pkglint ./build'.`,
@@ -133,6 +162,9 @@ spell that one 'pkglint ./build'.`,
 	cmd.Flags().BoolVar(&bo.docker, "docker", false, "build inside a container instead of on the host, even when makepkg is installed")
 	cmd.Flags().StringVar(&bo.image, "image", "", "container image to build in, e.g. archlinux:base-devel; passing it implies --docker (default $PKGLINT_BUILD_IMAGE, which does not)")
 	cmd.Flags().StringArrayVar(&bo.makepkgArgs, "makepkg-arg", nil, "extra argument to pass to makepkg; repeatable (the scriptable form of '-- <args>')")
+	cmd.Flags().BoolVar(&bo.fix, "fix", false, "write the safe auto-fixes for the built-package findings back into the PKGBUILD (the PB8xx fixes, which only a build can compute; 'pkglint --fix' applies the rest)")
+	cmd.Flags().BoolVar(&bo.unsafeFix, "unsafe-fix", false, "also apply the behavior-changing built-package auto-fixes (implies --fix)")
+	cmd.Flags().BoolVar(&bo.diff, "diff", false, "with --fix/--unsafe-fix: show the changes instead of writing them")
 	return cmd
 }
 
@@ -198,6 +230,12 @@ type builder struct {
 	image     string
 	runnerErr error
 	localDB   func() *alpmdb.DB
+
+	// fixes are the PKGBUILD rewrites the built archives earned, held until
+	// every report has been rendered. They cannot be printed as they are
+	// computed: the reports go to the same stdout, and under --format=json
+	// interleaved prose would not be JSON any more.
+	fixes []rules.FixResult
 }
 
 // runBuild builds and lints each path, returning the process exit code.
@@ -209,7 +247,7 @@ func runBuild(paths []string, ro reportOpts, bo buildOpts, stdout io.Writer) int
 		ignored: ro.disabled(),
 		gate:    refusalGate(ro.failOn),
 		bo:      bo,
-		localDB: newLocalDB(alpmdb.DefaultRoot, os.Stderr),
+		localDB: newLocalDB(localDBRoot, os.Stderr),
 	}
 	// Resolved once: which runtime to use cannot differ between paths, and
 	// finding out costs a $PATH search apiece otherwise. The error is deferred
@@ -233,6 +271,17 @@ func runBuild(paths []string, ro reportOpts, bo buildOpts, stdout io.Writer) int
 	}
 
 	code := renderReports(stdout, reports, ro)
+	// After the reports, so nothing lands in the middle of a JSON or SARIF
+	// document, and so the findings a fix answers are on screen above it.
+	if applied, ok := applyFixResults(stdout, b.fixes, bo.diff); !ok {
+		return 2
+	} else if applied > 0 {
+		verb := "applied"
+		if bo.diff {
+			verb = "would apply"
+		}
+		fmt.Fprintf(stdout, "%s %d fix(es) to the PKGBUILD from what the build produced\n", verb, applied)
+	}
 	// --fail-on grades findings; it says nothing about whether the command
 	// did its job. A refusal, a makepkg failure, or a missing runtime is an
 	// operational failure and fails the run even under --fail-on=never, which
@@ -338,6 +387,16 @@ func (b *builder) build(ctx context.Context, path string) []report.PackageReport
 			continue
 		}
 		out = append(out, report.New(archive, rules.RunPackage(built, b.localDB(), b.ignored)))
+		if level := b.bo.fixLevel(); level != rules.FixNone {
+			// pkg is the PKGBUILD this very invocation gated and handed to
+			// makepkg, and built is what came back, so the pairing the
+			// package-scope fixers need is this loop's own. It is passed
+			// nowhere else. Held read-only across the build, the file on disk
+			// is still the bytes pkg was parsed from, so the edits apply to
+			// it; a split build's other members are turned away by the fixers
+			// themselves rather than filtered here.
+			b.fixes = append(b.fixes, rules.FixPackage(pkg, built, b.localDB(), b.ignored, level, nil)...)
+		}
 	}
 	return out
 }

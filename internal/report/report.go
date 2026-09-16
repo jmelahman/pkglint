@@ -262,28 +262,53 @@ func summarize(reports []PackageReport) string {
 // is an upper bound for those, which is why it advertises flags rather than
 // promising a number of rewrites. Empty when nothing is fixable.
 func summarizeFixes(reports []PackageReport) string {
-	levels := make(map[string]rules.FixLevel)
+	index := make(map[string]rules.Rule)
 	for _, r := range rules.Registry() {
-		levels[r.ID] = r.FixLevel
+		index[r.ID] = r
 	}
-	safe, unsafe := 0, 0
+	// Two tallies, because the two scopes are repaired by different commands:
+	// a built-package finding has no PKGBUILD in front of `pkglint --fix` to
+	// rewrite, and advertising that flag for it would send the user to a run
+	// that changes nothing.
+	var safe, unsafe, buildSafe, buildUnsafe int
 	for _, r := range reports {
 		for _, f := range r.Findings {
-			switch levels[f.RuleID] {
+			rule, ok := index[f.RuleID]
+			if !ok {
+				continue
+			}
+			s, u := &safe, &unsafe
+			if rule.Scope == rules.ScopePackage {
+				s, u = &buildSafe, &buildUnsafe
+			}
+			switch rule.FixLevel {
 			case rules.FixSafe:
-				safe++
+				*s++
 			case rules.FixUnsafe:
-				unsafe++
+				*u++
 			}
 		}
 	}
+	var parts []string
+	if p := fixPhrase(safe, unsafe, ""); p != "" {
+		parts = append(parts, p)
+	}
+	if p := fixPhrase(buildSafe, buildUnsafe, "build "); p != "" {
+		parts = append(parts, p)
+	}
+	return strings.Join(parts, "; ")
+}
+
+// fixPhrase is one tally's sentence. prefix is the command the flags belong
+// to, empty for the root command.
+func fixPhrase(safe, unsafe int, prefix string) string {
 	switch {
 	case safe > 0 && unsafe > 0:
-		return fmt.Sprintf("%d finding(s) fixable with --fix, %d more with --unsafe-fix", safe, unsafe)
+		return fmt.Sprintf("%d finding(s) fixable with %s--fix, %d more with %s--unsafe-fix", safe, prefix, unsafe, prefix)
 	case safe > 0:
-		return fmt.Sprintf("%d finding(s) fixable with --fix", safe)
+		return fmt.Sprintf("%d finding(s) fixable with %s--fix", safe, prefix)
 	case unsafe > 0:
-		return fmt.Sprintf("%d finding(s) fixable with --unsafe-fix", unsafe)
+		return fmt.Sprintf("%d finding(s) fixable with %s--unsafe-fix", unsafe, prefix)
 	}
 	return ""
 }
@@ -500,7 +525,7 @@ func RenderRules(w io.Writer, all []rules.Rule, color bool) {
 // any. --rules and `explain` share it so the two cannot drift apart.
 func renderRuleHeader(w io.Writer, s styler, r rules.Rule) {
 	fmt.Fprintf(w, "%s %s  %s", s.wrap(ansiBold, r.ID), r.Name, s.severityRange(r.Severities()))
-	if flag := r.FixLevel.Flag(); flag != "" {
+	if flag := r.FixCommand(); flag != "" {
 		code := ansiGreen
 		if !r.FixLevel.Safe() {
 			code = ansiYellow
@@ -554,7 +579,7 @@ func RenderRuleDetail(w io.Writer, r rules.Rule, color bool) {
 	if r.Good != "" {
 		renderRuleSection(w, s, ansiGreen, "Preferred", snippetLines(r.Good))
 	}
-	if flag := r.FixLevel.Flag(); flag != "" {
+	if flag := r.FixCommand(); flag != "" {
 		fix := fmt.Sprintf("'pkglint %s' rewrites this in place", flag)
 		if !r.FixLevel.Safe() {
 			fix += " — the rewrite is mechanical but changes what the build does, so read the result"
@@ -578,6 +603,12 @@ func suppressLines(r rules.Rule) []string {
 		directive, prose = "pkglint --ignore "+r.ID, "turns the rule off for a whole run. An "+
 			"inline '# pkglint: ignore=' directive cannot reach this finding: it is reported "+
 			"against a file in the built archive, not a line of the PKGBUILD."
+		if r.FixLevel.Fixable() {
+			// The fix does land in the PKGBUILD, so there the directive has
+			// somewhere to go — on the line the rewrite would touch.
+			prose += " The directive does decline the auto-fix, though: put it on the array " +
+				"the fix would rewrite."
+		}
 	}
 	return append([]string{directive, ""}, wrapWords(prose, rulesWidth-len(ruleIndent))...)
 }

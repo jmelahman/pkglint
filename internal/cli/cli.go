@@ -406,24 +406,9 @@ func (m rewriteMode) run(paths []string, diff bool, stdout io.Writer) int {
 			rc = 2
 			continue
 		}
-		applied := 0
-		for _, r := range m.transform(pkg) {
-			if !r.Changed() {
-				continue
-			}
-			for _, e := range r.Applied {
-				applied++
-				fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", rel(e.Path), e.Line, e.RuleID, e.Desc)
-				if diff {
-					fmt.Fprint(stdout, editHunk(r.Original, e))
-				}
-			}
-			if !diff {
-				if err := writeFixed(r.Path, r.Fixed); err != nil {
-					fmt.Fprintf(os.Stderr, "pkglint: writing %s: %v\n", r.Path, err)
-					rc = 2
-				}
-			}
+		applied, ok := applyFixResults(stdout, m.transform(pkg), diff)
+		if !ok {
+			rc = 2
 		}
 		if m.after != nil {
 			m.after(path, pkg, applied)
@@ -438,6 +423,39 @@ func (m rewriteMode) run(paths []string, diff bool, stdout io.Writer) int {
 		}
 	}
 	return rc
+}
+
+// applyFixResults prints every edit in results — with its hunk under --diff —
+// and writes the rewritten units unless --diff. It returns how many edits were
+// printed and whether every write succeeded; a failed write is reported on
+// stderr and leaves the rest of the results to be applied.
+//
+// Both rewriting paths go through it: `--fix`/`--add-ignores`, which transform
+// a PKGBUILD in one pass, and `build --fix`, which transforms it from what the
+// build produced. Keeping the printing and the writing in one place is what
+// makes the two read identically.
+func applyFixResults(stdout io.Writer, results []rules.FixResult, diff bool) (applied int, ok bool) {
+	ok = true
+	for _, r := range results {
+		if !r.Changed() {
+			continue
+		}
+		for _, e := range r.Applied {
+			applied++
+			fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", rel(e.Path), e.Line, e.RuleID, e.Desc)
+			if diff {
+				fmt.Fprint(stdout, editHunk(r.Original, e))
+			}
+		}
+		if diff {
+			continue
+		}
+		if err := writeFixed(r.Path, r.Fixed); err != nil {
+			fmt.Fprintf(os.Stderr, "pkglint: writing %s: %v\n", r.Path, err)
+			ok = false
+		}
+	}
+	return applied, ok
 }
 
 // runFix applies auto-fixes at the given level, writing files in place (or,

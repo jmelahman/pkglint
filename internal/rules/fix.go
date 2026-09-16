@@ -9,7 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jmelahman/pkglint/internal/alpmdb"
 	"github.com/jmelahman/pkglint/internal/pkgbuild"
+	"github.com/jmelahman/pkglint/internal/pkgfile"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -26,6 +28,19 @@ const (
 	// review. They are applied only by --unsafe-fix (which implies --fix).
 	FixUnsafe
 )
+
+// FixCommand is the pkglint invocation that applies this rule's auto-fix,
+// empty when it has none. It is the bare flag for a PKGBUILD-scope rule, and
+// `build --fix` for a package-scope one: that finding comes out of a built
+// archive, and `pkglint --fix` has only the PKGBUILD to read, so `build` — the
+// one command that holds both — is where the fix can be applied at all.
+func (r Rule) FixCommand() string {
+	flag := r.FixLevel.Flag()
+	if flag == "" || r.Scope != ScopePackage {
+		return flag
+	}
+	return "build " + flag
+}
 
 // Fixable reports whether the level has an auto-fix at all.
 func (l FixLevel) Fixable() bool { return l == FixSafe || l == FixUnsafe }
@@ -145,6 +160,16 @@ func (r FixResult) Changed() bool { return !bytes.Equal(r.Original, r.Fixed) }
 // excluding rules in ignore, occurrences suppressed inline, and fixes above
 // the requested level.
 func CollectEdits(ctx *Context, ignore map[string]bool, level FixLevel, env *FixEnv) []Edit {
+	return collectEdits(ctx, ignore, level, env, ScopePKGBUILD)
+}
+
+// collectEdits is CollectEdits restricted to one scope. The two scopes are
+// never collected together: a PKGBUILD-scope fix answers a finding the file
+// alone produced and belongs to `--fix`, while a package-scope fix answers one
+// only a build could produce and belongs to `pkglint build --fix`. Running
+// both from the build would silently make it the more thorough `--fix`, on a
+// PKGBUILD whose static findings were already reported and gated.
+func collectEdits(ctx *Context, ignore map[string]bool, level FixLevel, env *FixEnv, scope Scope) []Edit {
 	if env == nil {
 		env = &FixEnv{}
 	}
@@ -154,7 +179,7 @@ func CollectEdits(ctx *Context, ignore map[string]bool, level FixLevel, env *Fix
 	// declaration's line is a maintainer declining that rename entirely.
 	waived := map[string]bool{}
 	for _, rule := range registry() {
-		if rule.Fix == nil || rule.FixLevel == FixNone || rule.FixLevel > level || ignore[rule.ID] {
+		if rule.Scope != scope || rule.Fix == nil || rule.FixLevel == FixNone || rule.FixLevel > level || ignore[rule.ID] {
 			continue
 		}
 		for _, e := range rule.Fix(ctx, env) {
@@ -196,6 +221,22 @@ func dropGroups(edits []Edit, groups map[string]bool) []Edit {
 // returning one FixResult per unit that had edits applied.
 func Fix(pkg *pkgbuild.Package, ignore map[string]bool, level FixLevel, env *FixEnv) []FixResult {
 	return applyByUnit(pkg, CollectEdits(NewContext(pkg), ignore, level, env))
+}
+
+// FixPackage computes and applies the package-scope auto-fixes for pkg from the
+// archive it built, returning one FixResult per unit that had edits applied.
+// db is the pacman local database the package-scope rules resolve against; a
+// nil db stands the fixes down exactly as it stands the rules down.
+//
+// pf must be the archive pkg produced. Nothing here verifies that a build
+// happened — only `pkglint build` can say so — but the fixers check that the
+// archive is the package the PKGBUILD declares before writing anything, so a
+// mismatched pair yields no edits rather than a wrong one. See fixpkg.go.
+func FixPackage(pkg *pkgbuild.Package, pf *pkgfile.Package, db *alpmdb.DB, ignore map[string]bool, level FixLevel, env *FixEnv) []FixResult {
+	ctx := NewContext(pkg)
+	ctx.File = pf
+	ctx.DB = db
+	return applyByUnit(pkg, collectEdits(ctx, ignore, level, env, ScopePackage))
 }
 
 // applyByUnit applies the edits to the units they address, returning one

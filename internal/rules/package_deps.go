@@ -47,10 +47,25 @@ func (ctx *Context) resolveNeeded(e *pkgfile.Entry, soname string) (owner string
 	return ctx.DB.LibraryOwner(soname, e.ELF.Class == elf.ELFCLASS32), false
 }
 
-func checkMissingLibDeps(ctx *Context) []Finding {
-	if ctx.DB == nil {
-		return nil
-	}
+// libDepGap is one installed package this package's binaries link against and
+// whose depends coverage falls short, as found by the walk checkMissingLibDeps
+// and fixMissingLibDeps share. Sonames and Files are sorted; Files holds up to
+// three examples.
+type libDepGap struct {
+	Owner   string
+	Sonames []string
+	Files   []string
+	State   depSatisfaction
+}
+
+// missingLibDeps resolves every DT_NEEDED entry in the package to the installed
+// package that owns it and reports the ones depends does not already cover
+// directly. Gaps come back ordered by owner; orphans maps a soname no installed
+// package provides to up to three files needing it.
+//
+// The fixer walks this too, so a soname that stops being a gap — because the
+// rule's resolution changed, not because the fix ran — takes the fix with it.
+func missingLibDeps(ctx *Context) (gaps []libDepGap, orphans map[string][]string) {
 	f := ctx.facts()
 	type need struct {
 		sonames map[string]bool
@@ -58,7 +73,7 @@ func checkMissingLibDeps(ctx *Context) []Finding {
 		state   depSatisfaction
 	}
 	byOwner := map[string]*need{}
-	orphans := map[string][]string{} // soname -> example files
+	orphans = map[string][]string{}
 	for i := range ctx.File.Entries {
 		e := &ctx.File.Entries[i]
 		if !isPackageELF(e) {
@@ -97,29 +112,46 @@ func checkMissingLibDeps(ctx *Context) []Finding {
 			}
 		}
 	}
+	for _, owner := range sortedKeys(mapKeySet(byOwner)) {
+		n := byOwner[owner]
+		gaps = append(gaps, libDepGap{
+			Owner:   owner,
+			Sonames: sortedKeys(n.sonames),
+			Files:   sortedKeys(n.files),
+			State:   n.state,
+		})
+	}
+	return gaps, orphans
+}
+
+func checkMissingLibDeps(ctx *Context) []Finding {
+	if ctx.DB == nil {
+		return nil
+	}
+	gaps, orphans := missingLibDeps(ctx)
+	f := ctx.facts()
 	var out []Finding
-	for owner, n := range byOwner {
-		libs := sortedKeys(n.sonames)
-		files := sortedKeys(n.files)
-		switch n.state {
+	for _, g := range gaps {
+		libs := strings.Join(g.Sonames, ", ")
+		switch g.State {
 		case depMissing:
 			if !f.closureComplete {
-				out = append(out, pkgFinding("PB809", Info, files[0],
+				out = append(out, pkgFinding("PB809", Info, g.Files[0],
 					"binaries link %s from package %q, not reachable from depends as installed here — but some declared dependencies are not installed, so this may be incomplete",
-					strings.Join(libs, ", "), owner))
+					libs, g.Owner))
 				continue
 			}
-			out = append(out, pkgFinding("PB809", Error, files[0],
+			out = append(out, pkgFinding("PB809", Error, g.Files[0],
 				"binaries link %s from package %q, which is not reachable from depends; add it",
-				strings.Join(libs, ", "), owner))
+				libs, g.Owner))
 		case depTransitive:
-			out = append(out, pkgFinding("PB809", Info, files[0],
+			out = append(out, pkgFinding("PB809", Info, g.Files[0],
 				"binaries link %s from package %q, reached only transitively; a direct depends entry protects against the middleman dropping it",
-				strings.Join(libs, ", "), owner))
+				libs, g.Owner))
 		case depOptional:
-			out = append(out, pkgFinding("PB809", Warn, files[0],
+			out = append(out, pkgFinding("PB809", Warn, g.Files[0],
 				"binaries link %s from package %q, which is only an optdepends; a hard link needs a hard dependency",
-				strings.Join(libs, ", "), owner))
+				libs, g.Owner))
 		}
 	}
 	for soname, files := range orphans {
@@ -140,6 +172,16 @@ func sonameBase(soname string) string {
 		return soname[:i+3]
 	}
 	return soname
+}
+
+// mapKeySet turns any map's keys into the set sortedKeys takes, so a walk that
+// accumulates per-owner state can still be emitted in a stable order.
+func mapKeySet[V any](m map[string]V) map[string]bool {
+	out := make(map[string]bool, len(m))
+	for k := range m {
+		out[k] = true
+	}
+	return out
 }
 
 func sortedKeys(m map[string]bool) []string {

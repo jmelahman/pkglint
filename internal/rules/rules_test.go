@@ -1467,6 +1467,47 @@ build() {
   eval "$stuff"
 }`)})
 	})
+	t.Run("PB302 constant metadata assignment is inert", func(t *testing.T) {
+		// retroshare's idiom: a conditional depends+= kept out of .SRCINFO.
+		// The string is constant and assigns literals, so review sees
+		// exactly what runs.
+		for _, line := range []string{
+			`eval "depends+=(
+      'libbz2.so'    # bzip2
+      'libssl.so'    # openssl
+    )"`,
+			`eval 'optdepends_x86_64=("foo: bar")'`,
+			`eval "provides=(libfoo.so) conflicts=(foo-git)"`,
+			`eval "depends=(a" ")"`,              // eval joins its words with spaces
+			`eval 'depends=("lib*.so" "{a,b}")'`, // quoted: no globbing or braces
+		} {
+			expectNoRule(t, "PB302", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  `+line+`
+}`)})
+		}
+	})
+	t.Run("PB302 constant eval that could run something is still flagged", func(t *testing.T) {
+		for _, line := range []string{
+			`eval "echo hi"`,                       // a command
+			`eval 'depends=($(curl -s x))'`,        // a substitution inside the string
+			`eval 'depends=("$_dep")'`,             // an expansion inside the string
+			`eval "PATH=/tmp/x"`,                   // not package metadata
+			`eval "source=(http://example.com/x)"`, // feeds a download
+			`eval "install=x.install"`,             // names a scriptlet
+			`eval "depends=(a) > /tmp/x"`,          // a redirect
+			`eval "depends[1]=a"`,                  // a subscript can expand
+			`eval "provides=(*.so)"`,               // globs against the build directory
+			`eval "depends=(lib{a,b})"`,            // brace expansion
+			`eval "depends=(~/x)"`,                 // tilde expansion
+			`eval "depends=(\$x)"`,                 // an escape pkglint won't unescape
+			`eval "depends=(a"`,                    // does not parse
+			`eval`,                                 // nothing to judge
+		} {
+			src := map[string]string{"PKGBUILD": pkgbuildWith("", "package() {\n  "+line+"\n}")}
+			expectRule(t, "PB302", src)
+		}
+	})
 	t.Run("PB303 base64 decode into shell", func(t *testing.T) {
 		expectRule(t, "PB303", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
@@ -1852,6 +1893,78 @@ package() {
 package() {
   make INSTALL_ROOT="$pkgdir" install
 }`)})
+	})
+	t.Run("PB404 prefix inside the build tree is fine", func(t *testing.T) {
+		// aseprite stages into a scratch directory, then copies what it wants
+		// into $pkgdir by hand; the install never reaches the live system.
+		for _, prefix := range []string{"--prefix=staging", "--prefix staging", `--prefix "$srcdir/staging"`, "--prefix=./out/usr", `--prefix="$srcdir"`, `--prefix="${srcdir}/"`} {
+			expectNoRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  cd "$srcdir"
+  cmake --install build `+prefix+` --strip
+  install -Dm755 staging/bin/demo "$pkgdir/usr/bin/demo"
+}`)})
+		}
+	})
+	t.Run("PB404 prefix outside the build tree is still flagged", func(t *testing.T) {
+		for _, prefix := range []string{"--prefix=/usr", "--prefix=../../usr", `--prefix "$HOME/.local"`, `--prefix "$srcdir/../../usr"`} {
+			expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  cmake --install build `+prefix+`
+}`)})
+		}
+	})
+	t.Run("PB404 an opaque or mixed destination is still flagged", func(t *testing.T) {
+		for _, body := range []string{
+			`cmake --install build --prefix="$(compute_prefix)"`,
+			`cmake --install build --prefix="staging$((1))"`,
+			`pip install --root=/ --prefix=usr .`, // every destination must stay inside
+			`pip install --prefix=usr --root=/ .`,
+		} {
+			expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", "package() {\n  cd \"$srcdir\"\n  "+body+"\n}")})
+		}
+	})
+	t.Run("PB404 a helper or unnamed cd leaves the build tree", func(t *testing.T) {
+		for _, body := range []string{
+			"_goto_root\n  cmake --install build --prefix=usr",
+			"_outer\n  cmake --install build --prefix=usr",
+			"cd -\n  cmake --install build --prefix=usr",
+			"pushd +1\n  cmake --install build --prefix=usr",
+			"pushd -0\n  cmake --install build --prefix=usr",
+			"cd \"$(_where)\"\n  cmake --install build --prefix=usr",
+		} {
+			expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+_goto_root() {
+  cd /
+}
+_outer() {
+  _goto_root
+}
+package() {
+  `+body+`
+}`)})
+		}
+	})
+	t.Run("PB404 cargo --target is a triple, not a destination", func(t *testing.T) {
+		expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  cargo install --target x86_64-unknown-linux-gnu --path .
+}`)})
+	})
+	t.Run("PB404 prefix naming a sibling of srcdir is still flagged", func(t *testing.T) {
+		expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  cmake --install build --prefix="${srcdir}x/usr"
+}`)})
+	})
+	t.Run("PB404 relative prefix after leaving the build tree is still flagged", func(t *testing.T) {
+		for _, cd := range []string{"cd /", "cd", "pushd /opt", `cd "$HOME"`} {
+			expectRule(t, "PB404", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  `+cd+`
+  cmake --install "$srcdir/build" --prefix=usr
+}`)})
+		}
 	})
 	t.Run("PB405 write to pacman.conf", func(t *testing.T) {
 		files := map[string]string{"PKGBUILD": pkgbuildWith("", `

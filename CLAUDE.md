@@ -32,6 +32,13 @@ git's `ext::` "run this command" transport out. Keep it that way.)
   `cmd/` — a second entry point would only duplicate that shim. `version` is
   stamped in `internal/cli`, not in `main`, so `.goreleaser.yml` and
   `hatch_build.py` both name that symbol in `-X`.
+- `tools/fptriage` is a maintainer program, not a second pkglint entry point:
+  it lints the site's snapshot cache and asks TypeSafe (typesafe-sdk-go, which
+  nothing else imports) whether sampled findings are false positives, ranking
+  rules by it. It sends PKGBUILD text out and never runs it. Verdicts append to
+  `fptriage.jsonl`, which is also its cache:
+  `go run ./tools/fptriage -cache .cache -rules PB914 -dry-run`, then drop
+  `-dry-run` with `TYPESAFE_API_KEY` set.
 - `go test ./internal/cli -run TestGolden -update` regenerates
   `internal/cli/testdata/*/expected.txt`.
 - CI enforces a statement-coverage floor (test.yml, `-coverpkg=./...`) and a

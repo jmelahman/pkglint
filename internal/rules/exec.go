@@ -781,7 +781,7 @@ var decoders = map[string]bool{"base64": true, "base32": true, "xxd": true, "uud
 func checkEval(ctx *Context) []Finding {
 	var out []Finding
 	for _, c := range ctx.Commands() {
-		if c.Name != "eval" {
+		if c.Name != "eval" || inertEval(c) {
 			continue
 		}
 		sev := Error
@@ -795,6 +795,123 @@ func checkEval(ctx *Context) []Finding {
 		out = append(out, c.finding("PB302", sev, "%s", msg))
 	}
 	return out
+}
+
+// evalMetadataVars are the package-metadata arrays an inert eval may assign.
+// Maintainers eval a conditional `depends+=(...)` in package() to keep it out
+// of the metadata makepkg scrapes for .SRCINFO; the string is constant, so
+// review sees exactly what runs. Nothing here is executed or sourced:
+// `install` names a scriptlet and the source/checksum arrays feed downloads,
+// so they stay out.
+var evalMetadataVars = map[string]bool{
+	"depends": true, "optdepends": true, "makedepends": true, "checkdepends": true,
+	"provides": true, "conflicts": true, "replaces": true, "backup": true, "groups": true,
+}
+
+// inertEval reports whether an eval's string is a constant that parses to
+// nothing but literal assignments to package-metadata arrays — code a reviewer
+// reads in full, which runs no command and expands nothing. Anything else,
+// including a string pkglint cannot render exactly, stays PB302's.
+func inertEval(c Command) bool {
+	var src strings.Builder
+	for i, w := range c.Call.Args[1:] {
+		if i > 0 {
+			src.WriteByte(' ')
+		}
+		lit, ok := literalWord(w, false)
+		if !ok {
+			return false
+		}
+		src.WriteString(lit)
+	}
+	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(src.String()), "")
+	if err != nil || len(f.Stmts) == 0 {
+		return false
+	}
+	for _, st := range f.Stmts {
+		call, ok := st.Cmd.(*syntax.CallExpr)
+		if !ok || len(call.Args) > 0 || len(st.Redirs) > 0 || st.Negated || st.Background || st.Coprocess {
+			return false
+		}
+		for _, as := range call.Assigns {
+			if as.Name == nil || as.Index != nil || as.Naked || !evalMetadataVars[metadataBase(as.Name.Value)] {
+				return false
+			}
+			if as.Value != nil {
+				if _, ok := literalWord(as.Value, true); !ok {
+					return false
+				}
+			}
+			if as.Array != nil {
+				for _, el := range as.Array.Elems {
+					if el.Index != nil || el.Value == nil {
+						return false
+					}
+					if _, ok := literalWord(el.Value, true); !ok {
+						return false
+					}
+				}
+			}
+		}
+	}
+	return true
+}
+
+// metadataBase strips an architecture suffix: depends_x86_64 is depends. No
+// metadata name contains an underscore, so the first one starts the suffix.
+func metadataBase(name string) string {
+	base, _, _ := strings.Cut(name, "_")
+	return base
+}
+
+// literalWord renders a word that expands nothing — plain text, single quotes,
+// double quotes around plain text — returning its value.
+//
+// For eval's own arguments (inner false) the value is the text eval will
+// parse, so a backslash in unquoted or double-quoted text is refused rather
+// than unescaped: exactness matters more than coverage. Single-quoted text is
+// already exact. Inside the evaluated string (inner true) the value is never
+// used, only vetted, so escapes are harmless; but an unquoted word there is
+// subject to globbing, brace and tilde expansion, so `depends=(*.so)` would
+// take its contents from the build directory rather than from the text.
+func literalWord(w *syntax.Word, inner bool) (string, bool) {
+	var b strings.Builder
+	lit := func(v string) bool {
+		if !inner && strings.ContainsRune(v, '\\') {
+			return false
+		}
+		b.WriteString(v)
+		return true
+	}
+	for i, p := range w.Parts {
+		switch p := p.(type) {
+		case *syntax.Lit:
+			if inner && (strings.ContainsAny(p.Value, "*?[{") || (i == 0 && strings.HasPrefix(p.Value, "~"))) {
+				return "", false
+			}
+			if !lit(p.Value) {
+				return "", false
+			}
+		case *syntax.SglQuoted:
+			if p.Dollar {
+				return "", false
+			}
+			b.WriteString(p.Value)
+		case *syntax.DblQuoted:
+			if p.Dollar {
+				return "", false
+			}
+			for _, q := range p.Parts {
+				l, ok := q.(*syntax.Lit)
+				if !ok || !lit(l.Value) {
+					return "", false
+				}
+			}
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
 }
 
 func checkDecodeExec(ctx *Context) []Finding {

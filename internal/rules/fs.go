@@ -355,6 +355,7 @@ func checkInstallDestdir(ctx *Context) []Finding {
 			venvFns[c.Fn] = true
 		}
 	}
+	leaves := map[string]bool{} // fn -> leavesBuildTree, computed once each
 	var out []Finding
 	for _, c := range ctx.Commands() {
 		if c.Fn != "package" && !strings.HasPrefix(c.Fn, "package_") {
@@ -363,6 +364,16 @@ func checkInstallDestdir(ctx *Context) []Finding {
 		tool, ok := liveInstallCommand(c)
 		if !ok || installBindsDestdir(c) || venvFns[c.Fn] || funcBindsDestdir(c.Unit, c.Fn) {
 			continue
+		}
+		if installStaysInBuildTree(c) {
+			left, seen := leaves[c.Fn]
+			if !seen {
+				left = leavesBuildTree(ctx, c.Unit, c.Fn)
+				leaves[c.Fn] = left
+			}
+			if !left {
+				continue
+			}
 		}
 		out = append(out, c.finding("PB404", Error,
 			"`%s` in package() is not redirected into $pkgdir (set DESTDIR/--root/--prefix/--destdir)", tool))
@@ -427,6 +438,108 @@ func installBindsDestdir(c Command) bool {
 	}
 	for _, a := range c.Args {
 		if referencesStaging(a) || strings.HasPrefix(a, "DESTDIR=") {
+			return true
+		}
+	}
+	return false
+}
+
+// installDestFlags are the options that name where an install lands. With a
+// value that stays inside the build tree, the install is a scratch staging
+// step — aseprite's `cmake --install build --prefix=staging`, followed by a
+// hand-picked copy into $pkgdir — and never reaches the live system.
+//
+// --target is pip's (a directory); cargo's --target is a platform triple,
+// which says nothing about where the install lands.
+var installDestFlags = []string{"--prefix", "--root", "--destdir", "--target"}
+
+// installStaysInBuildTree reports whether the command names at least one
+// destination and every one it names stays inside the build tree: pip's
+// `--root=/ --prefix=usr` lands in the live /usr however tame --prefix looks.
+func installStaysInBuildTree(c Command) bool {
+	named := false
+	for i, a := range c.Args {
+		for _, f := range installDestFlags {
+			if f == "--target" && c.Name == "cargo" {
+				continue
+			}
+			j, v := i, ""
+			switch {
+			case strings.HasPrefix(a, f+"="):
+				v = strings.TrimPrefix(a, f+"=")
+			case a == f && i+1 < len(c.Args):
+				j, v = i+1, c.Args[i+1]
+			default:
+				continue
+			}
+			if (j < len(c.ArgDyn) && c.ArgDyn[j]) || !insideBuildTree(v) {
+				return false
+			}
+			named = true
+		}
+	}
+	return named
+}
+
+// insideBuildTree reports whether path stays under the directory package()
+// runs in: relative, or rooted at $srcdir, and never climbing out with "..".
+// Anything else it expands — $HOME, $prefix — could be anywhere.
+func insideBuildTree(path string) bool {
+	for _, root := range []string{"$srcdir", "${srcdir}"} {
+		if rest, ok := strings.CutPrefix(path, root); ok && (rest == "" || rest[0] == '/') {
+			path = "." + rest
+			break
+		}
+	}
+	// \x00 is how RenderWord marks what it could not render — a command
+	// substitution, an arithmetic expansion — which could be anywhere.
+	if path == "" || strings.ContainsAny(path, "$`~\x00") || strings.HasPrefix(path, "/") {
+		return false
+	}
+	for seg := range strings.SplitSeq(path, "/") {
+		if seg == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// leavesBuildTree reports whether fn, or a PKGBUILD function it calls, changes
+// directory somewhere a relative install destination would no longer be
+// inside the build tree: `cd /` turns `--prefix=usr` into the live /usr.
+// Position is ignored — a `cd /tmp` later undone still counts — which can only
+// keep a finding, never hide one.
+func leavesBuildTree(ctx *Context, u *pkgbuild.Unit, fn string) bool {
+	fns := map[string]bool{}
+	var reach func(name string)
+	reach = func(name string) {
+		if fns[name] {
+			return
+		}
+		fns[name] = true
+		if fd := u.Functions[name]; fd != nil {
+			for _, called := range calledFuncs(u, fd) {
+				reach(called)
+			}
+		}
+	}
+	reach(fn)
+	for _, c := range ctx.Commands() {
+		if !fns[c.Fn] || (c.Name != "cd" && c.Name != "pushd") {
+			continue
+		}
+		var dir string
+		dyn := false
+		for i, a := range c.Args {
+			if !strings.HasPrefix(a, "-") || len(a) > 1 && a[1] >= '0' && a[1] <= '9' || a == "-" {
+				dir, dyn = a, i < len(c.ArgDyn) && c.ArgDyn[i]
+				break
+			}
+		}
+		// `cd -` returns to $OLDPWD and pushd's +N/-N rotate the stack:
+		// neither names where it goes.
+		if dir == "" || dyn || dir == "-" || dir[0] == '+' || dir[0] == '-' ||
+			!(insideBuildTree(dir) || referencesStaging(dir)) {
 			return true
 		}
 	}

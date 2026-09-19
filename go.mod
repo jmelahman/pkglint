@@ -1,8 +1,9 @@
 module github.com/jmelahman/pkglint
 
-go 1.26.5
+go 1.27.1
 
 require (
+	github.com/jmelahman/typesafe-sdk-go v0.1.0
 	github.com/klauspost/compress v1.19.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9

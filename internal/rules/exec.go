@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -1026,12 +1027,24 @@ func checkDynamicCommands(ctx *Context) []Finding {
 		case indirect:
 			out = append(out, c.finding("PB306", Error,
 				"command name via ${!indirection}: what runs cannot be determined statically"))
-		case c.Dynamic:
+		case c.Dynamic && !inBuildTreePath(c.RawName):
 			out = append(out, c.finding("PB306", Warn,
 				"command name %q is not statically resolvable", c.RawName))
 		}
 	}
 	return out
+}
+
+// inBuildTreePath reports whether a command path is a file under $srcdir,
+// $pkgdir or $startdir: `"$srcdir/foo-${arch[0]}.AppImage" --appimage-extract`
+// runs something the sources put there, whichever variant it picks.
+func inBuildTreePath(name string) bool {
+	for _, root := range []string{"$srcdir/", "${srcdir}/", "$pkgdir/", "${pkgdir}/", "$startdir/", "${startdir}/"} {
+		if rest, ok := strings.CutPrefix(name, root); ok {
+			return !strings.Contains(rest, "..")
+		}
+	}
+	return false
 }
 
 var (
@@ -1045,7 +1058,7 @@ func checkObfuscatedLiterals(ctx *Context) []Finding {
 	for i := range units {
 		u := &units[i]
 		for lineNo, line := range strings.Split(string(u.Raw), "\n") {
-			if hexRunRe.MatchString(line) {
+			if slices.ContainsFunc(hexRunRe.FindAllString(line, -1), variedBytes) {
 				out = append(out, Finding{RuleID: "PB307", Severity: Warn,
 					Message: "long hex-escape run looks like an encoded payload",
 					Path:    u.Path, Line: lineNo + 1, Col: 1})
@@ -1058,6 +1071,14 @@ func checkObfuscatedLiterals(ctx *Context) []Finding {
 		}
 	}
 	return out
+}
+
+// variedBytes reports whether a \xNN run spells more than one byte value. A
+// run of one repeated byte is padding (epsonscan2 NUL-pads a path it patches
+// into a binary with bbe), not an encoded payload.
+func variedBytes(run string) bool {
+	run = strings.ToLower(run)
+	return strings.Count(run, run[:4]) != len(run)/4
 }
 
 // looksLikeDigestContext avoids flagging checksum arrays: hex digests are

@@ -122,7 +122,8 @@ func checkLib32Pkgdesc(ctx *Context) []Finding {
 		return nil
 	}
 	desc, ok := pkgdescValue(ctx)
-	if !ok || desc == "" || strings.HasSuffix(desc, "(32-bit)") {
+	// "(32-bit, beta version)" carries the marker too.
+	if !ok || desc == "" || strings.Contains(desc, "(32-bit") {
 		return nil
 	}
 	return []Finding{varFinding(ctx, "PB975", Info, []string{"pkgdesc"},
@@ -216,7 +217,9 @@ func npmUncachedInstalls(ctx *Context) []Command {
 				break
 			}
 		}
-		if cached {
+		// npm reads its config from the environment case-insensitively, so an
+		// exported (or prefixed) npm_config_cache redirects the cache as well.
+		if cached || len(assignmentsTo(ctx, "npm_config_cache", c)) > 0 || len(assignmentsTo(ctx, "NPM_CONFIG_CACHE", c)) > 0 {
 			continue
 		}
 		out = append(out, c)

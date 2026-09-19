@@ -442,7 +442,10 @@ func checkSkippedChecksums(ctx *Context) []Finding {
 	}
 	var out []Finding
 	for _, e := range ctx.Pkg.Sources() {
-		if e.VCS != "" || e.Local {
+		// file:// reads a file already on the machine — ttf-ms-win10-auto
+		// names fonts it extracts from a Windows image — so nothing is
+		// downloaded for a checksum to verify.
+		if e.VCS != "" || e.Local || e.Proto == "file" {
 			continue
 		}
 		if isSignatureSource(e) || sigVerified[effectiveFilename(e)] {
@@ -671,7 +674,8 @@ func checkSourceDomains(ctx *Context) []Finding {
 	var out []Finding
 	for _, e := range ctx.Pkg.Sources() {
 		h := e.Host()
-		if h == "" || sameSite(h, urlHost) {
+		// A file:// source has no host: `file://courbi.ttf` is a local file.
+		if h == "" || e.Proto == "file" || sameSite(h, urlHost) {
 			continue
 		}
 		known := false

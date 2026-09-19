@@ -184,10 +184,14 @@ func checkScriptletPersistence(ctx *Context) []Finding {
 		switch {
 		case persistenceWriters[c.Name]:
 		case c.Name == "sed" && sedInPlace(c):
+		case (c.Name == "rm" || c.Name == "rmdir") && (c.Fn == "pre_remove" || c.Fn == "post_remove"):
+			// Cleaning up on removal is what a correct scriptlet does
+			// (sunloginclient's post_remove deletes its autostart entry).
+			continue
 		case c.Name == "rm" || c.Name == "rmdir":
-			// Deleting persistence is the opposite of installing it, and it is
-			// what a correct pre_remove does. Still worth naming — the file was
-			// outside pacman's tracking either way — but not at Error.
+			// Deleting outside removal can be sabotage — clearing a hardening
+			// file before installing — and PB405 leaves scriptlet deletions to
+			// this rule, so name it, though not at Error.
 			sev, verb = Warn, "removes"
 		default:
 			// A path that is only a test operand (`[ -f /etc/cron.d/foo ]`), a

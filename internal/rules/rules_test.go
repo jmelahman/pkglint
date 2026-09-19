@@ -344,6 +344,14 @@ url='https://example.com'
 source=("git+https://example.com/demo.git#commit=abc123")
 sha256sums=('SKIP')`, "")})
 	})
+	t.Run("PB101 not for file:// sources", func(t *testing.T) {
+		expectNoRule(t, "PB101", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://example.com'
+source=("file://calibri.ttf")
+sha256sums=('SKIP')`, "")})
+	})
 	t.Run("PB102 md5-only digests", func(t *testing.T) {
 		expectRule(t, "PB102", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
 pkgver=1
@@ -432,6 +440,14 @@ pkgver=1
 pkgrel=1
 url='https://project.example.com'
 source=("https://cdn.sketchy.io/demo.tar.gz")
+sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
+	})
+	t.Run("PB105 not for file:// sources", func(t *testing.T) {
+		expectNoRule(t, "PB105", map[string]string{"PKGBUILD": pkgbuildWith(`pkgname=demo
+pkgver=1
+pkgrel=1
+url='https://project.example.com'
+source=("file://courbi.ttf")
 sha256sums=('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')`, "")})
 	})
 	t.Run("PB105 github raw content allowed", func(t *testing.T) {
@@ -1570,6 +1586,24 @@ build() {
   p=$'\x62\x61\x73\x68\x20\x2d\x63\x20\x65\x76\x69\x6c'
 }`)})
 	})
+	t.Run("PB307 not for a run of one repeated byte", func(t *testing.T) {
+		// epsonscan2 NUL-pads a path it patches into a binary.
+		expectNoRule(t, "PB307", map[string]string{"PKGBUILD": pkgbuildWith("", `
+package() {
+  bbe -e "s|x86_64-linux-gnu/epsonscan2/|epsonscan2/`+strings.Repeat(`\x00`, 16)+`|" -o out in
+}`)})
+	})
+	t.Run("PB306 not for a command path under srcdir", func(t *testing.T) {
+		// jitsi-meet-desktop-bin picks the AppImage by architecture.
+		expectNoRule(t, "PB306", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  "${srcdir}/demo-${arch[0]}-${pkgver}.AppImage" --appimage-extract
+}`)})
+		expectRule(t, "PB306", map[string]string{"PKGBUILD": pkgbuildWith("", `
+prepare() {
+  "${srcdir}/../demo-${arch[0]}" --run
+}`)})
+	})
 	t.Run("PB307 base64 blob payload", func(t *testing.T) {
 		expectRule(t, "PB307", map[string]string{"PKGBUILD": pkgbuildWith("", `
 build() {
@@ -1990,14 +2024,14 @@ package() {
 	})
 	t.Run("PB405 removing a sensitive path is not a write to it", func(t *testing.T) {
 		// Retracting a sudoers fragment an older release shipped withdraws the
-		// escalation path; reporting it as granting one is backwards. PB502
-		// still reports the removal, worded as a removal.
+		// escalation path; reporting it as granting one is backwards, and
+		// PB502 does not count a removal as persistence either.
 		files := map[string]string{
 			"PKGBUILD":     pkgbuildWith("", "install=demo.install"),
 			"demo.install": "post_remove() {\n  rm -f /etc/sudoers.d/demo\n}\n",
 		}
 		expectNoRule(t, "PB405", files)
-		expectRule(t, "PB502", files)
+		expectNoRule(t, "PB502", files)
 	})
 	t.Run("PB405 skips a build-time removal but PB401 still reports it", func(t *testing.T) {
 		// writeTargetViolation defers sensitive paths to PB405, and PB405

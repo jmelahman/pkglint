@@ -62,6 +62,36 @@ build() {
 }`)})
 	})
 
+	t.Run("bare GOFLAGS statements count once GOFLAGS is exported", func(t *testing.T) {
+		// seafile-server builds GOFLAGS up line by line and exports it once.
+		files := map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  GOFLAGS='-buildmode=pie'
+  GOFLAGS+=' -trimpath'
+  GOFLAGS+=' -modcacherw'
+  export GOFLAGS
+  for d in a b; do
+    pushd "$d"
+    go build .
+    popd
+  done
+}`)}
+		ids := ruleIDs(lint(t, files))
+		for _, id := range []string{"PB914", "PB915", "PB916"} {
+			if ids[id] != 0 {
+				t.Errorf("%s fires on an exported GOFLAGS: %v", id, ids)
+			}
+		}
+	})
+
+	t.Run("a bare GOFLAGS that is never exported stays a shell variable", func(t *testing.T) {
+		expectRule(t, "PB915", map[string]string{"PKGBUILD": pkgbuildWith("", `
+build() {
+  GOFLAGS='-buildmode=pie -trimpath'
+  go build .
+}`)})
+	})
+
 	t.Run("go mod download in prepare needs -modcacherw", func(t *testing.T) {
 		expectRule(t, "PB916", map[string]string{"PKGBUILD": pkgbuildWith("", `
 prepare() {

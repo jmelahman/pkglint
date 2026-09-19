@@ -347,6 +347,16 @@ func TestNetworkCommandsCoverInstallers(t *testing.T) {
 		"python -m pip install x":             true,
 		"python3 -m pip install --no-index x": false,
 		"python -m venv x":                    false,
+		// rsync is a local copy unless an operand names a host.
+		`rsync -rtl "${srcdir}/opt/jbr" "${pkgdir}/opt"`: false,
+		"rsync -aL out/ out_new/":                        false,
+		"rsync -a host:/srv/x ./x":                       true,
+		"rsync -a user@host:x ./x":                       true,
+		"rsync -a host::module ./x":                      true,
+		"rsync -a rsync://mirror/x ./x":                  true,
+		"rsync -a -e ssh a/ b/":                          true,
+		"rsync -avze ssh a/ b/":                          true,
+		`rsync -a "$_src" ./x`:                           true,
 	}
 	for cmd, want := range cases {
 		t.Run(cmd, func(t *testing.T) {

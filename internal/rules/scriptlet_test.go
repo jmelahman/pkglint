@@ -73,17 +73,31 @@ func TestScriptletPersistenceMessagesNotFlagged(t *testing.T) {
 		})
 	})
 
-	t.Run("PB502 removal is reported below error", func(t *testing.T) {
-		// Cleaning up in pre_remove is correct behaviour, so it must not cost
-		// the package the grade an installed-persistence finding would.
+	t.Run("PB502 removal outside a remove hook is still named", func(t *testing.T) {
+		// PB405 leaves scriptlet deletions to PB502, so an install-time rm of
+		// a hardening file must not vanish from both.
 		files := map[string]string{
 			"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
-			"foo.install": "pre_remove() {\n  rm -f /etc/cron.d/foo\n}\n",
+			"foo.install": "pre_install() {\n  rm -f /etc/sudoers.d/lockdown\n}\n",
 		}
+		expectRule(t, "PB502", files)
 		for _, f := range lint(t, files) {
 			if f.RuleID == "PB502" && f.Severity >= Error {
 				t.Errorf("removal reported at %v, want below error: %s", f.Severity, f.Message)
 			}
+		}
+	})
+	t.Run("PB502 removal in a remove hook is not persistence", func(t *testing.T) {
+		// Cleaning up in pre_remove is correct behaviour (sunloginclient
+		// removes its autostart entry there).
+		for _, script := range []string{
+			"pre_remove() {\n  rm -f /etc/cron.d/foo\n}\n",
+			"post_remove() {\n  rm -f /etc/xdg/autostart/awesun.desktop\n  rmdir /etc/cron.d/foo\n}\n",
+		} {
+			expectNoRule(t, "PB502", map[string]string{
+				"PKGBUILD":    pkgbuildWith("", "install=foo.install"),
+				"foo.install": script,
+			})
 		}
 	})
 }

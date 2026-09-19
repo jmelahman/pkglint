@@ -81,6 +81,8 @@ func TestLib32Rules(t *testing.T) {
 	})
 	t.Run("PB975 suffixed pkgdesc", func(t *testing.T) {
 		expectNoRule(t, "PB975", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("lib32-demo", "'x86_64'", "pkgdesc='A demonstration library (32-bit)'\n"), "")})
+		// lib32-nvidia-utils-beta qualifies the marker.
+		expectNoRule(t, "PB975", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("lib32-demo", "'x86_64'", "pkgdesc='A demonstration library (32-bit, beta version)'\n"), "")})
 	})
 	t.Run("PB976 build without -m32", func(t *testing.T) {
 		expectRule(t, "PB976", map[string]string{"PKGBUILD": pkgbuildWith(namedHeader("lib32-demo", "'x86_64'", ""), `
@@ -153,6 +155,26 @@ prepare() {
 makedepends=('npm')
 prepare() {
   npm ci --cache="$srcdir/npm-cache"
+}`)})
+	})
+	t.Run("PB980 npm_config_cache in the environment", func(t *testing.T) {
+		expectNoRule(t, "PB980", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('npm')
+prepare() {
+  export npm_config_cache="$srcdir/npm-cache"
+  npm ci
+}`)})
+		expectNoRule(t, "PB980", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('npm')
+prepare() {
+  npm_config_cache="$srcdir/npm-cache" npm install
+}`)})
+		// Set but not exported, npm never sees it.
+		expectRule(t, "PB980", map[string]string{"PKGBUILD": pkgbuildWith("", `
+makedepends=('npm')
+prepare() {
+  npm_config_cache="$srcdir/npm-cache"
+  npm ci
 }`)})
 	})
 	t.Run("PB980 npm run is not a download", func(t *testing.T) {

@@ -43,7 +43,7 @@ func assignmentsTo(ctx *Context, name string, c Command) []string {
 // caller, if any.
 func assignmentsInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.CallExpr) []string {
 	var out []string
-	scanAssignments(u, name, fn, at, own, false, func(as *syntax.Assign) {
+	scanAssignments(u, name, fn, at, own, exportedInScope(u, name, fn, at, own), func(as *syntax.Assign) {
 		if as.Value == nil {
 			return
 		}
@@ -158,6 +158,31 @@ func scanAssignments(u *pkgbuild.Unit, name, fn string, at int, own *syntax.Call
 	}
 }
 
+// exportedInScope reports whether an `export name` (or `declare -x`) in scope
+// has put name in the environment. Once it has, a plain `name=…` statement
+// reaches child processes too, before the export or after it — seafile-server
+// builds GOFLAGS up over five `GOFLAGS+=` lines and exports it once — so
+// scanAssignments has to count those statements.
+func exportedInScope(u *pkgbuild.Unit, name, fn string, at int, own *syntax.CallExpr) bool {
+	if u == nil || u.File == nil {
+		return false
+	}
+	exports := map[*syntax.Assign]bool{}
+	syntax.Walk(u.File, func(n syntax.Node) bool {
+		if dc, ok := n.(*syntax.DeclClause); ok && declExports(dc) {
+			for _, as := range dc.Args {
+				exports[as] = true
+			}
+		}
+		return true
+	})
+	found := false
+	scanAssignments(u, name, fn, at, own, false, func(as *syntax.Assign) {
+		found = found || exports[as]
+	})
+	return found
+}
+
 // makepkgPhase reports whether fn is a function makepkg calls itself, and so
 // has a known position in the run order.
 func makepkgPhase(fn string) bool {
@@ -184,7 +209,8 @@ func goFlags(ctx *Context, c Command) []string {
 		at = off(c.Stmt.Pos())
 	}
 	var out []string
-	scanAssignments(c.Unit, "GOFLAGS", c.Fn, at, c.Call, false, func(as *syntax.Assign) {
+	exported := exportedInScope(c.Unit, "GOFLAGS", c.Fn, at, c.Call)
+	scanAssignments(c.Unit, "GOFLAGS", c.Fn, at, c.Call, exported, func(as *syntax.Assign) {
 		if as.Value == nil {
 			return
 		}

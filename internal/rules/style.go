@@ -1112,7 +1112,9 @@ func checkMakepkgInternalFunctions(ctx *Context) []Finding {
 
 // --- PB908: maintainer tag ---------------------------------------------------
 
-var maintainerTagRe = regexp.MustCompile(`(?im)^\s*#\s*Maintainer\s*:`)
+// A qualifier may sit between the tag and its colon: "# Maintainer (since
+// 5.1.8): …". Without the colon it is not the tag tools parse.
+var maintainerTagRe = regexp.MustCompile(`(?im)^\s*#\s*Maintainers?\b[^:\n]*:`)
 
 func checkMaintainerComment(ctx *Context) []Finding {
 	if maintainerTagRe.Match(ctx.Pkg.PKGBUILD.Raw) {

@@ -202,6 +202,18 @@ func TestMaintainerComment(t *testing.T) {
 	if got := styleLint(t, "")["PB908"]; got != 0 {
 		t.Errorf("got %d PB908 findings with a maintainer tag, want 0", got)
 	}
+	// A qualified tag still names the maintainer (electronmail-bin); a tag
+	// without its colon does not parse as one.
+	for tag, want := range map[string]int{
+		"# Maintainer (since 5.1.8): Sam Coder": 0,
+		"# Maintainers: Sam Coder":              0,
+		"# Maintainer Sam Coder":                1,
+	} {
+		h := strings.Replace(styleHeader, "# Maintainer: Sam Coder", tag, 1)
+		if got := ruleIDs(lint(t, map[string]string{"PKGBUILD": h}))["PB908"]; got != want {
+			t.Errorf("%q: got %d PB908 findings, want %d", tag, got, want)
+		}
+	}
 	// Namcap accepts arbitrary spacing around the tag.
 	spaced := strings.Replace(styleHeader, "# Maintainer: Sam Coder", "#  maintainer  : Sam Coder", 1)
 	if got := ruleIDs(lint(t, map[string]string{"PKGBUILD": spaced}))["PB908"]; got != 0 {

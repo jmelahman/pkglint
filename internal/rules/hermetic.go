@@ -147,7 +147,7 @@ var hermeticRules = []Rule{
 // specific invocation touches the network.
 var networkCommands = map[string]func(Command) bool{
 	"curl": always, "wget": always, "aria2c": always, "axel": always,
-	"scp": always, "sftp": always, "rsync": always,
+	"scp": always, "sftp": always, "rsync": rsyncRemote,
 	"git": func(c Command) bool {
 		switch c.Subcommand() {
 		case "clone", "fetch", "pull", "ls-remote", "submodule", "remote":
@@ -321,6 +321,35 @@ var networkCommands = map[string]func(Command) bool{
 }
 
 func always(Command) bool { return true }
+
+// rsyncRemote reports whether an rsync reaches another host. rsync is as
+// often a cp with better flags (`rsync -a "$srcdir/opt" "$pkgdir/opt"`), and
+// only an operand naming a host — host:path, user@host:path, host::module,
+// rsync://… — or a remote shell (-e/--rsh) leaves the machine. An operand
+// pkglint cannot read counts as remote unless it is rooted in the build tree.
+func rsyncRemote(c Command) bool {
+	for i, a := range c.Args {
+		switch {
+		case a == "-e" || strings.HasPrefix(a, "--rsh"):
+			return true
+		case strings.HasPrefix(a, "-"):
+			if !strings.HasPrefix(a, "--") && strings.Contains(a, "e") {
+				return true // -avze ssh
+			}
+			continue
+		case strings.Contains(a, "://"):
+			return true
+		}
+		head, _, _ := strings.Cut(a, "/")
+		if strings.Contains(head, ":") {
+			return true
+		}
+		if argOpaque(c, i) && !hasPrefixAny(a, "$pkgdir", "${pkgdir", "$srcdir", "${srcdir", "$startdir", "${startdir") {
+			return true
+		}
+	}
+	return false
+}
 
 func pipxFetches(c Command) bool {
 	switch c.Subcommand() {

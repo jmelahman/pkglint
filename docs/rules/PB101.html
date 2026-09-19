@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PB101: skipped-checksum — AUR Report Card</title>
+<meta name="description" content="PB101 (skipped-checksum): Every remote, non-VCS source should carry a real checksum. `SKIP` means makepkg performs no integrity verification at all: if the upstream file or the connection is tampered…">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/rules/PB101.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="PB101: skipped-checksum — AUR Report Card">
+<meta property="og:description" content="PB101 (skipped-checksum): Every remote, non-VCS source should carry a real checksum. `SKIP` means makepkg performs no integrity verification at all: if the upstream file or the connection is tampered…">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/rules/PB101.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">PB101</div>
+  <div>
+    <p class="eyebrow"><a href="../index.html">AUR report card</a> ·
+      <a href="index.html">Rule reference</a></p>
+    <h1><span class="obj">skipped-checksum</span></h1>
+    
+    <p class="lede">Every remote, non-VCS source should carry a real checksum. <code>SKIP</code> means makepkg performs no integrity verification at all: if the upstream file or the connection is tampered with, nothing notices. Pin the artifact with a sha256 or stronger digest. Detached signature files and the artifacts they verify are exempt — there the PGP machinery does the verifying, and PB111 flags it when that machinery is unanchored.</p>
+    
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Example</div>
+  <div>
+    <div class="example">
+      <figure class="bad">
+        <figcaption><span class="tag-bad">Flagged</span></figcaption>
+        <pre>source=(&#34;https://example.com/foo-$pkgver.tar.gz&#34;)
+sha256sums=(&#39;SKIP&#39;)</pre>
+      </figure>
+      <figure class="good">
+        <figcaption><span class="tag-good">Preferred</span></figcaption>
+        <pre>source=(&#34;https://example.com/foo-$pkgver.tar.gz&#34;)
+sha256sums=(&#39;9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08&#39;)</pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <div class="tag">Suppress</div>
+  <div>
+    <p>If a package trips this rule on purpose and you have reviewed it, put the directive on
+    the offending line or the line above it:</p>
+    <pre class="snippet"># pkglint: ignore=PB101</pre>
+    <p>It covers only that line pair, in that file. Passing <code>--ignore PB101</code>
+    turns the rule off for a whole run instead.</p>
+    <nav class="rulenav">
+      <span></span>
+      <a href="PB102.html">PB102 weak-checksum &rarr;</a>
+    </nav>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

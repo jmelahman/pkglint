@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jdk17-openj9-bin — AUR Report Card</title>
+<meta name="description" content="pkglint grade B for aur/jdk17-openj9-bin: 4 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/jdk17-openj9-bin.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="jdk17-openj9-bin — AUR Report Card">
+<meta property="og:description" content="pkglint grade B for aur/jdk17-openj9-bin: 4 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/jdk17-openj9-bin.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-B" title="grade B">B</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>jdk17-openj9-bin</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>17.0.20.1_openj9_0.61.0-1</b>
+          
+          <span>maintained by roryhealy</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/jdk17-openj9-bin">AUR page</a>
+          
+          <a href="../badge/jdk17-openj9-bin.svg">badge</a>
+        </p>
+        <p>IBM Semeru OpenJ9 with openjdk17</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 4</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 1</div>
+        <div class="rid"><a href="../rules/PB601.html">PB601</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          pkgver differs between PKGBUILD (&#34;$_jdkfullver_openj9_0.61.0&#34;) and .SRCINFO (&#34;17.0.20.1_openj9_0.61.0&#34;); regenerate .SRCINFO
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;custom&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 28</div>
+        <div class="rid"><a href="../rules/PB919.html">PB919</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          conflicts lists the package&#39;s own name &#34;jdk17-openj9-bin&#34;; a package can never conflict with itself, so the entry is dead metadata the guidelines say to drop
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 30</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;developer.ibm.com&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

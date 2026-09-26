@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>airmanager — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/airmanager: 20 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/airmanager.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="airmanager — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/airmanager: 20 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/airmanager.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>airmanager</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>5.2.7-1</b>
+          
+          <span>maintained by nsyntych</span>
+          
+          <span>0 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/airmanager">AUR page</a>
+          
+          <a href="../badge/airmanager.svg">badge</a>
+        </p>
+        <p>Flight simulator instrument panels</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 20</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 13</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libfreeimage.deb::http://archive.ubuntu.com/ubuntu/pool/universe/f/freeimage/libfreeimage3_3.18.0&#43;ds2-1ubuntu3_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 13</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 14</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libjxr0.deb::http://archive.ubuntu.com/ubuntu/pool/universe/j/jxrlib/libjxr0_1.1-6build1_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 14</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 15</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libjpeg8.deb::http://archive.ubuntu.com/ubuntu/pool/main/libj/libjpeg8-empty/libjpeg8_8c-2ubuntu8_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 15</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libjpeg-turbo8.deb::http://archive.ubuntu.com/ubuntu/pool/main/libj/libjpeg-turbo/libjpeg-turbo8_2.0.3-0ubuntu1_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libraw19.deb::http://archive.ubuntu.com/ubuntu/pool/main/libr/libraw/libraw19_0.19.5-1ubuntu1_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libopenexr.deb::http://archive.ubuntu.com/ubuntu/pool/universe/o/openexr/libopenexr24_2.3.0-6ubuntu0.5_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 19</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libilmbase.deb::http://archive.ubuntu.com/ubuntu/pool/universe/i/ilmbase/libilmbase24_2.3.0-6build1_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 19</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libtiff5.deb::http://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.0.9-5ubuntu0.10_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libwebp6.deb::http://archive.ubuntu.com/ubuntu/pool/main/libw/libwebp/libwebp6_0.6.1-2ubuntu0.20.04.3_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB104.html">PB104</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;libjbig0.deb::http://archive.ubuntu.com/ubuntu/pool/main/j/jbigkit/libjbig0_2.1-3.1build1_amd64.deb&#34; is fetched over unencrypted http://; the pinned digest still verifies it, so this costs availability rather than integrity
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 22</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;archive.ubuntu.com&#34; differs from project url host &#34;siminnovations.com&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

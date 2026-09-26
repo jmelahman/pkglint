@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lib32-virtualgl — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for multilib/lib32-virtualgl: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/lib32-virtualgl.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="lib32-virtualgl — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for multilib/lib32-virtualgl: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/lib32-virtualgl.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>lib32-virtualgl</h1>
+        
+        <p class="facts">
+          <span class="repo repo-multilib">multilib</span>
+          <b>3.1.5-1</b>
+          
+          <span>maintained by svenstaro</span>
+          <span>packaged by Sven-Hendrik Haase</span>
+          <a href="https://archlinux.org/pkgbase/lib32-virtualgl/">Arch Linux page</a>
+          <a href="https://gitlab.archlinux.org/archlinux/packaging/packages/lib32-virtualgl">PKGBUILD</a>
+          
+          <a href="../badge/lib32-virtualgl.svg">badge</a>
+        </p>
+        <p>32-bit serverside components for 64-bit VirtualGL servers</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 7</div>
+        <div class="rid"><a href="../rules/PB975.html">PB975</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          lib32 package descriptions end with &#34;(32-bit)&#34; so the variant is visible everywhere pacman shows the one-line description
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 10</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;LGPL&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 12</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;lib32-libxv&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 12</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;lib32-glu&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 12</div>
+        <div class="rid"><a href="../rules/PB904.html">PB904</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          &#34;virtualgl&#34; is already in depends; every runtime dependency is installed at build time too
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 13</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;virtualgl.org&#34;
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

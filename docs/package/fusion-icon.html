@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fusion-icon — AUR Report Card</title>
+<meta name="description" content="pkglint grade F for aur/fusion-icon: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/fusion-icon.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="fusion-icon — AUR Report Card">
+<meta property="og:description" content="pkglint grade F for aur/fusion-icon: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/fusion-icon.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-F" title="grade F">F</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>fusion-icon</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>1:0.2.4-1</b>
+          
+          <span>maintained by raquelmoura</span>
+          
+          <span>52 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/fusion-icon">AUR page</a>
+          
+          <a href="../badge/fusion-icon.svg">badge</a>
+        </p>
+        <p>Simple tray icon for Compiz 0.8</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 14</div>
+        <div class="rid"><a href="../rules/PB920.html">PB920</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          license &#34;GPL&#34; is a pre-SPDX identifier; Arch packages declare SPDX license expressions (e.g. GPL-2.0-or-later, BSD-3-Clause)
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 18</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;github.com&#34; differs from project url host &#34;www.compiz.org&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-critical">
+        <div class="loc">line 25</div>
+        <div class="rid"><a href="../rules/PB301.html">PB301</a></div>
+        <div class="msg"><span class="sev critical">critical</span>
+          &#34;python2&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 41</div>
+        <div class="rid"><a href="../rules/PB934.html">PB934</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          python setup.py build uses the removed distutils flow; the Python package guidelines build with `python -m build` and install with `python -m installer`
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 46</div>
+        <div class="rid"><a href="../rules/PB934.html">PB934</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          python setup.py install uses the removed distutils flow; the Python package guidelines build with `python -m build` and install with `python -m installer`
+          </div>
+      </div>
+      
+    </div>
+    
+    <p class="file">fusion-icon.install</p>
+    <div class="findings">
+      
+      <div class="finding sev-info">
+        <div class="loc">line 2</div>
+        <div class="rid"><a href="../rules/PB504.html">PB504</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          gtk-update-icon-cache is run automatically by a pacman hook since pacman 5.0; this scriptlet call is redundant
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

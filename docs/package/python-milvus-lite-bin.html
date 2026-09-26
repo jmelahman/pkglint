@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>python-milvus-lite-bin — AUR Report Card</title>
+<meta name="description" content="pkglint grade C for aur/python-milvus-lite-bin: 3 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../assets/site.css?v=918ceb8d">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/python-milvus-lite-bin.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="python-milvus-lite-bin — AUR Report Card">
+<meta property="og:description" content="pkglint grade C for aur/python-milvus-lite-bin: 3 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/python-milvus-lite-bin.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-C" title="grade C">C</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>python-milvus-lite-bin</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>2.5.1-1</b>
+          
+          <span>maintained by robertkiss</span>
+          
+          <span>1 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/python-milvus-lite-bin">AUR page</a>
+          
+          <a href="../badge/python-milvus-lite-bin.svg">badge</a>
+        </p>
+        <p>A lightweight version of Milvus wrapped with Python.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 3</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 16</div>
+        <div class="rid"><a href="../rules/PB932.html">PB932</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;…-2.5.1-py3-none-manylinux2014_x86_64.whl&#34; is a pre-built wheel; the Python package guidelines require building from the sdist so the code compiled is the code reviewed
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 17</div>
+        <div class="rid"><a href="../rules/PB932.html">PB932</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          source &#34;…-2.5.1-py3-none-manylinux2014_aarch64.whl&#34; is a pre-built wheel; the Python package guidelines require building from the sdist so the code compiled is the code reviewed
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 20</div>
+        <div class="rid"><a href="../rules/PB901.html">PB901</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          architecture &#34;x86_64&#34; is hardcoded; use $CARCH so the PKGBUILD ports to other architectures
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

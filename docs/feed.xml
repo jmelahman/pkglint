@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>pkglint: new security findings</title>
+  <subtitle>Arch package bases whose latest change introduced a critical finding, a security error, or provenance drift.</subtitle>
+  <id>https://jamison.lahman.dev/pkglint/feed.xml</id>
+  <updated>2026-10-24T04:35:30Z</updated>
+  <author>
+    <name>pkglint</name>
+  </author>
+  <link rel="self" type="application/atom+xml" href="https://jamison.lahman.dev/pkglint/feed.xml"></link>
+  <link rel="alternate" type="text/html" href="https://jamison.lahman.dev/pkglint/"></link>
+  <entry>
+    <title type="text">framework-control-beta 0.5.6-5 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/framework-control-beta/1792815110</id>
+    <published>2026-10-24T04:35:30Z</published>
+    <updated>2026-10-24T04:35:30Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/framework-control-beta"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=framework-control-beta"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/framework-control-beta.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/ozturkkl/framework-control/archive/refs/tags/0.5.6.tar.gz changed (f4247a5b1466… → 8b0128882cd1…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">mixing-station 3.2.0-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/mixing-station/1792789043</id>
+    <published>2026-10-23T21:25:08Z</published>
+    <updated>2026-10-23T21:25:08Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/mixing-station"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=mixing-station"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/mixing-station.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://mixingstation.app/backend/api/web/download/archive/mixing-station-pc/update/3.2.0 changed (91d2f9270ddc… → 54952ac73f54…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">mircode-bin 1.1.0-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/mircode-bin/1792776300</id>
+    <published>2026-10-23T17:54:52Z</published>
+    <updated>2026-10-23T17:54:52Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/mircode-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=mircode-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/mircode-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/LaT-SKY/MirCode/releases/download/v1.1.0/mircode-v1.1.0-linux-amd64.tar.gz changed (7a9979b6dd72… → f9e6f6267260…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">linux-cachyos-jetm 7.3.0-6 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/linux-cachyos-jetm/1792760598</id>
+    <published>2026-10-23T13:37:44Z</published>
+    <updated>2026-10-23T13:37:44Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/linux-cachyos-jetm"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=linux-cachyos-jetm"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/linux-cachyos-jetm.html"></link>
+    <link rel="related" title="PB301" href="https://jamison.lahman.dev/pkglint/rules/PB301.html"></link>
+    <category term="aur"></category>
+    <category term="PB301"></category>
+    <content type="text">critical PB301 PKGBUILD:410 &#34;_purge_fetched_patches&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction&#xA;</content>
+  </entry>
+</feed>

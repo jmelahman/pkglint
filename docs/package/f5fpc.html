@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>f5fpc · AUR Report Card</title>
+<meta name="description" content="pkglint grade D for aur/f5fpc: 6 finding(s) from static analysis.">
+
+<link rel="stylesheet" href="../design/design.css?v=589a7284">
+<link rel="stylesheet" href="../assets/site.css?v=589a7284">
+
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/atom+xml" title="pkglint: new security findings" href="../feed.xml">
+
+<link rel="canonical" href="https://jamison.lahman.dev/pkglint/package/f5fpc.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUR Report Card">
+<meta property="og:title" content="f5fpc · AUR Report Card">
+<meta property="og:description" content="pkglint grade D for aur/f5fpc: 6 finding(s) from static analysis.">
+<meta property="og:url" content="https://jamison.lahman.dev/pkglint/package/f5fpc.html">
+<meta property="og:image" content="https://jamison.lahman.dev/pkglint/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The AUR Report Card masthead over pkglint&#39;s grade ramp: A for no warnings through F for any critical finding.">
+
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div>
+    <a class="mark" href="../index.html"><b>pkglint</b><span>AUR report card</span></a>
+    <nav>
+      <a href="../rules/index.html">Rules</a>
+      <a href="../results.json">JSON</a>
+      <a href="../feed.xml" title="Packages whose latest change introduced a security finding">Feed</a>
+      <a href="https://github.com/jmelahman/pkglint">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="row">
+  <div class="tag">Package</div>
+  <div>
+    <div class="pkghead">
+      <div class="stamp stamp-D" title="grade D">D</div>
+      <div>
+        <p class="eyebrow"><a href="../index.html">AUR report card</a></p>
+        <h1>f5fpc</h1>
+        
+        <p class="facts">
+          <span class="repo repo-aur">aur</span>
+          <b>7272.0.0.2-3</b>
+          
+          <span>maintained by zrhoffman</span>
+          
+          <span>4 votes</span>
+          <a href="https://aur.archlinux.org/pkgbase/f5fpc">AUR page</a>
+          
+          <a href="../badge/f5fpc.svg">README badge</a>
+        </p>
+        <p>Command-line VPN client using FastPPP to connect to F5Networks BIG-IP APM 13.0</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="row">
+  <div class="tag">Drift</div>
+  <div>
+    <div class="note note-alert">
+      <h3>Source drift since the previous scan</h3>
+      <ul><li>b2 checksum for https://vpn.f5networks.net/public/download/linux_f5cli.aarch64.deb changed (dd595bc76eda… → 3845e1caae7a…) while the URL stayed the same: the artifact is no longer the one previously reviewed</li><li>b2 checksum for https://vpn.f5networks.net/public/download/linux_f5cli.x86_64.deb changed (6714a424b78d… → a6a5b9e07533…) while the URL stayed the same: the artifact is no longer the one previously reviewed</li><li>sha256 checksum for https://vpn.f5networks.net/public/download/linux_f5cli.aarch64.deb changed (4f503e035fa5… → 2a8886a9816b…) while the URL stayed the same: the artifact is no longer the one previously reviewed</li><li>sha256 checksum for https://vpn.f5networks.net/public/download/linux_f5cli.x86_64.deb changed (dcfe671ac8d0… → f9b436e89277…) while the URL stayed the same: the artifact is no longer the one previously reviewed</li></ul>
+      <p>A changed artifact behind an unchanged URL, or a commit pin that moved without a
+      version bump, is the shape a hijacked upstream release takes. A legitimately
+      re-tagged release looks exactly the same, which is why this one is worth re-reading.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="row">
+  <div class="tag">Findings<small>n = 6</small></div>
+  <div>
+  
+    
+    <p class="file">PKGBUILD</p>
+    <div class="findings">
+      
+      <div class="finding sev-error">
+        <div class="loc">line 8</div>
+        <div class="rid"><a href="../rules/PB101.html">PB101</a></div>
+        <div class="msg"><span class="sev error">error</span>
+          remote source &#34;license.html::https://cdn.f5.com/product/apm/apps/eula.html&#34; has no checksum (SKIP): the download is never verified
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 9</div>
+        <div class="rid"><a href="../rules/PB902.html">PB902</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          custom variable &#34;mirror&#34; should be prefixed with an underscore (_mirror) to avoid clashing with makepkg fields
+          <span class="fix fix-unsafe" title="pkglint rewrites this for you with --unsafe-fix">--unsafe-fix</span></div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 10</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;vpn.f5networks.net&#34; differs from project url host &#34;techdocs.f5.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-info">
+        <div class="loc">line 11</div>
+        <div class="rid"><a href="../rules/PB105.html">PB105</a></div>
+        <div class="msg"><span class="sev info">info</span>
+          source host &#34;vpn.f5networks.net&#34; differs from project url host &#34;techdocs.f5.com&#34;
+          </div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 21</div>
+        <div class="rid"><a href="../rules/PB918.html">PB918</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          provides lists the package&#39;s own name &#34;f5fpc&#34;; a package always provides itself, so the entry is dead metadata the guidelines say to drop
+          <span class="fix fix-safe" title="pkglint rewrites this for you with --fix">--fix</span></div>
+      </div>
+      
+      <div class="finding sev-warn">
+        <div class="loc">line 36</div>
+        <div class="rid"><a href="../rules/PB403.html">PB403</a></div>
+        <div class="msg"><span class="sev warn">warn</span>
+          chmod u&#43;s creates a setuid/setgid file
+          </div>
+      </div>
+      
+    </div>
+    
+  
+  </div>
+</section>
+
+</main>
+</body>
+</html>

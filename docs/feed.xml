@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>pkglint: new security findings</title>
+  <subtitle>Arch package bases whose latest change introduced a critical finding, a security error, or provenance drift.</subtitle>
+  <id>https://jamison.lahman.dev/pkglint/feed.xml</id>
+  <updated>2026-10-30T16:01:11Z</updated>
+  <author>
+    <name>pkglint</name>
+  </author>
+  <link rel="self" type="application/atom+xml" href="https://jamison.lahman.dev/pkglint/feed.xml"></link>
+  <link rel="alternate" type="text/html" href="https://jamison.lahman.dev/pkglint/"></link>
+  <entry>
+    <title type="text">linux-galaxyaudio-bin 7.2.11-1 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/linux-galaxyaudio-bin/1793361410</id>
+    <published>2026-10-30T16:01:11Z</published>
+    <updated>2026-10-30T16:01:11Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/linux-galaxyaudio-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=linux-galaxyaudio-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/linux-galaxyaudio-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-7.2.11-1-x86_64.pkg.tar.zst changed (38916204c905… → 83391dc31a0a…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-headers-7.2.11-1-x86_64.pkg.tar.zst changed (09bf69d640e1… → 6d899f06dcde…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">pacman-tmpfs 2026.10.31-1 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/pacman-tmpfs/1793374126</id>
+    <published>2026-10-30T15:52:51Z</published>
+    <updated>2026-10-30T15:52:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/pacman-tmpfs"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=pacman-tmpfs"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/pacman-tmpfs.html"></link>
+    <link rel="related" title="PB301" href="https://jamison.lahman.dev/pkglint/rules/PB301.html"></link>
+    <category term="aur"></category>
+    <category term="PB301"></category>
+    <content type="text">critical PB301 PKGBUILD:50 &#34;echo&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">powerline-console-fonts 20240322-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/powerline-console-fonts/1793300862</id>
+    <published>2026-10-30T15:52:51Z</published>
+    <updated>2026-10-30T15:52:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/powerline-console-fonts"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=powerline-console-fonts"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/powerline-console-fonts.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha512 checksum for https://raw.githubusercontent.com/powerline/powerline/develop/LICENSE changed (65ca72eeab47… → 837073c64e26…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">sober-bin 2026.10.30-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/sober-bin/1793314131</id>
+    <published>2026-10-30T15:52:51Z</published>
+    <updated>2026-10-30T15:52:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/sober-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=sober-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/sober-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://pkg.sober-dev.app/ce/sober_v$_upstream_version_linux_amd64 changed (17717bc0a518… → 92be4898ddf3…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">pho-bin 1.0.6-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/pho-bin/1793318153</id>
+    <published>2026-10-30T00:25:13Z</published>
+    <updated>2026-10-30T00:25:13Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/pho-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=pho-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/pho-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/utkarsh261/pho/releases/download/v1.0.4/$_appname_$pkgver_�.tar.gz changed (7b5a618539ff… → ab0db116170c…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">kew 4.4.1-2 (extra): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/extra/kew/1792740853</id>
+    <published>2026-10-29T16:40:48Z</published>
+    <updated>2026-10-29T16:40:48Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://archlinux.org/pkgbase/kew/"></link>
+    <link rel="related" title="PKGBUILD" href="https://gitlab.archlinux.org/archlinux/packaging/packages/kew"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/kew.html"></link>
+    <category term="extra"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha512 checksum for https://codeberg.org/ravachol/kew/archive/v4.4.1.tar.gz changed (1aab7b57aeff… → ef0127c54c7b…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">zen-browser-i18n 1.23b-1 (aur): 1 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/zen-browser-i18n/1793271761</id>
+    <published>2026-10-29T16:19:01Z</published>
+    <updated>2026-10-29T16:19:01Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/zen-browser-i18n"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=zen-browser-i18n"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/zen-browser-i18n.html"></link>
+    <link rel="related" title="PB302" href="https://jamison.lahman.dev/pkglint/rules/PB302.html"></link>
+    <category term="aur"></category>
+    <category term="PB302"></category>
+    <content type="text">error PB302 PKGBUILD:54 eval assembles and executes code at build time, defeating static review&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">ir-bin 0.4.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/ir-bin/1793216296</id>
+    <published>2026-10-29T16:17:09Z</published>
+    <updated>2026-10-29T16:17:09Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/ir-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=ir-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/ir-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/r-lib/ir/releases/download/v0.4.1/ir-aarch64-unknown-linux-gnu.tar.gz changed (6fd9281e538c… → 92649e568cb8…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">linux-galaxyaudio-bin 7.2.11-1 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/linux-galaxyaudio-bin/1793275634</id>
+    <published>2026-10-29T16:17:09Z</published>
+    <updated>2026-10-29T16:17:09Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/linux-galaxyaudio-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=linux-galaxyaudio-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/linux-galaxyaudio-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-7.2.11-1-x86_64.pkg.tar.zst changed (68f68d4f9392… → 38916204c905…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-headers-7.2.11-1-x86_64.pkg.tar.zst changed (3394bbb86564… → 09bf69d640e1…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">r-rig-bin 0.11.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/r-rig-bin/1793216275</id>
+    <published>2026-10-29T16:17:09Z</published>
+    <updated>2026-10-29T16:17:09Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/r-rig-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=r-rig-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/r-rig-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/r-lib/rig/releases/download/v0.11.1/rig-linux-aarch64-0.11.1.tar.gz changed (757b5b7886b0… → 2b796885bc03…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">r-rig 0.11.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/r-rig/1793216277</id>
+    <published>2026-10-29T16:17:09Z</published>
+    <updated>2026-10-29T16:17:09Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/r-rig"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=r-rig"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/r-rig.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha512 checksum for https://github.com/r-lib/rig/archive/v0.11.1.tar.gz changed (4b91a08f16f9… → 3037e85b06fd…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">raven-bin 0.21.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/raven-bin/1793216308</id>
+    <published>2026-10-29T16:17:09Z</published>
+    <updated>2026-10-29T16:17:09Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/raven-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=raven-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/raven-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/jbearak/raven/releases/download/v0.21.1/raven-linux-arm64.zip changed (f051b3e083de… → 8dfa4ebf4aad…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">rpx-bin 2.1.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/rpx-bin/1793216315</id>
+    <published>2026-10-29T16:17:09Z</published>
+    <updated>2026-10-29T16:17:09Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/rpx-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=rpx-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/rpx-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/scalerail-solutions/rpx/releases/download/v2.1.1/rpx-aarch64-unknown-linux-gnu.tar.xz changed (d877d9d4e4ea… → dc07cdf13a88…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">sable-bin 2.2.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/sable-bin/1793283841</id>
+    <published>2026-10-29T16:08:49Z</published>
+    <updated>2026-10-29T16:08:49Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/sable-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=sable-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/sable-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://git.sable.moe/SableClient/sable-next/releases/download/v2.2.1/sable-2.2.1-amd64.deb changed (b2313f264b44… → 4b324c97ee03…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">skalibs-git 2.16.0.0.r2.g4fbc763-1 (aur): 1 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/skalibs-git/1793235656</id>
+    <published>2026-10-29T01:49:33Z</published>
+    <updated>2026-10-29T01:49:33Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/skalibs-git"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=skalibs-git"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/skalibs-git.html"></link>
+    <link rel="related" title="PB104" href="https://jamison.lahman.dev/pkglint/rules/PB104.html"></link>
+    <category term="aur"></category>
+    <category term="PB104"></category>
+    <content type="text">error PB104 PKGBUILD:13 source &#34;$pkgname::git+git://git.skarnet.org/skalibs&#34; is fetched over unencrypted git:// with nothing verifying what arrives&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">yancat-countdown-bin 1.7.1-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/yancat-countdown-bin/1793207818</id>
+    <published>2026-10-28T17:25:51Z</published>
+    <updated>2026-10-28T17:25:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/yancat-countdown-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=yancat-countdown-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/yancat-countdown-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/yan-cat/countdown/releases/download/v1.7.1/Countdown-linux-x86_64.tar.gz changed (976222ebdce3… → b916c9907c87…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">whoisthat 0.14.3-4 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/whoisthat/1793172558</id>
+    <published>2026-10-28T16:13:34Z</published>
+    <updated>2026-10-28T16:13:34Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/whoisthat"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=whoisthat"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/whoisthat.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/kvunoff/whoisthat/archive/refs/tags/v0.14.3.tar.gz changed (024a83de4ba6… → 86c655bb1af2…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">serial-port-utility-bin 6.6.8-1 (aur): 1 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/serial-port-utility-bin/1793088078</id>
+    <published>2026-10-28T16:07:48Z</published>
+    <updated>2026-10-28T16:07:48Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/serial-port-utility-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=serial-port-utility-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/serial-port-utility-bin.html"></link>
+    <link rel="related" title="PB503" href="https://jamison.lahman.dev/pkglint/rules/PB503.html"></link>
+    <category term="aur"></category>
+    <category term="PB503"></category>
+    <content type="text">error PB503 �.install:1 install scriptlet could not be read or parsed and was not analyzed: stat �.install: invalid argument&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">ryzen-smu-dkms 1.0-7 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/ryzen-smu-dkms/1792896037</id>
+    <published>2026-10-28T16:06:46Z</published>
+    <updated>2026-10-28T16:06:46Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/ryzen-smu-dkms"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=ryzen-smu-dkms"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/ryzen-smu-dkms.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift pinned commit for git+https://github.com/MadGoatHaz/RamSleuth.git moved (0562ec9391b4… → 0ae168dcb289…) without a pkgver change&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">linux-galaxyaudio-bin 7.2.11-1 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/linux-galaxyaudio-bin/1793188562</id>
+    <published>2026-10-28T16:05:16Z</published>
+    <updated>2026-10-28T16:05:16Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/linux-galaxyaudio-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=linux-galaxyaudio-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/linux-galaxyaudio-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-7.2.11-1-x86_64.pkg.tar.zst changed (0996e9e67076… → 68f68d4f9392…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-headers-7.2.11-1-x86_64.pkg.tar.zst changed (5cf75e5830b5… → 3394bbb86564…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">metapi 1.9.2-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/metapi/1793188229</id>
+    <published>2026-10-28T16:05:16Z</published>
+    <updated>2026-10-28T16:05:16Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/metapi"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=metapi"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/metapi.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/wyf9661/metapi/archive/refs/tags/v1.9.2.tar.gz changed (803161962e77… → 0c49a590e37f…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">icecat 153.6.0-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/icecat/1793138510</id>
+    <published>2026-10-28T15:59:28Z</published>
+    <updated>2026-10-28T15:59:28Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/icecat"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=icecat"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/icecat.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift pinned commit for git+https://https.git.savannah.gnu.org/git/gnuzilla.git moved (a3ef38e25706… → 06bc11d237bb…) without a pkgver change&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">kanata-switcher 1.2.0-1 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/kanata-switcher/1793199373</id>
+    <published>2026-10-28T15:59:28Z</published>
+    <updated>2026-10-28T15:59:28Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/kanata-switcher"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=kanata-switcher"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/kanata-switcher.html"></link>
+    <link rel="related" title="PB501" href="https://jamison.lahman.dev/pkglint/rules/PB501.html"></link>
+    <category term="aur"></category>
+    <category term="PB501"></category>
+    <content type="text">critical PB501 kanata-switcher.install:42 curl accesses the network from an install scriptlet running as root&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">konform-browser 1:153.6.0.100-2 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/konform-browser/1793170838</id>
+    <published>2026-10-28T15:59:28Z</published>
+    <updated>2026-10-28T15:59:28Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/konform-browser"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=konform-browser"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/konform-browser.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://codeberg.org/konform-browser/source/releases/download/$_srcver.$_lwrelver/security-state--intermediates.zip changed (2fe9151f44f1… → ab91a4abb6c9…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/mozilla-l10n/firefox-l10n/archive/$_l10n_commit.tar.gz changed (50b9d366fb58… → 9b522f126c7e…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">hdas 1.6.1-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/hdas/1793186528</id>
+    <published>2026-10-28T11:41:12Z</published>
+    <updated>2026-10-28T11:41:12Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/hdas"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=hdas"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/hdas.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/adelmonte/hdas/archive/refs/tags/v1.6.1.tar.gz changed (f7b20acab999… → 7bf65f4e03e9…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">layaair-ide 3.4.2-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/layaair-ide/1793158920</id>
+    <published>2026-10-28T05:41:26Z</published>
+    <updated>2026-10-28T05:41:26Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/layaair-ide"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=layaair-ide"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/layaair-ide.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://ldc-1251285021.file.myqcloud.com/layaair3/layaair-3.4/linux/LayaAirIDE-linux-x86_64-3.4.2.AppImage changed (b6e0d5eab743… → cc890ec91611…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">zen-browser-twilight-bin 1.24t.20261026-2 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/zen-browser-twilight-bin/1793143696</id>
+    <published>2026-10-28T00:03:24Z</published>
+    <updated>2026-10-28T00:03:24Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/zen-browser-twilight-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=zen-browser-twilight-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/zen-browser-twilight-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift b2 checksum for https://github.com/zen-browser/desktop/releases/download/twilight-1/zen.linux-aarch64.tar.xz changed (a5698dcc5e50… → 6f02075e4cfb…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift b2 checksum for https://github.com/zen-browser/desktop/releases/download/twilight-1/zen.linux-x86_64.tar.xz changed (24d444df8146… → 73fee3ed3942…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">devcrate 0.2.0-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/devcrate/1793116301</id>
+    <published>2026-10-27T16:02:51Z</published>
+    <updated>2026-10-27T16:02:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/devcrate"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=devcrate"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/devcrate.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/LongYinStudio/DevCrate/releases/download/v0.2.0/devcrate_$pkgver_amd64.deb changed (sha256:d14cb… → d14cbc84ff5a…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">sober-bin 2026.10.28-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/sober-bin/1793114577</id>
+    <published>2026-10-27T16:02:51Z</published>
+    <updated>2026-10-27T16:02:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/sober-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=sober-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/sober-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://pkg.sober-dev.app/ce/sober_v$_upstream_version_linux_amd64 changed (658e3d3fe6a0… → 17717bc0a518…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">sparrow-wifi-git r400.b4f4592-1 (aur): 1 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/sparrow-wifi-git/1793116365</id>
+    <published>2026-10-27T16:02:51Z</published>
+    <updated>2026-10-27T16:02:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/sparrow-wifi-git"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=sparrow-wifi-git"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/sparrow-wifi-git.html"></link>
+    <link rel="related" title="PB503" href="https://jamison.lahman.dev/pkglint/rules/PB503.html"></link>
+    <category term="aur"></category>
+    <category term="PB503"></category>
+    <content type="text">error PB503 �.install:1 install scriptlet could not be read or parsed and was not analyzed: stat �.install: invalid argument&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">plasma-theme-master 2.1.0-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/plasma-theme-master/1792802168</id>
+    <published>2026-10-27T15:34:53Z</published>
+    <updated>2026-10-27T15:34:53Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/plasma-theme-master"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=plasma-theme-master"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/plasma-theme-master.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/SonOfMithras/plasma-theme-master/archive/refs/tags/v2.1.0.tar.gz changed (bf849f892a62… → cf99fcfb6a9f…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">ncmdump-latest-bin 1.5.0-1 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/ncmdump-latest-bin/1792991291</id>
+    <published>2026-10-27T15:31:46Z</published>
+    <updated>2026-10-27T15:31:46Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/ncmdump-latest-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=ncmdump-latest-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/ncmdump-latest-bin.html"></link>
+    <link rel="related" title="PB301" href="https://jamison.lahman.dev/pkglint/rules/PB301.html"></link>
+    <category term="aur"></category>
+    <category term="PB301"></category>
+    <content type="text">critical PB301 PKGBUILD:48 &#34;_main&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">linux-galaxyaudio-bin 7.2.11-1 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/linux-galaxyaudio-bin/1793100182</id>
+    <published>2026-10-27T15:29:38Z</published>
+    <updated>2026-10-27T15:29:38Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/linux-galaxyaudio-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=linux-galaxyaudio-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/linux-galaxyaudio-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-7.2.11-1-x86_64.pkg.tar.zst changed (170f23c2fe15… → 0996e9e67076…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/antpln/linux-galaxyaudio/releases/download/v7.2.11/linux-galaxyaudio-headers-7.2.11-1-x86_64.pkg.tar.zst changed (cfcbe4c802ca… → 5cf75e5830b5…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">calibraw-bin 1.3.1-3 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/calibraw-bin/1793058491</id>
+    <published>2026-10-27T15:23:25Z</published>
+    <updated>2026-10-27T15:23:25Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/calibraw-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=calibraw-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/calibraw-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/Duecki1/CalibRaw/releases/download/v1.3.1/CalibRaw-�.AppImage changed (57ac3f9b29d2… → 73196e224d92…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">dsh-desktop-bin 0.12.1-7 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/dsh-desktop-bin/1793086095</id>
+    <published>2026-10-27T15:23:25Z</published>
+    <updated>2026-10-27T15:23:25Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/dsh-desktop-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=dsh-desktop-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/dsh-desktop-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/xy-arch-git/dsh-desktop-linux/releases/download/v0.12.1/dsh-desktop-0.12.1-linux-x64.tar.zst changed (197b21ab06dc… → eb9eb69a4c39…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">nperf-gui-appimage 2.15.11-1 (aur): 2 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/nperf-gui-appimage/1793050596</id>
+    <published>2026-10-27T15:23:25Z</published>
+    <updated>2026-10-27T15:23:25Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/nperf-gui-appimage"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=nperf-gui-appimage"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/nperf-gui-appimage.html"></link>
+    <link rel="related" title="PB302" href="https://jamison.lahman.dev/pkglint/rules/PB302.html"></link>
+    <category term="aur"></category>
+    <category term="PB302"></category>
+    <content type="text">error PB302 PKGBUILD:22 eval assembles and executes code at build time, defeating static review&#xA;error PB302 PKGBUILD:23 eval assembles and executes code at build time, defeating static review&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">youtube-to-mp3 3.9.24-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/youtube-to-mp3/1793095094</id>
+    <published>2026-10-27T10:33:29Z</published>
+    <updated>2026-10-27T10:33:29Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/youtube-to-mp3"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=youtube-to-mp3"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/youtube-to-mp3.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://www.mediahuman.com/de/download/YouTubeToMP3.amd64.deb changed (765abbfb81f2… → 8581f47cff9a…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">alibabasans-puhuiti3-fonts 3.0-5 (aur): 1 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/alibabasans-puhuiti3-fonts/1793071342</id>
+    <published>2026-10-27T05:02:55Z</published>
+    <updated>2026-10-27T05:02:55Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/alibabasans-puhuiti3-fonts"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=alibabasans-puhuiti3-fonts"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/alibabasans-puhuiti3-fonts.html"></link>
+    <link rel="related" title="PB302" href="https://jamison.lahman.dev/pkglint/rules/PB302.html"></link>
+    <category term="aur"></category>
+    <category term="PB302"></category>
+    <content type="text">error PB302 PKGBUILD:43 eval assembles and executes code at build time, defeating static review&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">sober-bin 2026.10.27-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/sober-bin/1793075228</id>
+    <published>2026-10-27T05:02:55Z</published>
+    <updated>2026-10-27T05:02:55Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/sober-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=sober-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/sober-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://pkg.sober-dev.app/ce/sober_v$_upstream_version_linux_amd64 changed (7b06db25af2a… → 658e3d3fe6a0…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">dropout-bin 0.2.0_rc.2-1 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/dropout-bin/1792740344</id>
+    <published>2026-10-26T16:15:31Z</published>
+    <updated>2026-10-26T16:15:31Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/dropout-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=dropout-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/dropout-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/HydroRoll-Team/DropOut/releases/download/dropout-v0.2.0-rc.2/Dropout_0.2.0-rc.2_amd64.deb changed (be086ae3ce5a… → a264a42f6599…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/HydroRoll-Team/DropOut/releases/download/dropout-v0.2.0-rc.2/Dropout_0.2.0-rc.2_arm64.deb changed (4d2c36b2faf4… → e937d7fa94eb…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">sysd-manager 2.24.2-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/sysd-manager/1793025196</id>
+    <published>2026-10-26T16:07:03Z</published>
+    <updated>2026-10-26T16:07:03Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/sysd-manager"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=sysd-manager"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/sysd-manager.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/plrigaux/sysd-manager/archive/refs/tags/v2.24.2.tar.gz changed (b96b7d4a2330… → 949bb822e558…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">updfparser-git r33.6060d12344-3 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/updfparser-git/1793023614</id>
+    <published>2026-10-26T14:16:48Z</published>
+    <updated>2026-10-26T14:16:48Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/updfparser-git"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=updfparser-git"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/updfparser-git.html"></link>
+    <link rel="related" title="PB301" href="https://jamison.lahman.dev/pkglint/rules/PB301.html"></link>
+    <category term="aur"></category>
+    <category term="PB301"></category>
+    <content type="text">critical PB301 PKGBUILD:25 &#34;curl&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">shimelinux 1.4.1-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/shimelinux/1792966794</id>
+    <published>2026-10-25T23:17:04Z</published>
+    <updated>2026-10-25T23:17:04Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/shimelinux"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=shimelinux"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/shimelinux.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/BujjuIsABee/shimelinux/archive/refs/tags/v1.4.1.tar.gz changed (7219779681c2… → 9092d662eee2…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">electron-nightly-bin 47.0.0nightly.20261023-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/electron-nightly-bin/1792888033</id>
+    <published>2026-10-25T13:43:56Z</published>
+    <updated>2026-10-25T13:43:56Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/electron-nightly-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=electron-nightly-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/electron-nightly-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift b2 checksum for https://github.com/electron/nightlies/releases/download/v�/electron-v�-linux-x64.zip changed (dd315965e9e5… → a831c211b6e4…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">guile-gcrypt 0.5.0-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/guile-gcrypt/1792929668</id>
+    <published>2026-10-25T13:43:25Z</published>
+    <updated>2026-10-25T13:43:25Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/guile-gcrypt"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=guile-gcrypt"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/guile-gcrypt.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://codeberg.org/guile-gcrypt/guile-gcrypt/archive/v0.5.0.tar.gz changed (79ea92185f57… → 92dd5d2253ec…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">python-fangfrisch 1.9.3-2 (aur): 1 error</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/python-fangfrisch/1792929937</id>
+    <published>2026-10-25T13:43:25Z</published>
+    <updated>2026-10-25T13:43:25Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/python-fangfrisch"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=python-fangfrisch"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/python-fangfrisch.html"></link>
+    <link rel="related" title="PB503" href="https://jamison.lahman.dev/pkglint/rules/PB503.html"></link>
+    <category term="aur"></category>
+    <category term="PB503"></category>
+    <content type="text">error PB503 �.install:1 install scriptlet could not be read or parsed and was not analyzed: stat �.install: invalid argument&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">creativecraft-bin 0.3.2-1 (aur): 2 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/creativecraft-bin/1792919822</id>
+    <published>2026-10-25T10:10:51Z</published>
+    <updated>2026-10-25T10:10:51Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/creativecraft-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=creativecraft-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/creativecraft-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/bhimio1/CreativeCraft/releases/download/v0.3.2/creativecraft-0.3.2-linux-aarch64.tar.gz changed (d3d4df659224… → e9406025388b…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;drift sha256 checksum for https://github.com/bhimio1/CreativeCraft/releases/download/v0.3.2/creativecraft-0.3.2-linux-x86_64.tar.gz changed (1ae7a0bf3599… → d0a65232bdf6…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">reviu-bin 1.7.0-1 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/reviu-bin/1792881305</id>
+    <published>2026-10-25T00:21:37Z</published>
+    <updated>2026-10-25T00:21:37Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/reviu-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=reviu-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/reviu-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/reviu-dev/reviu/releases/download/v1.7.0/reviu-1.7.0-linux-�.tar.gz changed (3ab369132238… → ea7312e98c1e…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">niri-pip r7.dfa79f4-1 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/niri-pip/1792857480</id>
+    <published>2026-10-24T17:00:18Z</published>
+    <updated>2026-10-24T17:00:18Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/niri-pip"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=niri-pip"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/niri-pip.html"></link>
+    <link rel="related" title="PB301" href="https://jamison.lahman.dev/pkglint/rules/PB301.html"></link>
+    <category term="aur"></category>
+    <category term="PB301"></category>
+    <content type="text">critical PB301 PKGBUILD:67 &#34;cat&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">framework-control-beta 0.5.6-5 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/framework-control-beta/1792815110</id>
+    <published>2026-10-24T04:35:30Z</published>
+    <updated>2026-10-24T04:35:30Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/framework-control-beta"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=framework-control-beta"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/framework-control-beta.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/ozturkkl/framework-control/archive/refs/tags/0.5.6.tar.gz changed (f4247a5b1466… → 8b0128882cd1…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">mixing-station 3.2.0-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/mixing-station/1792789043</id>
+    <published>2026-10-23T21:25:08Z</published>
+    <updated>2026-10-23T21:25:08Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/mixing-station"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=mixing-station"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/mixing-station.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://mixingstation.app/backend/api/web/download/archive/mixing-station-pc/update/3.2.0 changed (91d2f9270ddc… → 54952ac73f54…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">mircode-bin 1.1.0-2 (aur): 1 drift</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/mircode-bin/1792776300</id>
+    <published>2026-10-23T17:54:52Z</published>
+    <updated>2026-10-23T17:54:52Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/mircode-bin"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=mircode-bin"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/mircode-bin.html"></link>
+    <category term="aur"></category>
+    <category term="drift"></category>
+    <content type="text">drift sha256 checksum for https://github.com/LaT-SKY/MirCode/releases/download/v1.1.0/mircode-v1.1.0-linux-amd64.tar.gz changed (7a9979b6dd72… → f9e6f6267260…) while the URL stayed the same: the artifact is no longer the one previously reviewed&#xA;</content>
+  </entry>
+  <entry>
+    <title type="text">linux-cachyos-jetm 7.3.0-6 (aur): 1 critical</title>
+    <id>tag:jamison.lahman.dev,2026:pkglint/aur/linux-cachyos-jetm/1792760598</id>
+    <published>2026-10-23T13:37:44Z</published>
+    <updated>2026-10-23T13:37:44Z</updated>
+    <link rel="alternate" type="text/html" title="package" href="https://aur.archlinux.org/pkgbase/linux-cachyos-jetm"></link>
+    <link rel="related" title="PKGBUILD" href="https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=linux-cachyos-jetm"></link>
+    <link rel="related" type="text/html" title="report card" href="https://jamison.lahman.dev/pkglint/package/linux-cachyos-jetm.html"></link>
+    <link rel="related" title="PB301" href="https://jamison.lahman.dev/pkglint/rules/PB301.html"></link>
+    <category term="aur"></category>
+    <category term="PB301"></category>
+    <content type="text">critical PB301 PKGBUILD:410 &#34;_purge_fetched_patches&#34; executes at PKGBUILD top level — it runs whenever the file is sourced, even for metadata extraction&#xA;</content>
+  </entry>
+</feed>
